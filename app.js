@@ -619,42 +619,43 @@ function buildTrack(data) {
   // Dedup on RAW positions (a checkpoint often sits 2 cm from a flag), then
   // gates contribute entry/centre/exit points along their fly-through axis so
   // the curve crosses each gate perpendicular to its frame.
-  const nodes = [];
-  let lastRaw = null;
+  // Every element's stored +Z axis IS its crossing direction in VelociDrone
+  // (verified against the official posters: this is what produces the split-S
+  // loops and hook turns the editor draws). Each element contributes
+  // entry/centre/exit points along that axis — no direction guessing.
+  const pathPts = [];
+  const CROSS = 1.6;   // entry/exit helper distance (m)
+  let last = null;
   seq.forEach((g, i) => {
     const kind = kinds[i];
     if (kind === 'tool') return;
     const raw = toVec(g.trans.pos);
-    if (lastRaw && raw.distanceTo(lastRaw) < 0.5) return;
-    lastRaw = raw;
     const q = toQuat(g.trans.rot);
+    const through = new THREE.Vector3(0, 0, 1).applyQuaternion(q).normalize();
+    // skip only true duplicates (same spot, same crossing direction)
+    if (last && raw.distanceTo(last.raw) < 0.1 && through.dot(last.through) > 0.95) return;
+    last = { raw, through };
     const sy = (g.trans.scale?.[1] ?? 100) / 100;
+    let center;
     if (kind === 'flag') {
-      nodes.push({ p: raw.clone().add(new THREE.Vector3(0, 1.5, 0)) });   // past the flag ~1.5 m up
+      center = raw.clone().add(new THREE.Vector3(0, 1.5, 0));      // past the flag ~1.5 m up
     } else if (kind === 'checkpoint') {
-      // invisible squares (e.g. DefaultSquare) still have a real aperture;
-      // huge helper checkpoints (scale 10000) are just points
-      const p = sy <= 3
+      center = sy <= 3
         ? raw.clone().add(new THREE.Vector3(0, GATE_SIZE * sy / 2, 0).applyQuaternion(q))
-        : raw;
-      nodes.push({ p });
+        : raw.clone().add(new THREE.Vector3(0, 1.0, 0));           // helper poles: ~pole height
     } else {
       // aperture centre from the real model bounds when we have them
       const bb = MODELS_INDEX[g.prefab];
       const cy = bb ? (bb.min[1] + bb.max[1]) / 2 : GATE_SIZE / 2;
-      const p = raw.clone().add(new THREE.Vector3(0, cy * sy, 0).applyQuaternion(q));
-      nodes.push({ p, through: new THREE.Vector3(0, 0, 1).applyQuaternion(q) });
+      center = raw.clone().add(new THREE.Vector3(0, cy * sy, 0).applyQuaternion(q));
     }
+    pathPts.push(
+      center.clone().addScaledVector(through, -CROSS),
+      center,
+      center.clone().addScaledVector(through, CROSS),
+    );
   });
-  const pathPts = [];
-  nodes.forEach((n, i) => {
-    if (!n.through || nodes.length < 2) { pathPts.push(n.p); return; }
-    // orient the pass direction using the outgoing leg
-    const next = nodes[(i + 1) % nodes.length].p;
-    const sign = Math.sign(n.through.dot(next.clone().sub(n.p))) || 1;
-    const off = n.through.clone().multiplyScalar(1.3 * sign);
-    pathPts.push(n.p.clone().sub(off), n.p, n.p.clone().add(off));
-  });
+  pathPts.forEach(p => { p.y = Math.max(p.y, groundY + 0.35); });   // never dip underground
   if (pathPts.length >= 3) {
     const curve = new THREE.CatmullRomCurve3(pathPts, true, 'catmullrom', 0.35);
     flyPath = curve;
