@@ -1,0 +1,18 @@
+{
+  "tracks": [
+    {
+      "file": "tracks/2024-au-nats-quali.json",
+      "name": "2024 AU NATS Quali",
+      "scene": "Scene16",
+      "gates": 14,
+      "barriers": 7
+    },
+    {
+      "file": "tracks/2026-au-nats-v3-polished.json",
+      "name": "2026 AU NATS V3 Polished",
+      "scene": "Scene6",
+      "gates": 47,
+      "barriers": 298
+    }
+  ]
+}
