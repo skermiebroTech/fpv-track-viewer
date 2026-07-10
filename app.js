@@ -70,11 +70,11 @@ const COL = {
 // Renderer / scene / camera
 // ---------------------------------------------------------------------------
 const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -86,7 +86,7 @@ camera.position.set(0, 60, 60);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.08;
+controls.dampingFactor = 0.12;
 controls.maxPolarAngle = Math.PI * 0.49;
 controls.minDistance = 2;
 controls.maxDistance = 400;
@@ -95,7 +95,7 @@ scene.add(new THREE.HemisphereLight('#eafff2', '#3a7a55', 1.9));
 const sun = new THREE.DirectionalLight('#fffdf5', 2.4);
 sun.position.set(-45, 80, -30);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.bias = -0.0004;
 scene.add(sun);
 scene.add(sun.target);
@@ -593,6 +593,30 @@ function buildTrack(data) {
     }
     obj.userData.debug = debug;
     seqSelectables.push(obj);
+
+    // dive-style gates (tilted + elevated) stand on legs from all 4 frame
+    // corners down to the ground, like VelociDrone builds them
+    if (kind !== 'flag') {
+      const through = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
+      if (pos.y > groundY + 0.3 && Math.abs(through.y) > 0.5) {
+        const bb = MODELS_INDEX[g.prefab];
+        const xs = bb ? [bb.min[0], bb.max[0]] : [-GATE_SIZE / 2, GATE_SIZE / 2];
+        const ys = bb ? [bb.min[1], bb.max[1]] : [0, GATE_SIZE];
+        for (const cx of xs) for (const cy of ys) {
+          const corner = new THREE.Vector3(cx * sc[0] / 100, cy * sc[1] / 100, 0)
+            .applyQuaternion(quat).add(pos);
+          const h = corner.y - groundY;
+          if (h > 0.3) {
+            const leg = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.035, 0.035, h, 8), SHARED.poleMat);
+            leg.position.set(corner.x, groundY + h / 2, corner.z);
+            leg.castShadow = true;
+            leg.userData.debug = debug;   // clicking a leg selects its gate
+            groups.gates.add(leg);
+          }
+        }
+      }
+    }
     if (isStart) {
       // checkered marker plate on the start gate, whatever its model
       const plate = new THREE.Mesh(
@@ -624,7 +648,7 @@ function buildTrack(data) {
   // loops and hook turns the editor draws). Each element contributes
   // entry/centre/exit points along that axis — no direction guessing.
   const pathPts = [];
-  const CROSS = 1.6;   // entry/exit helper distance (m)
+  const CROSS = 2.4;   // entry/exit helper distance (m) — clearance around gate frames
   let last = null;
   seq.forEach((g, i) => {
     const kind = kinds[i];
@@ -657,7 +681,9 @@ function buildTrack(data) {
   });
   pathPts.forEach(p => { p.y = Math.max(p.y, groundY + 0.35); });   // never dip underground
   if (pathPts.length >= 3) {
-    const curve = new THREE.CatmullRomCurve3(pathPts, true, 'catmullrom', 0.35);
+    // centripetal parameterisation: no overshoot, straight through the
+    // collinear entry/centre/exit triples — flies like a drone would
+    const curve = new THREE.CatmullRomCurve3(pathPts, true, 'centripetal');
     flyPath = curve;
     flyDuration = Math.max(14, curve.getLength() / 16);  // ~16 m/s tour pace
     const div = Math.max(400, pathPts.length * 24);
@@ -1041,7 +1067,12 @@ const loadingEl = document.getElementById('loading');
 async function loadManifest() {
   try {
     const res = await fetch('tracks/manifest.json');
-    const man = await res.json();
+    let man = await res.json();
+    // unpublished tracks live in a gitignored local overlay
+    try {
+      const local = await fetch('tracks/manifest.local.json');
+      if (local.ok) man = await local.json();
+    } catch (e) { /* no local overlay */ }
     trackSelect.innerHTML = '';
     man.tracks.forEach(t => {
       const opt = document.createElement('option');
@@ -1107,8 +1138,8 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
-  updateFly(dt);
-  controls.update();
+  if (flyActive) updateFly(dt);
+  else controls.update();
   renderer.render(scene, camera);
 }
 

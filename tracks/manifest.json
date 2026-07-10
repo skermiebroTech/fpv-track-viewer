@@ -6,13 +6,6 @@
       "scene": "Scene16",
       "gates": 14,
       "barriers": 7
-    },
-    {
-      "file": "tracks/2026-au-nats-v3-polished.json",
-      "name": "2026 AU NATS V3 Polished",
-      "scene": "Scene6",
-      "gates": 47,
-      "barriers": 298
     }
   ]
 }
