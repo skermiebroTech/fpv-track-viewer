@@ -5,7 +5,8 @@ import { parseTrk, buildTrk, decryptTrk } from './trk.js?v=11';
 import { parseMrsim } from './mrsim.js';
 import { vdToMrsim, mrsimToVd, MRSIM_LOCATIONS, VD_SCENES } from './convert.js';
 import { computeRaceline, planeBasis } from './raceline.js';
-import { fetchWrLine, fetchLeaderboard, fetchFlightFor, averageLaps, parseGhostBytes } from './ghostfetch.js?v=11';
+import { fetchLeaderboard, fetchFlightFor, averageLaps, parseGhostBytes,
+  getProxyBase, setProxyBase, needsProxySetup } from './ghostfetch.js?v=12';
 
 // ===========================================================================
 // Data conventions (verified against the official 2024 AU NATS layout):
@@ -1565,11 +1566,22 @@ btnGhost.addEventListener('click', () => {
   btnGhost.classList.add('primary');
 });
 // ---- Human lines: email, live leaderboard fetch, compare, import ----------
-// All live fetches go through serve.py's same-origin /vd proxy, so the account
-// email in the request never touches a third party.
+// getLeaderBoard is fetched straight from velocidrone.com (its reply allows
+// cross-origin reads), so the leaderboard works even on GitHub Pages.
+// getFlight does not, and its request carries the account email, so it goes
+// through a trusted proxy instead: serve.py's /vd locally, or a Cloudflare
+// Worker (proxy-worker.js) when hosted — this repo's deployed instance by
+// default, overridable with your own via the field below.
 const emailInput = document.getElementById('emailInput');
 emailInput.value = localStorage.getItem('vd_email') || '';
 emailInput.addEventListener('change', () => localStorage.setItem('vd_email', emailInput.value.trim()));
+const proxyInput = document.getElementById('proxyInput');
+proxyInput.value = getProxyBase();
+proxyInput.addEventListener('change', () => { setProxyBase(proxyInput.value); proxyInput.value = getProxyBase(); });
+// the field only matters when serve.py's /vd can't exist (hosted viewer)
+if (needsProxySetup() || (proxyInput.value && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname))) {
+  proxyInput.style.display = '';
+}
 function getEmail() {
   const e = emailInput.value.trim();
   if (!e) { emailInput.focus(); throw new Error('enter your VelociDrone account email above first'); }
@@ -2183,7 +2195,11 @@ function loadCatalogue() {
   // single-flight: opening the browser while a fetch is running must not
   // start a second 500 KB download
   cataloguePromise ??= (async () => {
-    const res = await fetch(corsProxy(`${VD_API}/api/get_official_tracks`));
+    // public data, no email involved — a third-party CORS proxy is acceptable
+    // here, but prefer the user's own worker when one is configured
+    const proxy = getProxyBase();
+    const res = await fetch(proxy ? `${proxy}/get_official_tracks`
+                                  : corsProxy(`${VD_API}/api/get_official_tracks`));
     if (!res.ok) throw new Error(`catalogue unavailable (${res.status})`);
     const data = JSON.parse(decryptTrk(await res.text(), 'Bat Cave Games'));
     if (!data.success || !Array.isArray(data.tracks)) {

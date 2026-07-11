@@ -6,8 +6,11 @@
 //   getFlight       -> one pilot's recorded flight ("ghost")
 //
 // Both take a single form field  post_data = base64(AES-128-ECB("Bat Cave
-// Games", params))  and reply with the same encryption; both send
-// Access-Control-Allow-Origin: * so the browser can call them directly.
+// Games", params))  and reply with the same encryption. Replies under ~4 KB
+// carry Access-Control-Allow-Origin: * (bigger ones lose the header to a
+// server-side buffering quirk), so small paged getLeaderBoard calls work
+// directly from any origin, while getFlight — always far bigger — never
+// does, and is readable only through a proxy you own (see below).
 //
 // A flight is  base64( zlib( .NET-BinaryFormatter( List<TransformRecord> ) ) ).
 // TransformRecord = _position (WB_Vector3, Unity metres, Y-up), _quaternion,
@@ -19,26 +22,60 @@
 // ===========================================================================
 import { encryptAes, decryptTrk } from './trk.js?v=11';
 
-// Same-origin proxy provided by serve.py (browser -> your localhost ->
-// VelociDrone), so getFlight's missing CORS header and the account email in
-// post_data never touch a third party. Requires serving with serve.py.
-const API = '/vd/leaderboard';
+// getLeaderBoard is fetched straight from velocidrone.com (its paged replies
+// carry ACAO:*), so the leaderboard works on GitHub Pages with no setup.
+// getFlight's reply has no CORS header AND its post_data holds the account
+// email under a public AES key, so it must go through a proxy the user owns —
+// never a third-party CORS proxy. Two options, in order of preference:
+//   - a personal Cloudflare Worker (proxy-worker.js, pasted once) — works
+//     anywhere the viewer is hosted; URL kept in localStorage
+//   - serve.py's same-origin /vd when running the viewer locally
+const DIRECT_API = 'https://www.velocidrone.com/api/leaderboard';
+const IS_LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 const KEY = 'Bat Cave Games';
 
+// this repo's deployed instance of proxy-worker.js — the zero-setup default
+// for a hosted viewer; paste your own worker URL in the UI field to override
+const DEFAULT_PROXY = 'https://vd-proxy.skermiebro.workers.dev';
+
+export function getProxyBase() {
+  const saved = (localStorage.getItem('vd_proxy') || '').trim().replace(/\/+$/, '');
+  return saved || (IS_LOCAL ? '' : DEFAULT_PROXY);
+}
+export function setProxyBase(url) {
+  localStorage.setItem('vd_proxy', (url || '').trim().replace(/\/+$/, ''));
+}
+// true when fetching a flight would fail without the user configuring a proxy
+export const needsProxySetup = () => !IS_LOCAL && !getProxyBase();
+
+function flightBase() {
+  const proxy = getProxyBase();
+  if (proxy) return `${proxy}/leaderboard`;
+  if (IS_LOCAL) return '/vd/leaderboard';
+  throw new Error('fetching a flight from a hosted viewer needs your own proxy: ' +
+    'deploy proxy-worker.js to Cloudflare Workers (free — see README) and paste ' +
+    'its URL into the proxy field above');
+}
+
 async function apiPost(endpoint, params) {
+  const base = endpoint === 'getFlight' ? flightBase() : DIRECT_API;
   const post_data = encryptAes(new URLSearchParams(params).toString(), KEY);
   let res;
   try {
-    res = await fetch(`${API}/${endpoint}`, {
+    res = await fetch(`${base}/${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ post_data }).toString(),
     });
   } catch {
-    throw new Error('cannot reach the local proxy — serve the viewer with `python3 serve.py`');
+    throw new Error(base.startsWith('/vd')
+      ? 'cannot reach the local proxy — serve the viewer with `python3 serve.py`'
+      : `cannot reach ${base} — check the proxy URL / your connection`);
   }
   if (res.status === 404 || res.status === 405) {
-    throw new Error('live fetch needs the local proxy — serve the viewer with `python3 serve.py`');
+    throw new Error(base.startsWith('/vd')
+      ? 'live fetch needs the local proxy — serve the viewer with `python3 serve.py`'
+      : `the proxy at ${base} did not recognise the request (HTTP ${res.status}) — is it proxy-worker.js?`);
   }
   if (!res.ok) throw new Error(`${endpoint} failed (HTTP ${res.status})`);
   return JSON.parse(decryptTrk(await res.text(), KEY));
@@ -226,12 +263,23 @@ export async function parseGhostBytes(bytes) {
 }
 
 // Leaderboard entries for a (track, mode): [{ playername, lap_time, country, model_id, user_id }]
+// Paged: the API drops its Access-Control-Allow-Origin header on responses
+// over ~4 KB (server-side buffering quirk — also why getFlight, always
+// >100 KB, can never be read cross-origin), so one big request would be
+// unreadable from a hosted viewer. 15 rows ≈ 2.7 KB stays safely under.
 export async function fetchLeaderboard({ trackId, protectedValue = 1, raceMode = 6, count = 25 }) {
-  const board = await apiPost('getLeaderBoard', {
-    track_id: trackId, sim_version: '1.16', offset: 0, count,
-    protected_track_value: protectedValue, model_id: 0, race_mode: raceMode, quad_class: 0,
-  });
-  const rows = board.tracktimes || [];
+  const PAGE = 15;
+  const rows = [];
+  for (let offset = 0; offset < count; offset += PAGE) {
+    const want = Math.min(PAGE, count - offset);
+    const board = await apiPost('getLeaderBoard', {
+      track_id: trackId, sim_version: '1.16', offset, count: want,
+      protected_track_value: protectedValue, model_id: 0, race_mode: raceMode, quad_class: 0,
+    });
+    const page = board.tracktimes || [];
+    rows.push(...page);
+    if (page.length < want) break;               // end of the board
+  }
   return rows.map((r, i) => ({
     rank: i + 1, playername: (r.playername || '').trim(), lap_time: Number(r.lap_time),
     country: r.country, model_id: r.model_id, user_id: r.user_id,

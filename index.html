@@ -138,8 +138,9 @@
   #linesTools { margin-top: 12px; border-top: 2px solid var(--line); padding-top: 10px; }
   .sect { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
     color: var(--green); font-weight: 900; font-style: italic; margin-bottom: 8px; }
-  #emailInput, #selLineSrc { width: 100%; border: 2px solid var(--line); border-radius: 8px;
-    padding: 7px 9px; font-size: 12.5px; font-weight: 600; }
+  #emailInput, #proxyInput, #selLineSrc { width: 100%; border: 2px solid var(--line);
+    border-radius: 8px; padding: 7px 9px; font-size: 12.5px; font-weight: 600; }
+  #proxyInput { margin-top: 6px; }
   #selLineSrc { width: auto; cursor: pointer; background: var(--card); }
   .picker { margin-top: 8px; max-height: 168px; overflow-y: auto; }
   .picker:empty { display: none; }
@@ -260,7 +261,10 @@
   <div id="linesTools" style="display:none">
     <div class="sect">Human lines</div>
     <input id="emailInput" type="email" placeholder="VelociDrone account email"
-      title="Stored in this browser; sent only to your own local proxy for fetching flights" autocomplete="off">
+      title="Stored in this browser; sent only through your own proxy (local serve.py or your Cloudflare Worker) for fetching flights" autocomplete="off">
+    <input id="proxyInput" type="url" placeholder="Proxy URL — deploy proxy-worker.js (README)"
+      title="Fetching a flight needs a proxy you own: VelociDrone's getFlight reply blocks cross-origin reads, and a third-party proxy could read your email. Deploy proxy-worker.js to Cloudflare Workers (free) and paste its URL here."
+      autocomplete="off" style="display:none">
     <div class="btnrow">
       <button class="act" id="btnFetchWr">⤓ WR line</button>
       <button class="act" id="btnBoard">☰ Leaderboard</button>
@@ -346,6 +350,6 @@
 <!-- bump ?v= together with the importmap entries above whenever the modules
      change — plain dev servers send no cache headers and browsers happily
      serve stale modules otherwise -->
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=12"></script>
 </body>
 </html>
