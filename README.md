@@ -97,19 +97,35 @@ track), quaternion, throttle and timing.
 a small MS-NRBF reader — entirely in the browser. Two catches shape the
 setup:
 
-- `getFlight`'s POST response carries **no CORS header**, so a browser can't
-  read it cross-origin.
+- The API drops its CORS header on responses over **~4 KB**, so a browser
+  can't read a flight (always ≥100 KB) cross-origin. Small responses keep the
+  header, so the **leaderboard works from anywhere** — including GitHub
+  Pages, no setup — fetched in 15-row pages that stay under the limit.
 - `getFlight` needs your **account email** in `post_data`, and that field is
   only AES-encrypted with a *public* key — so a third-party CORS proxy could
   read it.
 
-So the live fetch goes through **`serve.py`**, which serves the viewer and
-proxies `/vd/*` to VelociDrone on the same origin. Your email travels browser
-→ your own localhost → VelociDrone, never a third party:
+So fetching a *flight* goes through a proxy **you own** — your email travels
+browser → your proxy → VelociDrone, never a third party. Two ways to have one:
 
-```bash
-python3 serve.py            # http://localhost:8099  (viewer + /vd proxy)
-```
+- **Locally**: `serve.py` serves the viewer and proxies `/vd/*` to
+  VelociDrone on the same origin:
+
+  ```bash
+  python3 serve.py            # http://localhost:8099  (viewer + /vd proxy)
+  ```
+
+- **Hosted (GitHub Pages)**: [`proxy-worker.js`](proxy-worker.js) deployed as
+  a Cloudflare Worker (free tier). The viewer defaults to this repo's
+  instance (`vd-proxy.skermiebro.workers.dev`), so the hosted site works with
+  no setup. To run your own instead — recommended if you fork this —
+  deploy it with `npx wrangler deploy proxy-worker.js --name vd-proxy`
+  (or paste the file into a new Worker at
+  [dash.cloudflare.com](https://dash.cloudflare.com)) and put the
+  `https://<name>.<account>.workers.dev` URL into the **proxy URL** field
+  under *Human lines* (shown whenever the viewer isn't on localhost,
+  remembered in the browser). The worker only forwards the same endpoints
+  serve.py allows, and nothing is logged.
 
 The button appears for tracks whose online leaderboard id is known (any track
 opened via **🌐 Browse**, plus the bundled AU NATS Quali). `getFlight` only
@@ -155,6 +171,11 @@ python3 serve.py            # viewer + /vd proxy (needed for live Fetch WR line)
    ```
 2. On GitHub: **Settings → Pages → Deploy from a branch**, pick `main` / root.
 3. Live at `https://<you>.github.io/<repo>/`. (`.nojekyll` included.)
+
+Everything works on Pages out of the box: the live leaderboard is fetched
+straight from VelociDrone, and flight lines go through the bundled proxy
+worker (see [Live fetch](#live-fetch-fetch-wr-line) — deploy your own
+instance if you fork this).
 
 ## Adding / updating tracks
 
@@ -271,6 +292,10 @@ MRSIM's native size; nets and other objects with no equivalent are skipped
 | `mrsim.js` | MRSIM `.xml` track decoder (scene-graph walker) |
 | `mrsim-lib.js` | Embedded MRSIM object library (generated) |
 | `convert.js` | VelociDrone ⇄ MRSIM track converter |
+| `ghostfetch.js` | Live leaderboard/flight fetch + ghost decoding (zlib + MS-NRBF) |
+| `serve.py` | Local dev server: static files + same-origin `/vd` proxy |
+| `proxy-worker.js` | Personal Cloudflare Worker proxy for flight fetch on a hosted viewer |
+| `ghosts/*.json` | Bundled human WR lines (`{pilot, lap_time, frames}`) |
 | `tracks/manifest.json` | Tracks shown in the dropdown |
 | `tracks/*.json` | Exported layouts (`meta` + `gates` + `barriers`) |
 | `export_tracks.py` | Export tracks from the VelociDrone user DB |
