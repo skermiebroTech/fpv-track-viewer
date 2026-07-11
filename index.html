@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>VelociDrone Track Viewer</title>
 <style>
   :root {
@@ -38,9 +38,11 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
+  html { -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--green-dark); color: var(--ink); }
+  button, select, input, .slider, .row label { touch-action: manipulation; }
   #app { position: fixed; inset: 0; }
   canvas { display: block; }
 
@@ -53,16 +55,9 @@
     border-bottom: 4px solid var(--green);
     box-shadow: 0 2px 14px rgba(10, 60, 35, 0.25);
   }
-  #header > div:nth-child(2) { min-width: 0; }
+  #header > div:first-child { min-width: 0; }
   #header h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 40vw; }
-  #badge {
-    width: 40px; height: 40px; flex: 0 0 auto; border-radius: 8px;
-    background: var(--yellow);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 900; font-style: italic; color: var(--red); font-size: 11px;
-    border: 2px solid var(--red); letter-spacing: .5px;
-  }
   #header h1 {
     font-size: 17px; margin: 0; font-weight: 900; font-style: italic;
     text-transform: uppercase; letter-spacing: .4px; color: var(--green);
@@ -90,9 +85,10 @@
   /* ---- Community track browser ---- */
   #browser {
     display: none; position: absolute; z-index: 15;
-    top: 78px; left: 50%; transform: translateX(-50%);
+    top: calc(var(--headerH, 64px) + 14px); left: 50%; transform: translateX(-50%);
     width: min(480px, calc(100vw - 32px));
-    flex-direction: column; max-height: calc(100dvh - 110px);
+    flex-direction: column;
+    max-height: calc(100dvh - var(--headerH, 64px) - 46px);
   }
   #browser.open { display: flex; }
   #browser h2 { display: flex; align-items: center; justify-content: space-between; }
@@ -130,9 +126,22 @@
     color: var(--green); margin: 0 0 10px; font-weight: 900; font-style: italic;
   }
 
+  /* Collapsible cards: click the title to minimise a menu to its title bar */
+  .card.collapsible > h2 { display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; cursor: pointer;
+    user-select: none; -webkit-user-select: none; }
+  .card.collapsible > h2 .chev { font-style: normal; font-size: 11px;
+    color: var(--muted); transition: transform .15s; }
+  .card.collapsible > h2:hover .chev { color: var(--green); }
+  .card.collapsed > h2 { margin-bottom: 0; }
+  .card.collapsed > h2 .chev { transform: rotate(-90deg); }
+  .card.collapsed > .cardBody { display: none; }
+  .card.collapsed { padding: 10px 14px; }
+  #panel.collapsed, #materials.collapsed, #legend.collapsed { width: auto; }
+
   /* Layers / actions */
-  #panel { top: 78px; left: 16px; width: 216px;
-    max-height: calc(100dvh - 100px); overflow-y: auto; }
+  #panel { top: calc(var(--headerH, 64px) + 14px); left: 16px; width: 216px;
+    max-height: calc(100dvh - var(--headerH, 64px) - 36px); overflow-y: auto; }
   .row { display: flex; align-items: center; justify-content: space-between;
     padding: 5px 0; font-size: 13px; font-weight: 600; }
   .row label { cursor: pointer; user-select: none; }
@@ -160,10 +169,15 @@
   #linesTools { margin-top: 12px; border-top: 2px solid var(--line); padding-top: 10px; }
   .sect { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
     color: var(--green); font-weight: 900; font-style: italic; margin-bottom: 8px; }
-  #emailInput, #proxyInput, #selLineSrc { width: 100%; border: 2px solid var(--line);
-    border-radius: 8px; padding: 7px 9px; font-size: 12.5px; font-weight: 600;
+  #proxyInput, #selLineSrc, #boardSearch { width: 100%;
+    border: 2px solid var(--line); border-radius: 8px; padding: 7px 9px;
+    font-size: 12.5px; font-weight: 600;
     background: var(--card); color: var(--ink); }
   #proxyInput { margin-top: 6px; }
+  #boardSearch { margin-top: 8px; }
+  #boardStatus { font-size: 11.5px; color: var(--muted); font-weight: 600;
+    padding: 5px 2px 0; }
+  #boardStatus:empty { display: none; }
   #selLineSrc { width: auto; cursor: pointer; background: var(--card); }
   .picker { margin-top: 8px; max-height: 168px; overflow-y: auto; }
   .picker:empty { display: none; }
@@ -191,7 +205,8 @@
   .gradCtl input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 
   /* Track materials card */
-  #materials { top: 78px; right: 16px; width: 220px; }
+  #materials { top: calc(var(--headerH, 64px) + 14px); right: 16px; width: 220px;
+    max-height: calc(100dvh - var(--headerH, 64px) - 36px); overflow-y: auto; }
   #materials .mi { display: flex; align-items: baseline; gap: 8px;
     font-size: 13px; font-weight: 600; padding: 3px 0; }
   #materials .mi b { color: var(--red); font-size: 15px; min-width: 26px;
@@ -202,6 +217,7 @@
 
   /* Legend */
   #legend { bottom: 16px; left: 16px; padding: 10px 14px; }
+  #legend:not(.collapsed) h2 { margin-bottom: 6px; }  /* tighter than the card default */
   #legend .li { display: flex; align-items: center; gap: 9px; padding: 2px 0;
     font-size: 12px; font-weight: 600; color: var(--ink); }
   .sw { width: 14px; height: 14px; border-radius: 3px; flex: 0 0 auto;
@@ -233,12 +249,30 @@
     border-top-color: var(--yellow); border-radius: 50%; animation: sp 0.9s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
 
+  /* ---- Small screens: compact icon header, menus start as collapsed chips ---- */
   @media (max-width: 760px) {
-    #panel { width: 180px; top: 70px; left: 10px; padding: 11px;
-      max-height: calc(100dvh - 86px); }
-    #materials, #legend, #help { display: none; }
-    #header h1 { font-size: 13px; }
+    #header { padding: 6px 10px; gap: 6px 8px; }
+    #header h1 { font-size: 13px; max-width: 56vw; }
     #header .sub { display: none; }
+    #header .btxt { display: none; }            /* icon-only buttons */
+    #trackSelect { flex: 1 1 130px; min-width: 0; margin-left: 0;
+      padding: 8px 6px; font-size: 12px; }
+    #btnTrk, #btnConvert, #btnBrowse, #btnTheme { padding: 8px 10px; }
+    #convEnv { max-width: 96px; font-size: 11px; padding: 8px 4px; }
+
+    #panel { left: 10px; width: min(300px, calc(100vw - 20px)); }
+    #materials { right: 10px; width: min(220px, calc(100vw - 20px)); }
+    #legend { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); }
+    #help { display: none; }
+    #inspector { right: 10px; bottom: max(10px, env(safe-area-inset-bottom));
+      width: min(300px, calc(100vw - 20px));
+      max-height: 50dvh; overflow-y: auto; }
+    #browser { max-height: calc(100dvh - var(--headerH, 64px) - 26px); }
+
+    /* bigger touch targets */
+    .row { padding: 7px 0; }
+    .brRow, .brdRow { padding: 10px 4px; }
+    button.act { padding: 10px 6px; }
   }
 </style>
 </head>
@@ -246,22 +280,22 @@
 <div id="app"></div>
 
 <div id="header">
-  <div id="badge">AU<br>FPV</div>
   <div>
     <h1 id="trackName">VelociDrone Track Viewer</h1>
     <div class="sub" id="trackSub">Loading…</div>
   </div>
   <select id="trackSelect"></select>
-  <button id="btnBrowse" title="Search and view official VelociDrone tracks (community index)">🌐 Browse</button>
-  <button id="btnTrk" title="View a VelociDrone .trk or MRSIM .xml track file">Open track</button>
+  <button id="btnBrowse" title="Search and view official VelociDrone tracks (community index)">🌐<span class="btxt"> Browse</span></button>
+  <button id="btnTrk" title="View a VelociDrone .trk or MRSIM .xml track file">📂<span class="btxt"> Open track</span></button>
   <select id="convEnv" title="Environment for the converted track"></select>
-  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)">⇄ Convert</button>
+  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)">⇄<span class="btxt"> Convert</span></button>
   <button id="btnTheme" title="Toggle dark mode">🌙</button>
   <input type="file" id="trkFile" accept=".trk,.xml" hidden>
 </div>
 
-<div id="panel" class="card">
+<div id="panel" class="card collapsible">
   <h2>Layers</h2>
+  <div class="cardBody">
   <div class="row"><label for="tGates">Gates</label>
     <label class="switch"><input type="checkbox" id="tGates" checked><span class="slider"></span></label></div>
   <div class="row"><label for="tFlags">Flags</label>
@@ -291,10 +325,8 @@
 
   <div id="linesTools" style="display:none">
     <div class="sect">Human lines</div>
-    <input id="emailInput" type="email" placeholder="VelociDrone account email"
-      title="Stored in this browser; sent only through your own proxy (local serve.py or your Cloudflare Worker) for fetching flights" autocomplete="off">
     <input id="proxyInput" type="url" placeholder="Proxy URL — deploy proxy-worker.js (README)"
-      title="Fetching a flight needs a proxy you own: VelociDrone's getFlight reply blocks cross-origin reads, and a third-party proxy could read your email. Deploy proxy-worker.js to Cloudflare Workers (free) and paste its URL here."
+      title="Fetching a flight needs a CORS proxy: VelociDrone's getFlight reply blocks cross-origin reads. Deploy proxy-worker.js to Cloudflare Workers (free) and paste its URL here."
       autocomplete="off" style="display:none">
     <div class="btnrow">
       <button class="act" id="btnFetchWr">⤓ WR line</button>
@@ -304,7 +336,12 @@
       <button class="act" id="btnImportGhost">📁 Import .ghost</button>
     </div>
     <input id="ghostImport" type="file" accept=".ghost,.bin,.b64" style="display:none">
-    <div id="boardList" class="picker" style="display:none"></div>
+    <div id="boardBox" style="display:none">
+      <input id="boardSearch" type="search" placeholder="Search pilot name… ⏎"
+        title="Find a pilot who isn't in the top 25 — scans down the leaderboard for the name; empty search shows the top 25 again">
+      <div id="boardStatus"></div>
+      <div id="boardList" class="picker"></div>
+    </div>
     <div id="linesList" class="picker"></div>
     <div class="row" id="rowGrad">
       <label for="tGrad" title="Colour the loaded lines by lap time along a fast → slow gradient">Colour by time</label>
@@ -323,21 +360,24 @@
       </select>
     </div>
   </div>
+  </div>
 </div>
 
-<div id="materials" class="card">
+<div id="materials" class="card collapsible">
   <h2>Track Materials</h2>
-  <div id="matList"></div>
+  <div class="cardBody"><div id="matList"></div></div>
 </div>
 
-<div id="legend" class="card">
-  <h2 style="margin-bottom:6px">Legend</h2>
+<div id="legend" class="card collapsible">
+  <h2>Legend</h2>
+  <div class="cardBody">
   <div class="li"><span class="sw" style="background:#fff"></span> Race gate (2 m)</div>
   <div class="li"><span class="sw" style="background:var(--red)"></span> Dive gate / accents</div>
   <div class="li"><span class="sw" style="background:var(--khaki)"></span> Racing line (est.)</div>
   <div class="li" id="legGhost" style="display:none"><span class="sw" style="background:#19e0ff"></span> Human line (world record)</div>
   <div class="li"><span class="sw" style="background:repeating-linear-gradient(90deg,#ffd83d 0 6px,transparent 6px 10px)"></span> Ground trace</div>
   <div class="li"><span class="sw" style="background:repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0/8px 8px"></span> Start / finish</div>
+  </div>
 </div>
 
 <div id="help">
@@ -372,7 +412,7 @@
   </div>
 </div>
 
-<div id="loading"><div class="spin"></div><div>Loading track…</div></div>
+<div id="loading"><div class="spin"></div><div id="loadingMsg">Loading…</div></div>
 
 <script>
   // set the theme before first paint: saved choice wins, else follow the OS
@@ -382,6 +422,23 @@
       : matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   })();
+  // pit-lane loading banter — shared with app.js, which re-rolls on every load
+  window.__loadingPhrase = () => {
+    const P = [
+      'Checking the wires',
+      'You should probably lower your throttle cap',
+      'ELRS on top!',
+      'Hurry up {pilot}!',
+      'Starting on the tone in less than 5',
+      'Waiting for packs to charge',
+      'Mowing the lawn',
+      'Drift lawnmower!',
+    ];
+    const pilot = (localStorage.getItem('vd_email') || '').split('@')[0].trim() || 'pilot';
+    // function replacement: a '$' in the email prefix must not be a $-pattern
+    return P[Math.floor(Math.random() * P.length)].replace('{pilot}', () => pilot);
+  };
+  document.getElementById('loadingMsg').textContent = window.__loadingPhrase();
 </script>
 
 <script type="importmap">
@@ -400,6 +457,6 @@
 <!-- bump ?v= together with the importmap entries above whenever the modules
      change — plain dev servers send no cache headers and browsers happily
      serve stale modules otherwise -->
-<script type="module" src="app.js?v=14"></script>
+<script type="module" src="app.js?v=16"></script>
 </body>
 </html>

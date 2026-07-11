@@ -10,23 +10,23 @@
 // carry Access-Control-Allow-Origin: * (bigger ones lose the header to a
 // server-side buffering quirk), so small paged getLeaderBoard calls work
 // directly from any origin, while getFlight — always far bigger — never
-// does, and is readable only through a proxy you own (see below).
+// does, and is readable only through a CORS proxy (see below).
 //
 // A flight is  base64( zlib( .NET-BinaryFormatter( List<TransformRecord> ) ) ).
 // TransformRecord = _position (WB_Vector3, Unity metres, Y-up), _quaternion,
 // time (seconds), throttle… — decoded here into { pilot, lap_time, frames }.
 //
-// getFlight only returns a flight for a (track, race_mode) the calling account
-// has its own leaderboard time on (same rule as in-game Nemesis), so it needs
-// the account email and a track you have flown.
+// getFlight replies with success:false when the calling account has no
+// leaderboard time on the (track, race_mode) — but usually still includes the
+// requested flight, so we use whatever flight records come back regardless.
 // ===========================================================================
 import { encryptAes, decryptTrk } from './trk.js?v=11';
 
 // getLeaderBoard is fetched straight from velocidrone.com (its paged replies
 // carry ACAO:*), so the leaderboard works on GitHub Pages with no setup.
-// getFlight's reply has no CORS header AND its post_data holds the account
-// email under a public AES key, so it must go through a proxy the user owns —
-// never a third-party CORS proxy. Two options, in order of preference:
+// getFlight's reply has no CORS header, so a browser can only read it through
+// a proxy (the request carries no account data). Two options, in order of
+// preference:
 //   - a personal Cloudflare Worker (proxy-worker.js, pasted once) — works
 //     anywhere the viewer is hosted; URL kept in localStorage
 //   - serve.py's same-origin /vd when running the viewer locally
@@ -286,8 +286,49 @@ export async function fetchLeaderboard({ trackId, protectedValue = 1, raceMode =
   }));
 }
 
+// Find pilots by name anywhere on the board, not just the top rows. The API
+// has no server-side name filter, so this scans down the leaderboard in the
+// same CORS-safe 15-row pages (a few in flight at a time) until it reaches
+// maxRows or the end of the board — stopping early on an exact name match.
+// onProgress(rowsScanned, matches) fires per batch; return false to cancel.
+// Returns { matches: [{rank, playername, lap_time, …}], scanned, complete }.
+export async function searchLeaderboard({ trackId, protectedValue = 1, raceMode = 6,
+                                          query, maxRows = 750, onProgress }) {
+  const PAGE = 15, BATCH = 5;                    // 5 concurrent pages = 75 rows/batch
+  const q = query.trim().toLowerCase();
+  const matches = [];
+  let scanned = 0;
+  for (let base = 0; base < maxRows; base += PAGE * BATCH) {
+    const offsets = [];
+    for (let o = base; o < Math.min(base + PAGE * BATCH, maxRows); o += PAGE) offsets.push(o);
+    const pages = await Promise.all(offsets.map(offset =>
+      apiPost('getLeaderBoard', {
+        track_id: trackId, sim_version: '1.16', offset, count: PAGE,
+        protected_track_value: protectedValue, model_id: 0, race_mode: raceMode, quad_class: 0,
+      }).then(b => b.tracktimes || [])));
+    let ended = false;
+    pages.forEach((page, pi) => {
+      page.forEach((r, i) => {
+        const name = (r.playername || '').trim();
+        if (name.toLowerCase().includes(q)) {
+          matches.push({ rank: offsets[pi] + i + 1, playername: name,
+            lap_time: Number(r.lap_time), country: r.country,
+            model_id: r.model_id, user_id: r.user_id });
+        }
+      });
+      if (page.length) scanned = offsets[pi] + page.length;
+      if (page.length < PAGE) ended = true;      // ran off the end of the board
+    });
+    if (ended) return { matches, scanned, complete: true };
+    if (onProgress?.(scanned, matches) === false) return { matches, scanned, complete: false };
+    if (matches.some(m => m.playername.toLowerCase() === q)) break;  // exact hit — done
+  }
+  return { matches, scanned, complete: false };
+}
+
 // Fetch + decode one pilot's flight. Returns { pilot, lap_time, frames }.
-export async function fetchFlightFor({ email, trackId, protectedValue = 1, raceMode = 6, playername, lapTime }) {
+// email_address is accepted but never validated by the API, so we send none.
+export async function fetchFlightFor({ email = '', trackId, protectedValue = 1, raceMode = 6, playername, lapTime }) {
   const resp = await apiPost('getFlight', {
     email_address: email, track_id: trackId, lap_time: lapTime,
     race_mode: raceMode, protected_track_value: protectedValue,
@@ -295,17 +336,19 @@ export async function fetchFlightFor({ email, trackId, protectedValue = 1, raceM
   });
   const all = [...(resp.flights?.faster || []), ...(resp.flights?.user || []), ...(resp.flights?.slower || [])];
   const rec = all.find(r => (r.playername || '').trim() === playername && r.flight) || all.find(r => r.flight);
-  if (!resp.success || !rec) {
+  // success:false just means the calling account has no time on this track —
+  // the reply often still carries the requested flight, so only fail without one
+  if (!rec) {
     throw new Error(`no ghost for ${playername} — you must have your own ${raceMode === 3 ? 'single' : '3'}-lap time on this track first`);
   }
   return { pilot: (rec.playername || '').trim(), lap_time: Number(rec.lap_time), frames: await decodeFlight(rec.flight) };
 }
 
 // Fetch + decode the #1 world-record line (thin wrapper over the above).
-export async function fetchWrLine({ email, trackId, protectedValue = 1, raceMode = 6 }) {
+export async function fetchWrLine({ trackId, protectedValue = 1, raceMode = 6 }) {
   const board = await fetchLeaderboard({ trackId, protectedValue, raceMode, count: 1 });
   if (!board.length) throw new Error('no leaderboard times for this track / mode');
-  return fetchFlightFor({ email, trackId, protectedValue, raceMode, playername: board[0].playername, lapTime: board[0].lap_time });
+  return fetchFlightFor({ trackId, protectedValue, raceMode, playername: board[0].playername, lapTime: board[0].lap_time });
 }
 
 // ---- lap averaging ---------------------------------------------------------

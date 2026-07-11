@@ -5,10 +5,8 @@ Local dev server for the track viewer: serves the static files AND proxies
 
 Why the proxy: the live "Fetch WR line" feature calls the leaderboard API,
 whose `getFlight` response carries no CORS header, so a browser can't read it
-directly. Routing through a *third-party* CORS proxy would expose the request
-(the account email inside `post_data` is only AES-encrypted with a public key),
-so instead we forward it here — the request goes browser -> your own localhost
--> VelociDrone, never a third party.
+directly. Forwarding it here on the same origin sidesteps that — the request
+goes browser -> localhost -> VelociDrone (it carries no account data).
 
     python3 serve.py            # http://localhost:8099
     PORT=9000 python3 serve.py

@@ -1,13 +1,16 @@
 # VelociDrone Track Viewer
 
-A static, browser-based 3D viewer for [VelociDrone](https://www.velocidrone.com/) race
-tracks, built with [Three.js](https://threejs.org/) and hosted on **GitHub Pages**.
+A static, browser-based 3D viewer compatible with
+[VelociDrone](https://www.velocidrone.com/) and
+[MRSIM](https://store.steampowered.com/app/2338080/MRSIM/) tracks, built with
+[Three.js](https://threejs.org/) and hosted on **GitHub Pages**.
 Styled after the official AUFPV / Mission Foods Australian Drone Nationals track
 posters: green grid mat (1 m / 5 m lines), khaki racing line, white Mission gates,
 feather flags and a checkered start.
 
 Included tracks: **2024 AU NATS Quali** (6 gates, 6 flags, 1 elevated dive gate —
-validated against the official 2D layout poster) and **2026 AU NATS V3 Polished**.
+validated against the official 2D layout poster) and
+**2022 Mission Foods Australian Drone Nationals**.
 
 ## Features
 
@@ -16,9 +19,8 @@ validated against the official 2D layout poster) and **2026 AU NATS V3 Polished*
 - Race gates as 2 m square frames (white; dive gates red with yellow tips),
   flags as printed feather flags, checkered start/finish with crossed flags
   and a yellow direction arrow
-- Optimised racing line through every gate aperture (TOGT-inspired, see
-  [Racing line](#racing-line)) with an estimated race-pace lap time, plus a
-  flat ground projection to read altitude
+- Optimised racing line through every gate aperture with an estimated
+  race-pace lap time, plus a flat ground projection to read altitude
 - **Fly lap** — camera flight along the racing line that brakes into corners
   and sprints the straights, following the optimiser's speed profile
 - Layer toggles: gates, flags, sequence numbers, racing line, scenery,
@@ -26,6 +28,10 @@ validated against the official 2D layout poster) and **2026 AU NATS V3 Polished*
 - Track materials card (poster style): gate/flag/dive counts, lap length,
   course area, max altitude
 - Multiple tracks via a dropdown (driven by `tracks/manifest.json`)
+- Collapsible menus — click a card title (Layers / Track Materials / Legend)
+  to minimise it to its title bar; the choice is remembered. On phones and
+  other small screens the menus start minimised, the header switches to
+  compact icon buttons, and touch targets are enlarged.
 - **Open track** — view any VelociDrone `.trk` track file or MRSIM `.xml`
   track (header button or drag-and-drop it onto the page). Files are decoded
   entirely in the browser; nothing is uploaded anywhere.
@@ -39,43 +45,6 @@ validated against the official 2D layout poster) and **2026 AU NATS V3 Polished*
   in-game) or VelociDrone → MRSIM `.xml`. The environment selector next to
   the button picks the target scene (Empty Scene Day/Night… for VD; Empty
   Grass World / Baylands Park / Hardesty BMX for MRSIM).
-
-## Racing line
-
-The racing line is generated with the method of the
-**[TOGT-Planner](https://github.com/FSC-Lab/TOGT-Planner)** by
-[FSC-Lab](https://github.com/FSC-Lab) (Flight Systems & Control Lab,
-University of Toronto) — credit to them for the key idea:
-
-> Chao Qin, Maxime S.J. Michet, Jingxiang Chen, Hugh H.-T. Liu,
-> *"Time-Optimal Gate-Traversing Planner for Autonomous Drone Racing"*,
-> IEEE International Conference on Robotics and Automation (ICRA), 2024.
-
-Instead of forcing the line through gate centres, each gate is treated as a
-**crossing region**: the crossing point is a free variable inside the gate's
-aperture, kept there by a tanh map (as in TOGT's gate-region
-parameterisation) and optimised **jointly** with the rest of the trajectory
-against a lap-time objective. That is what makes the line cut to the inside
-edge of gates on turns and straighten S-sections, like a real race line.
-
-`raceline.js` is an independent JavaScript re-implementation of that idea,
-simplified so it runs client-side in milliseconds (their C++/Eigen planner
-can't run on a static page): the trajectory is a dense polyline rather than
-MINCO polynomials, lap time is estimated with a curvature-limited speed
-model `v = min(v_max, √(a_lat/κ))` instead of full quadrotor dynamics, and
-optimisation is Adam with local finite-difference gradients instead of
-L-BFGS with analytic gradients. The pre-optimisation line (perpendicular
-centre crossings) seeds the optimiser and remains as a fallback. The same
-speed profile drives the fly-lap pacing and the "est. race pace" readout —
-treat that number as a time-optimal bound, not a human lap prediction.
-
-Its parameters (`DEFAULTS` in `raceline.js`, overridable at runtime via
-`globalThis.__RL`) are calibrated so the generated line tracks real human
-world-record flights: a moderate lateral-acceleration limit gives the wide,
-flowing arcs a pilot actually flies, and the gate entry/exit helpers are
-vertically damped so steeply-tilted dive gates don't balloon the line above
-the course. Against the bundled WR lines it sits ~1.5 m (2024 AU NATS Quali)
-to ~2.3 m (2022 Mission Foods) from the human line on average.
 
 ## Human world-record line
 
@@ -94,19 +63,15 @@ track), quaternion, throttle and timing.
 
 `getLeaderBoard` / `getFlight` take a single AES-encrypted `post_data` field
 (key seed `Bat Cave Games`) and `ghostfetch.js` decodes the reply — zlib +
-a small MS-NRBF reader — entirely in the browser. Two catches shape the
-setup:
+a small MS-NRBF reader — entirely in the browser.
 
-- The API drops its CORS header on responses over **~4 KB**, so a browser
-  can't read a flight (always ≥100 KB) cross-origin. Small responses keep the
-  header, so the **leaderboard works from anywhere** — including GitHub
-  Pages, no setup — fetched in 15-row pages that stay under the limit.
-- `getFlight` needs your **account email** in `post_data`, and that field is
-  only AES-encrypted with a *public* key — so a third-party CORS proxy could
-  read it.
-
-So fetching a *flight* goes through a proxy **you own** — your email travels
-browser → your proxy → VelociDrone, never a third party. Two ways to have one:
+One catch shapes the setup: the API drops its CORS header on responses over
+**~4 KB**, so a browser can't read a flight (always ≥100 KB) cross-origin.
+Small responses keep the header, so the **leaderboard works from anywhere** —
+including GitHub Pages, no setup — fetched in 15-row pages that stay under
+the limit. Fetching a *flight* therefore goes through a CORS proxy (the
+request carries no account data — no email or login is needed). Two ways to
+have one:
 
 - **Locally**: `serve.py` serves the viewer and proxies `/vd/*` to
   VelociDrone on the same origin:
@@ -128,10 +93,8 @@ browser → your proxy → VelociDrone, never a third party. Two ways to have on
   serve.py allows, and nothing is logged.
 
 The button appears for tracks whose online leaderboard id is known (any track
-opened via **🌐 Browse**, plus the bundled AU NATS Quali). `getFlight` only
-returns a flight for a `(track, race_mode)` **you have your own leaderboard
-time on** — the same rule as in-game Nemesis — so it works for tracks you've
-flown. `protected_track_value` is 1 for official tracks, 2 for user tracks.
+opened via **🌐 Browse**, plus the bundled AU NATS Quali).
+`protected_track_value` is 1 for official tracks, 2 for user tracks.
 
 ### Offline (bundled / captured)
 

@@ -5,8 +5,8 @@ import { parseTrk, buildTrk, decryptTrk } from './trk.js?v=11';
 import { parseMrsim } from './mrsim.js';
 import { vdToMrsim, mrsimToVd, MRSIM_LOCATIONS, VD_SCENES } from './convert.js';
 import { computeRaceline, planeBasis } from './raceline.js';
-import { fetchLeaderboard, fetchFlightFor, averageLaps, parseGhostBytes,
-  getProxyBase, setProxyBase, needsProxySetup } from './ghostfetch.js?v=12';
+import { fetchLeaderboard, searchLeaderboard, fetchFlightFor, averageLaps,
+  parseGhostBytes, getProxyBase, setProxyBase, needsProxySetup } from './ghostfetch.js?v=13';
 
 // ===========================================================================
 // Data conventions (verified against the official 2024 AU NATS layout):
@@ -191,6 +191,39 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
   if (!localStorage.getItem('vd_theme')) setTheme(e.matches, false);
 });
 setTheme(isDark(), false);   // sync scene + button with the pre-paint choice
+
+// ---------------------------------------------------------------------------
+// UI chrome: header-height CSS var + collapsible menu cards
+// ---------------------------------------------------------------------------
+// The header wraps to 2-3 rows on narrow screens, so the cards can't hang off
+// a hard-coded top offset — publish the real height as --headerH instead.
+const headerEl = document.getElementById('header');
+function publishHeaderHeight() {
+  document.documentElement.style.setProperty('--headerH', `${headerEl.offsetHeight}px`);
+}
+new ResizeObserver(publishHeaderHeight).observe(headerEl);
+// RO callbacks are part of the render pipeline and stall in hidden tabs —
+// the resize event still fires there, so cover both
+window.addEventListener('resize', publishHeaderHeight);
+publishHeaderHeight();
+
+// Menus minimise to their title bar. Desktop starts open, small screens start
+// collapsed (the panel would otherwise bury the track); a manual choice is
+// remembered per card.
+const smallScreen = matchMedia('(max-width: 760px)');
+document.querySelectorAll('.card.collapsible').forEach(card => {
+  const h2 = card.querySelector('h2');
+  const chev = document.createElement('span');
+  chev.className = 'chev';
+  chev.textContent = '▼';
+  h2.appendChild(chev);
+  const key = `vd_fold_${card.id}`;
+  const saved = localStorage.getItem(key);
+  card.classList.toggle('collapsed', saved !== null ? saved === '1' : smallScreen.matches);
+  h2.addEventListener('click', () => {
+    localStorage.setItem(key, card.classList.toggle('collapsed') ? '1' : '0');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Conversions
@@ -1654,28 +1687,18 @@ btnGhost.addEventListener('click', () => {
   btnGhost.textContent = '■ Stop';
   btnGhost.classList.add('primary');
 });
-// ---- Human lines: email, live leaderboard fetch, compare, import ----------
+// ---- Human lines: live leaderboard fetch, compare, import -----------------
 // getLeaderBoard is fetched straight from velocidrone.com (its reply allows
 // cross-origin reads), so the leaderboard works even on GitHub Pages.
-// getFlight does not, and its request carries the account email, so it goes
-// through a trusted proxy instead: serve.py's /vd locally, or a Cloudflare
-// Worker (proxy-worker.js) when hosted — this repo's deployed instance by
-// default, overridable with your own via the field below.
-const emailInput = document.getElementById('emailInput');
-emailInput.value = localStorage.getItem('vd_email') || '';
-emailInput.addEventListener('change', () => localStorage.setItem('vd_email', emailInput.value.trim()));
+// getFlight does not, so it goes through a CORS proxy instead: serve.py's /vd
+// locally, or a Cloudflare Worker (proxy-worker.js) when hosted — this repo's
+// deployed instance by default, overridable with your own via the field below.
 const proxyInput = document.getElementById('proxyInput');
 proxyInput.value = getProxyBase();
 proxyInput.addEventListener('change', () => { setProxyBase(proxyInput.value); proxyInput.value = getProxyBase(); });
 // the field only matters when serve.py's /vd can't exist (hosted viewer)
 if (needsProxySetup() || (proxyInput.value && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname))) {
   proxyInput.style.display = '';
-}
-function getEmail() {
-  const e = emailInput.value.trim();
-  if (!e) { emailInput.focus(); throw new Error('enter your VelociDrone account email above first'); }
-  localStorage.setItem('vd_email', e);
-  return e;
 }
 const withBusy = async (btn, fn) => {
   const orig = btn.textContent; btn.disabled = true; btn.textContent = '…';
@@ -1703,9 +1726,8 @@ function refreshLinesUI() {
 
 async function addPilotLine(entry, isWr) {
   const t = resolveOnlineTrack(currentTrack?.meta);
-  const email = getEmail();
   const flight = await fetchFlightFor({
-    email, trackId: t.trackId, protectedValue: t.protectedValue, raceMode: t.raceMode,
+    trackId: t.trackId, protectedValue: t.protectedValue, raceMode: t.raceMode,
     playername: entry.playername, lapTime: entry.lap_time,
   });
   const dup = humanLines.find(l => l.pilot === flight.pilot);
@@ -1728,26 +1750,101 @@ btnFetchWr.addEventListener('click', () => withBusy(btnFetchWr, async () => {
 
 // leaderboard picker: fetch the top times, click one to add that pilot's line
 const btnBoard = document.getElementById('btnBoard');
+const boardBox = document.getElementById('boardBox');
 const boardList = document.getElementById('boardList');
+const boardSearch = document.getElementById('boardSearch');
+const boardStatus = document.getElementById('boardStatus');
+
+const escHtml = s => s.replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// pilots whose flight is being fetched right now — kept outside the DOM
+// because a progress re-render replaces the rows (and their busy class)
+const busyPilots = new Set();
+function renderBoard(rows) {
+  boardList.innerHTML = rows.map(e =>
+    `<div class="brdRow" data-name="${encodeURIComponent(e.playername)}" data-time="${e.lap_time}" data-rank="${e.rank}">` +
+    `<b>${e.rank}</b><span class="nm">${escHtml(e.playername)}</span><span class="tm">${e.lap_time.toFixed(3)}s</span></div>`).join('');
+  boardList.querySelectorAll('.brdRow').forEach(row => {
+    const name = decodeURIComponent(row.dataset.name);
+    if (busyPilots.has(name)) row.classList.add('busy');
+    row.addEventListener('click', async () => {
+      if (busyPilots.has(name)) return;
+      busyPilots.add(name);
+      row.classList.add('busy');
+      try {
+        await addPilotLine({ playername: name, lap_time: +row.dataset.time }, +row.dataset.rank === 1);
+      } catch (e) { alert(e.message); }
+      finally {
+        busyPilots.delete(name);
+        // the clicked row may have been replaced by a re-render meanwhile
+        boardList.querySelector(`.brdRow[data-name="${CSS.escape(row.dataset.name)}"]`)
+          ?.classList.remove('busy');
+      }
+    });
+  });
+}
+
+// a new track invalidates the open board: cancel any scan, drop stale rows
+function resetBoardUI() {
+  boardSearchGen++;
+  boardBox.style.display = 'none';
+  boardList.innerHTML = '';
+  boardStatus.textContent = '';
+  boardSearch.value = '';
+}
+
 btnBoard.addEventListener('click', () => withBusy(btnBoard, async () => {
   const t = resolveOnlineTrack(currentTrack?.meta);
   if (!t) return;
+  boardSearchGen++;                 // opening the board supersedes a running scan
+  boardSearch.value = '';
   const board = await fetchLeaderboard({ trackId: t.trackId, protectedValue: t.protectedValue, raceMode: t.raceMode, count: 25 });
-  boardList.style.display = '';
-  boardList.innerHTML = board.map(e =>
-    `<div class="brdRow" data-name="${encodeURIComponent(e.playername)}" data-time="${e.lap_time}">` +
-    `<b>${e.rank}</b><span class="nm">${e.playername}</span><span class="tm">${e.lap_time.toFixed(3)}s</span></div>`).join('');
-  boardList.querySelectorAll('.brdRow').forEach((row, i) => {
-    row.addEventListener('click', async () => {
-      if (row.classList.contains('busy')) return;
-      row.classList.add('busy');
-      try {
-        await addPilotLine({ playername: decodeURIComponent(row.dataset.name), lap_time: +row.dataset.time }, i === 0);
-      } catch (e) { alert(e.message); }
-      finally { row.classList.remove('busy'); }
-    });
-  });
+  boardBox.style.display = '';
+  boardStatus.textContent = '';
+  renderBoard(board);
 }));
+
+// pilot search: not everyone is in the top 25 — scan down the board for a name
+// (Enter to search, clear + Enter to go back to the top 25). A newer search,
+// opening the board afresh or switching track cancels the scan via the gen
+// guard in onProgress.
+let boardSearchGen = 0;
+boardSearch.addEventListener('keydown', async e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  const t = resolveOnlineTrack(currentTrack?.meta);
+  if (!t) { boardStatus.textContent = 'No online leaderboard for this track.'; return; }
+  const gen = ++boardSearchGen;
+  const q = boardSearch.value.trim();
+  try {
+    if (!q) {
+      const board = await fetchLeaderboard({ trackId: t.trackId, protectedValue: t.protectedValue, raceMode: t.raceMode, count: 25 });
+      if (gen !== boardSearchGen) return;
+      boardStatus.textContent = '';
+      renderBoard(board);
+      return;
+    }
+    boardList.innerHTML = '';
+    boardStatus.textContent = 'Searching…';
+    const { matches, scanned, complete } = await searchLeaderboard({
+      trackId: t.trackId, protectedValue: t.protectedValue, raceMode: t.raceMode, query: q,
+      onProgress: (rows, found) => {
+        if (gen !== boardSearchGen) return false;   // superseded — stop scanning
+        boardStatus.textContent = `Searching… ${rows} times scanned`;
+        renderBoard(found);
+        return true;
+      },
+    });
+    if (gen !== boardSearchGen) return;
+    renderBoard(matches);
+    boardStatus.textContent = matches.length
+      ? `${matches.length} match${matches.length === 1 ? '' : 'es'} in the top ${scanned}`
+      : `No “${q}” in the top ${scanned}` +
+        (complete ? ' (searched the whole board)' : ' — only the top 750 are scanned');
+  } catch (err) {
+    if (gen === boardSearchGen) boardStatus.textContent = err.message;
+  }
+});
 
 // import a .ghost file (or exported flight) and draw it as a human line
 const ghostImport = document.getElementById('ghostImport');
@@ -1839,6 +1936,11 @@ const inspectorEl = document.getElementById('inspector');
 const insBody = document.getElementById('insBody');
 const insTitle = document.getElementById('insTitle');
 const helpEl = document.getElementById('help');
+// touch devices: mouse-centric hints (right-drag, scroll, file drop) don't apply
+if (helpEl && matchMedia('(pointer: coarse)').matches) {
+  helpEl.innerHTML = '<b>Drag</b> rotate · <b>Pinch</b> zoom · <b>Two-finger drag</b> pan<br>' +
+    '<b>Tap</b> any object to inspect it';
+}
 let highlight = null;
 let currentDebug = null;
 
@@ -2054,6 +2156,7 @@ function setTrackInfo(name, sub, items) {
     (ghostMeta ? `<div class="mi small" style="color:#0b7c8c"><b>${ghostMeta.lap_time.toFixed(2)} s</b> WR — ${ghostMeta.pilot}</div>` : '') +
     `<div class="mi small"><b>${size.x.toFixed(0)}×${size.z.toFixed(0)} m</b> course area</div>` +
     `<div class="mi small"><b>${size.y.toFixed(1)} m</b> max altitude</div>`;
+  publishHeaderHeight();   // new title/selects can rewrap the header
 }
 
 let currentTrack = null;   // whatever presentTrack last displayed (for convert)
@@ -2077,6 +2180,7 @@ async function presentTrack(data, gen) {
     throw new Error('track file has no gates list');
   }
   currentTrack = data;
+  resetBoardUI();   // the open leaderboard (and any running scan) is stale now
   populateEnvSelector(data.format);
   if (data.format === 'mrsim') {
     const counts = buildTrackMrsim(data);
@@ -2130,6 +2234,10 @@ async function presentTrack(data, gen) {
 let loadGen = 0;
 async function runLoad(job, failMsg) {
   const gen = ++loadGen;
+  // fresh pit-lane banter every load (phrase list lives in index.html so the
+  // very first paint shows one too)
+  const msg = document.getElementById('loadingMsg');
+  if (msg && window.__loadingPhrase) msg.textContent = window.__loadingPhrase();
   loadingEl.style.display = 'flex';
   try {
     const data = await job();
@@ -2425,7 +2533,7 @@ window.addEventListener('resize', () => {
     await loadTrack(tracks[0].file);
   } else {
     loadingEl.querySelector('.spin')?.remove();   // stop the spinner on fatal errors
-    loadingEl.querySelector('div:last-child').textContent =
+    document.getElementById('loadingMsg').textContent =
       'No tracks found — check tracks/manifest.json (must be served over HTTP).';
   }
 })();

@@ -4,10 +4,8 @@
 //
 // Why it exists: VelociDrone's `getFlight` response carries no
 // Access-Control-Allow-Origin header, so a browser on GitHub Pages can never
-// read it directly. And its request holds your account email AES-encrypted
-// with a *public* key, so routing through a third-party CORS proxy would
-// expose it. This worker is the fix you own: browser -> your worker ->
-// VelociDrone, nobody else in the path.
+// read it directly. This worker adds the header: browser -> your worker ->
+// VelociDrone (the request carries no account data).
 //
 // Deploy (once, free tier is plenty):
 //   1. https://dash.cloudflare.com -> Workers & Pages -> Create -> Worker
