@@ -28,11 +28,15 @@
   /* ---- Header : white bar, green italic race-poster title ---- */
   #header {
     position: absolute; top: 0; left: 0; right: 0; z-index: 10;
-    display: flex; align-items: center; gap: 18px; padding: 10px 20px;
+    display: flex; align-items: center; flex-wrap: wrap;
+    gap: 8px 14px; padding: 8px 20px;
     background: var(--card);
     border-bottom: 4px solid var(--green);
     box-shadow: 0 2px 14px rgba(10, 60, 35, 0.25);
   }
+  #header > div:nth-child(2) { min-width: 0; }
+  #header h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 40vw; }
   #badge {
     width: 40px; height: 40px; flex: 0 0 auto; border-radius: 8px;
     background: var(--yellow);
@@ -50,6 +54,48 @@
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
+  #btnTrk, #btnConvert, #btnBrowse {
+    flex: 0 0 auto; background: var(--green); color: #fff;
+    border: 2px solid var(--green); border-radius: 8px;
+    padding: 7px 12px; font-size: 13px; font-weight: 800; cursor: pointer;
+  }
+  #btnConvert, #btnBrowse { background: var(--card); color: var(--green); }
+  #btnTrk:hover, #btnConvert:hover, #btnBrowse:hover { filter: brightness(1.12); }
+  #convEnv {
+    flex: 0 0 auto; max-width: 170px; background: var(--card); color: var(--ink);
+    border: 2px solid var(--line); border-radius: 8px;
+    padding: 7px 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+
+  /* ---- Community track browser ---- */
+  #browser {
+    display: none; position: absolute; z-index: 15;
+    top: 78px; left: 50%; transform: translateX(-50%);
+    width: min(480px, calc(100vw - 32px));
+    flex-direction: column; max-height: calc(100dvh - 110px);
+  }
+  #browser.open { display: flex; }
+  #browser h2 { display: flex; align-items: center; justify-content: space-between; }
+  #brClose { border: none; background: none; color: var(--muted); font-size: 18px;
+    cursor: pointer; line-height: 1; padding: 0 2px; font-weight: 700; }
+  #brClose:hover { color: var(--red); }
+  #brBar { display: flex; gap: 8px; margin-bottom: 10px; }
+  #brSearch { flex: 1; border: 2px solid var(--line); border-radius: 8px;
+    padding: 7px 10px; font-size: 13px; font-weight: 600; min-width: 0; }
+  #brSort { border: 2px solid var(--line); border-radius: 8px; padding: 7px 6px;
+    font-size: 12px; font-weight: 600; background: var(--card); cursor: pointer; }
+  #brList { overflow-y: auto; flex: 1; border-top: 2px solid var(--line); }
+  .brRow { display: flex; align-items: baseline; gap: 8px; padding: 7px 4px;
+    border-bottom: 1px dashed var(--line); font-size: 13px; cursor: pointer; }
+  .brRow:hover { background: #eaf5ee; }
+  .brRow b { font-weight: 700; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .brRow .scene { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  .brRow .stars { color: var(--yellow); font-size: 11.5px; font-weight: 800;
+    white-space: nowrap; }
+  #brStatus { font-size: 12px; color: var(--muted); font-weight: 600;
+    padding: 8px 2px 0; }
+  #brMore { margin-top: 8px; }
 
   /* ---- Cards ---- */
   .card {
@@ -86,6 +132,32 @@
   button.act:hover { background: #eaf5ee; }
   button.act.primary { background: var(--red); border-color: var(--red); color: #fff; }
   button.act.primary:hover { filter: brightness(1.1); }
+  button.act:disabled { opacity: .55; cursor: default; }
+
+  /* Human-lines tools */
+  #linesTools { margin-top: 12px; border-top: 2px solid var(--line); padding-top: 10px; }
+  .sect { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--green); font-weight: 900; font-style: italic; margin-bottom: 8px; }
+  #emailInput, #selLineSrc { width: 100%; border: 2px solid var(--line); border-radius: 8px;
+    padding: 7px 9px; font-size: 12.5px; font-weight: 600; }
+  #selLineSrc { width: auto; cursor: pointer; background: var(--card); }
+  .picker { margin-top: 8px; max-height: 168px; overflow-y: auto; }
+  .picker:empty { display: none; }
+  .brdRow { display: flex; align-items: baseline; gap: 8px; padding: 5px 4px;
+    border-bottom: 1px dashed var(--line); font-size: 12.5px; cursor: pointer; }
+  .brdRow:hover { background: #eaf5ee; }
+  .brdRow.busy { opacity: .5; cursor: default; }
+  .brdRow b { color: var(--muted); min-width: 18px; font-size: 11px; }
+  .brdRow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-weight: 700; }
+  .brdRow .tm { color: var(--green); font-weight: 800; font-size: 12px; }
+  .lineRow { display: flex; align-items: center; gap: 7px; padding: 4px 2px; font-size: 12px; }
+  .lineRow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-weight: 600; }
+  .lineRow .dl { color: var(--muted); font-weight: 600; }
+  .lineRow .lx { border: none; background: none; color: var(--muted); cursor: pointer;
+    font-size: 13px; font-weight: 800; padding: 0 2px; }
+  .lineRow .lx:hover { color: var(--red); }
 
   /* Track materials card */
   #materials { top: 78px; right: 16px; width: 220px; }
@@ -149,6 +221,11 @@
     <div class="sub" id="trackSub">Loading…</div>
   </div>
   <select id="trackSelect"></select>
+  <button id="btnBrowse" title="Search and view official VelociDrone tracks (community index)">🌐 Browse</button>
+  <button id="btnTrk" title="View a VelociDrone .trk or MRSIM .xml track file">Open track</button>
+  <select id="convEnv" title="Environment for the converted track"></select>
+  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)">⇄ Convert</button>
+  <input type="file" id="trkFile" accept=".trk,.xml" hidden>
 </div>
 
 <div id="panel" class="card">
@@ -161,6 +238,8 @@
     <span class="switch"><input type="checkbox" id="tNumbers" checked><span class="slider"></span></span></div>
   <div class="row"><label for="tLine">Racing line</label>
     <span class="switch"><input type="checkbox" id="tLine" checked><span class="slider"></span></span></div>
+  <div class="row" id="rowGhost" style="display:none"><label for="tGhost">Human line (WR)</label>
+    <span class="switch"><input type="checkbox" id="tGhost" checked><span class="slider"></span></span></div>
   <div class="row"><label for="tBarriers">Scenery / barriers</label>
     <span class="switch"><input type="checkbox" id="tBarriers" checked><span class="slider"></span></span></div>
   <div class="row"><label for="tCheckpoints">Hidden checkpoints</label>
@@ -168,10 +247,37 @@
 
   <div class="btnrow">
     <button class="act primary" id="btnFly">▶ Fly lap</button>
+    <button class="act" id="btnGhost" style="display:none">▶ WR lap</button>
   </div>
   <div class="btnrow">
     <button class="act" id="btnTop">2D layout</button>
     <button class="act" id="btnReset">Reset view</button>
+  </div>
+  <div class="btnrow">
+    <button class="act" id="btnCapture">⤓ Capture top-down PNG</button>
+  </div>
+
+  <div id="linesTools" style="display:none">
+    <div class="sect">Human lines</div>
+    <input id="emailInput" type="email" placeholder="VelociDrone account email"
+      title="Stored in this browser; sent only to your own local proxy for fetching flights" autocomplete="off">
+    <div class="btnrow">
+      <button class="act" id="btnFetchWr">⤓ WR line</button>
+      <button class="act" id="btnBoard">☰ Leaderboard</button>
+    </div>
+    <div class="btnrow">
+      <button class="act" id="btnImportGhost">📁 Import .ghost</button>
+    </div>
+    <input id="ghostImport" type="file" accept=".ghost,.bin,.b64" style="display:none">
+    <div id="boardList" class="picker" style="display:none"></div>
+    <div id="linesList" class="picker"></div>
+    <div class="row" id="rowLineSrc" style="display:none">
+      <label for="selLineSrc">Racing line</label>
+      <select id="selLineSrc">
+        <option value="generated">Generated</option>
+        <option value="avgwr">Averaged WR</option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -184,14 +290,32 @@
   <h2 style="margin-bottom:6px">Legend</h2>
   <div class="li"><span class="sw" style="background:#fff"></span> Race gate (2 m)</div>
   <div class="li"><span class="sw" style="background:var(--red)"></span> Dive gate / accents</div>
-  <div class="li"><span class="sw" style="background:var(--khaki)"></span> Racing line (3D)</div>
+  <div class="li"><span class="sw" style="background:var(--khaki)"></span> Racing line (est.)</div>
+  <div class="li" id="legGhost" style="display:none"><span class="sw" style="background:#19e0ff"></span> Human line (world record)</div>
   <div class="li"><span class="sw" style="background:repeating-linear-gradient(90deg,#ffd83d 0 6px,transparent 6px 10px)"></span> Ground trace</div>
   <div class="li"><span class="sw" style="background:repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0/8px 8px"></span> Start / finish</div>
 </div>
 
 <div id="help">
   <b>Drag</b> rotate · <b>Scroll</b> zoom · <b>Right-drag</b> pan<br>
-  <b>Click</b> any object to inspect it
+  <b>Click</b> any object to inspect it<br>
+  <b>Drop</b> a VelociDrone .trk or MRSIM .xml anywhere
+</div>
+
+<div id="browser" class="card">
+  <h2><span>Official VelociDrone tracks</span><button id="brClose" title="Close (Esc)">×</button></h2>
+  <div id="brBar">
+    <input id="brSearch" type="search" placeholder="Search tracks or sceneries…">
+    <select id="brSort">
+      <option value="popularity">Most rated</option>
+      <option value="rating">Best rated</option>
+      <option value="newest">Newest</option>
+      <option value="name">Name</option>
+    </select>
+  </div>
+  <div id="brList"></div>
+  <button class="act" id="brMore" style="display:none">Load more</button>
+  <div id="brStatus"></div>
 </div>
 
 <div id="inspector" class="card">
@@ -210,10 +334,18 @@
 {
   "imports": {
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
+
+    "./trk.js": "./trk.js?v=6",
+    "./mrsim.js": "./mrsim.js?v=6",
+    "./mrsim-lib.js": "./mrsim-lib.js?v=6",
+    "./convert.js": "./convert.js?v=6"
   }
 }
 </script>
-<script type="module" src="app.js"></script>
+<!-- bump ?v= together with the importmap entries above whenever the modules
+     change — plain dev servers send no cache headers and browsers happily
+     serve stale modules otherwise -->
+<script type="module" src="app.js?v=11"></script>
 </body>
 </html>
