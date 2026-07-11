@@ -17,6 +17,25 @@
     --muted: #5c7266;
     --card: #ffffff;
     --line: #d7e6dc;
+    --hover: #eaf5ee;
+    --slider: #c3d6c9;
+    color-scheme: light;
+  }
+  /* Poster-at-dusk palette: same race-green identity, lifted for contrast */
+  :root[data-theme="dark"] {
+    --green: #35c07d;
+    --green-dark: #0b1811;
+    --green-deep: #0a5530;
+    --red: #ff5b4f;
+    --yellow: #ffc23d;
+    --khaki: #c4b34e;
+    --ink: #e4efe7;
+    --muted: #8fa596;
+    --card: #141f18;
+    --line: #2a3a30;
+    --hover: #1c2a21;
+    --slider: #3b4d41;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden;
@@ -54,13 +73,14 @@
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
-  #btnTrk, #btnConvert, #btnBrowse {
+  #btnTrk, #btnConvert, #btnBrowse, #btnTheme {
     flex: 0 0 auto; background: var(--green); color: #fff;
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 12px; font-size: 13px; font-weight: 800; cursor: pointer;
   }
-  #btnConvert, #btnBrowse { background: var(--card); color: var(--green); }
-  #btnTrk:hover, #btnConvert:hover, #btnBrowse:hover { filter: brightness(1.12); }
+  #btnConvert, #btnBrowse, #btnTheme { background: var(--card); color: var(--green); }
+  #btnTheme { padding: 7px 9px; }
+  #btnTrk:hover, #btnConvert:hover, #btnBrowse:hover, #btnTheme:hover { filter: brightness(1.12); }
   #convEnv {
     flex: 0 0 auto; max-width: 170px; background: var(--card); color: var(--ink);
     border: 2px solid var(--line); border-radius: 8px;
@@ -81,13 +101,15 @@
   #brClose:hover { color: var(--red); }
   #brBar { display: flex; gap: 8px; margin-bottom: 10px; }
   #brSearch { flex: 1; border: 2px solid var(--line); border-radius: 8px;
-    padding: 7px 10px; font-size: 13px; font-weight: 600; min-width: 0; }
+    padding: 7px 10px; font-size: 13px; font-weight: 600; min-width: 0;
+    background: var(--card); color: var(--ink); }
   #brSort { border: 2px solid var(--line); border-radius: 8px; padding: 7px 6px;
-    font-size: 12px; font-weight: 600; background: var(--card); cursor: pointer; }
+    font-size: 12px; font-weight: 600; background: var(--card); color: var(--ink);
+    cursor: pointer; }
   #brList { overflow-y: auto; flex: 1; border-top: 2px solid var(--line); }
   .brRow { display: flex; align-items: baseline; gap: 8px; padding: 7px 4px;
     border-bottom: 1px dashed var(--line); font-size: 13px; cursor: pointer; }
-  .brRow:hover { background: #eaf5ee; }
+  .brRow:hover { background: var(--hover); }
   .brRow b { font-weight: 700; flex: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .brRow .scene { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
@@ -116,7 +138,7 @@
   .row label { cursor: pointer; user-select: none; }
   .switch { position: relative; width: 36px; height: 20px; flex: 0 0 auto; }
   .switch input { opacity: 0; width: 0; height: 0; }
-  .slider { position: absolute; inset: 0; background: #c3d6c9; border-radius: 20px;
+  .slider { position: absolute; inset: 0; background: var(--slider); border-radius: 20px;
     transition: .18s; cursor: pointer; }
   .slider:before { content: ""; position: absolute; height: 14px; width: 14px;
     left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .18s; }
@@ -129,7 +151,7 @@
     cursor: pointer; font-weight: 800; transition: .15s;
     border: 2px solid var(--green); background: var(--card); color: var(--green);
   }
-  button.act:hover { background: #eaf5ee; }
+  button.act:hover { background: var(--hover); }
   button.act.primary { background: var(--red); border-color: var(--red); color: #fff; }
   button.act.primary:hover { filter: brightness(1.1); }
   button.act:disabled { opacity: .55; cursor: default; }
@@ -139,14 +161,15 @@
   .sect { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
     color: var(--green); font-weight: 900; font-style: italic; margin-bottom: 8px; }
   #emailInput, #proxyInput, #selLineSrc { width: 100%; border: 2px solid var(--line);
-    border-radius: 8px; padding: 7px 9px; font-size: 12.5px; font-weight: 600; }
+    border-radius: 8px; padding: 7px 9px; font-size: 12.5px; font-weight: 600;
+    background: var(--card); color: var(--ink); }
   #proxyInput { margin-top: 6px; }
   #selLineSrc { width: auto; cursor: pointer; background: var(--card); }
   .picker { margin-top: 8px; max-height: 168px; overflow-y: auto; }
   .picker:empty { display: none; }
   .brdRow { display: flex; align-items: baseline; gap: 8px; padding: 5px 4px;
     border-bottom: 1px dashed var(--line); font-size: 12.5px; cursor: pointer; }
-  .brdRow:hover { background: #eaf5ee; }
+  .brdRow:hover { background: var(--hover); }
   .brdRow.busy { opacity: .5; cursor: default; }
   .brdRow b { color: var(--muted); min-width: 18px; font-size: 11px; }
   .brdRow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
@@ -159,6 +182,13 @@
   .lineRow .lx { border: none; background: none; color: var(--muted); cursor: pointer;
     font-size: 13px; font-weight: 800; padding: 0 2px; }
   .lineRow .lx:hover { color: var(--red); }
+  .gradCtl { display: flex; align-items: center; gap: 5px; }
+  .gradArrow { color: var(--muted); font-size: 11px; font-weight: 800; }
+  .gradCtl input[type="color"] { width: 22px; height: 22px; padding: 0;
+    border: 2px solid var(--line); border-radius: 6px; background: var(--card);
+    cursor: pointer; }
+  .gradCtl input[type="color"]::-webkit-color-swatch-wrapper { padding: 1px; }
+  .gradCtl input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 
   /* Track materials card */
   #materials { top: 78px; right: 16px; width: 220px; }
@@ -226,6 +256,7 @@
   <button id="btnTrk" title="View a VelociDrone .trk or MRSIM .xml track file">Open track</button>
   <select id="convEnv" title="Environment for the converted track"></select>
   <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)">⇄ Convert</button>
+  <button id="btnTheme" title="Toggle dark mode">🌙</button>
   <input type="file" id="trkFile" accept=".trk,.xml" hidden>
 </div>
 
@@ -275,6 +306,15 @@
     <input id="ghostImport" type="file" accept=".ghost,.bin,.b64" style="display:none">
     <div id="boardList" class="picker" style="display:none"></div>
     <div id="linesList" class="picker"></div>
+    <div class="row" id="rowGrad">
+      <label for="tGrad" title="Colour the loaded lines by lap time along a fast → slow gradient">Colour by time</label>
+      <span class="gradCtl">
+        <input type="color" id="gradFast" value="#ff321c" title="Fastest lap colour">
+        <span class="gradArrow">→</span>
+        <input type="color" id="gradSlow" value="#2e6fd6" title="Slowest lap colour">
+        <span class="switch"><input type="checkbox" id="tGrad"><span class="slider"></span></span>
+      </span>
+    </div>
     <div class="row" id="rowLineSrc" style="display:none">
       <label for="selLineSrc">Racing line</label>
       <select id="selLineSrc">
@@ -334,6 +374,16 @@
 
 <div id="loading"><div class="spin"></div><div>Loading track…</div></div>
 
+<script>
+  // set the theme before first paint: saved choice wins, else follow the OS
+  (() => {
+    const saved = localStorage.getItem('vd_theme');
+    const dark = saved ? saved === 'dark'
+      : matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+</script>
+
 <script type="importmap">
 {
   "imports": {
@@ -350,6 +400,6 @@
 <!-- bump ?v= together with the importmap entries above whenever the modules
      change — plain dev servers send no cache headers and browsers happily
      serve stale modules otherwise -->
-<script type="module" src="app.js?v=12"></script>
+<script type="module" src="app.js?v=14"></script>
 </body>
 </html>

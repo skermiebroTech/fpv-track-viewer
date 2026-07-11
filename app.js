@@ -120,6 +120,17 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(COL.sky);
 scene.fog = new THREE.Fog(COL.sky, 180, 600);
 
+// Scene halves of the two themes; the UI halves live in index.html CSS vars.
+// Dark keeps the poster identity but reads as dusk: near-black green sky,
+// deep ground, dimmer/cooler light. Gates and lines are emissive, so they
+// carry the scene.
+const SCENE_THEME = {
+  light: { sky: COL.sky, ground: COL.ground,
+           hemiSky: '#eafff2', hemiGround: '#3a7a55', hemi: 1.9, sun: 2.4 },
+  dark:  { sky: '#0d1712', ground: '#123422',
+           hemiSky: '#8fb3a0', hemiGround: '#101f17', hemi: 1.1, sun: 1.3 },
+};
+
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 3000);
 camera.position.set(0, 60, 60);
 
@@ -130,7 +141,8 @@ controls.maxPolarAngle = Math.PI * 0.49;
 controls.minDistance = 2;
 controls.maxDistance = 400;
 
-scene.add(new THREE.HemisphereLight('#eafff2', '#3a7a55', 1.9));
+const hemi = new THREE.HemisphereLight('#eafff2', '#3a7a55', 1.9);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fffdf5', 2.4);
 sun.position.set(-45, 80, -30);
 sun.castShadow = true;
@@ -148,6 +160,37 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.05;
 ground.receiveShadow = true;
 scene.add(ground);
+
+// ---------------------------------------------------------------------------
+// Theme (dark mode)
+// ---------------------------------------------------------------------------
+const isDark = () => document.documentElement.dataset.theme === 'dark';
+
+function applySceneTheme(dark) {
+  const t = SCENE_THEME[dark ? 'dark' : 'light'];
+  scene.background.set(t.sky);
+  scene.fog.color.set(t.sky);
+  ground.material.color.set(t.ground);
+  hemi.color.set(t.hemiSky);
+  hemi.groundColor.set(t.hemiGround);
+  hemi.intensity = t.hemi;
+  sun.intensity = t.sun;
+}
+
+const btnTheme = document.getElementById('btnTheme');
+function setTheme(dark, save) {
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  if (save) localStorage.setItem('vd_theme', dark ? 'dark' : 'light');
+  btnTheme.textContent = dark ? '☀️' : '🌙';
+  btnTheme.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+  applySceneTheme(dark);
+}
+btnTheme.addEventListener('click', () => setTheme(!isDark(), true));
+// follow the OS while the user hasn't chosen explicitly
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+  if (!localStorage.getItem('vd_theme')) setTheme(e.matches, false);
+});
+setTheme(isDark(), false);   // sync scene + button with the pre-paint choice
 
 // ---------------------------------------------------------------------------
 // Conversions
@@ -709,11 +752,12 @@ function addLine(spec) {
   const color = spec.color || pickColor(spec);
   const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
   const group = new THREE.Group();
+  const tubeMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0, emissive: color, emissiveIntensity: 0.35 });
   group.add(new THREE.Mesh(
     new THREE.TubeGeometry(curve, Math.max(400, pts.length * 4), spec.isWr ? 0.05 : 0.045, 8, false),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0, emissive: color, emissiveIntensity: 0.35 })));
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.6 }));
+    tubeMat));
+  const dotMat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.6 });
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), dotMat);
   dot.position.copy(pts[0]); group.add(dot);
   const tag = spec.tag || (spec.isWr ? 'WR' : spec.kind === 'avg' ? 'avg' : '');
   const label = badgeSprite(`${spec.pilot} · ${spec.lapTime ? spec.lapTime.toFixed(2) + 's' : ''} ${tag}`.trim(), '#0b3d46');
@@ -725,11 +769,54 @@ function addLine(spec) {
   for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + pts[i].distanceTo(pts[i - 1]));
   const T = spec.frames[spec.frames.length - 1].t || 1;
   const line = { id: ++lineSeq, kind: spec.kind, pilot: spec.pilot, lapTime: spec.lapTime,
-    isWr: !!spec.isWr, color, curve, group, frames: spec.frames,
+    isWr: !!spec.isWr, color, baseColor: color, tubeMat, dotMat, curve, group,
+    frames: spec.frames,
     profile: { t: spec.frames.map(f => f.t), s, T, S: s[s.length - 1] } };
   humanLines.push(line);
   syncPrimaryLine();
+  applyLineGradient();
   return line;
+}
+
+// ---- colour-by-time gradient ------------------------------------------------
+// When on, every loaded line is recoloured along a fast → slow gradient by its
+// lap time (fastest = gradFast, slowest = gradSlow, HSL lerp between); when
+// off, lines keep their assigned palette/WR colours. Both end colours are
+// user-pickable and remembered.
+const gradToggle = document.getElementById('tGrad');
+const gradFast = document.getElementById('gradFast');
+const gradSlow = document.getElementById('gradSlow');
+gradToggle.checked = localStorage.getItem('vd_grad_on') === '1';
+gradFast.value = localStorage.getItem('vd_grad_fast') || gradFast.value;
+gradSlow.value = localStorage.getItem('vd_grad_slow') || gradSlow.value;
+
+function applyLineGradient() {
+  const on = gradToggle.checked;
+  const times = humanLines.filter(l => l.lapTime > 0).map(l => l.lapTime);
+  const min = Math.min(...times), max = Math.max(...times);
+  for (const l of humanLines) {
+    let col = l.baseColor;
+    if (on && l.lapTime > 0) {
+      const f = max > min ? (l.lapTime - min) / (max - min) : 0;
+      col = '#' + new THREE.Color(gradFast.value)
+        .lerpHSL(new THREE.Color(gradSlow.value), f).getHexString();
+    }
+    l.color = col;
+    l.tubeMat.color.set(col); l.tubeMat.emissive.set(col);
+    l.dotMat.color.set(col); l.dotMat.emissive.set(col);
+  }
+  refreshLinesUI();
+}
+gradToggle.addEventListener('change', () => {
+  localStorage.setItem('vd_grad_on', gradToggle.checked ? '1' : '0');
+  applyLineGradient();
+});
+for (const inp of [gradFast, gradSlow]) {
+  inp.addEventListener('input', () => {          // live while dragging the picker
+    localStorage.setItem('vd_grad_fast', gradFast.value);
+    localStorage.setItem('vd_grad_slow', gradSlow.value);
+    if (gradToggle.checked) applyLineGradient();
+  });
 }
 
 // the primary line (WR if present, else first) drives the replay + info panel
@@ -748,7 +835,7 @@ function removeLine(line) {
   groups.ghost.remove(line.group);
   line.group.traverse(o => { o.geometry?.dispose?.(); if (o.material) { o.material.map?.dispose?.(); o.material.dispose?.(); } });
   syncPrimaryLine();
-  refreshLinesUI();
+  applyLineGradient();   // range changed — recolour + refresh the list
 }
 
 function clearGhost() {
@@ -1492,9 +1579,11 @@ function captureTopDown(px = 2200) {
   cam.lookAt(center.x, center.y, center.z);
 
   const rt = new THREE.WebGLRenderTarget(rw, rh, { samples: 4 });
+  applySceneTheme(false);             // the poster export is always the light look
   renderer.setRenderTarget(rt);
   renderer.render(scene, cam);
   renderer.setRenderTarget(null);
+  applySceneTheme(isDark());
 
   const buf = new Uint8Array(rw * rh * 4);
   renderer.readRenderTargetPixels(rt, 0, 0, rw, rh, buf);
