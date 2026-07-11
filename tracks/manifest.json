@@ -6,6 +6,13 @@
       "scene": "Scene16",
       "gates": 14,
       "barriers": 7
+    },
+    {
+      "file": "tracks/2022-mission-foods.json",
+      "name": "2022 Mission Foods Australian Drone Nationals",
+      "scene": "Scene16",
+      "gates": 38,
+      "barriers": 655
     }
   ]
 }

@@ -2,3 +2,5 @@
 # unpublished tracks stay local-only
 tracks/2026-au-nats-v3-polished.json
 tracks/manifest.local.json
+tracks/*.xml
+tracks/_test-*.json

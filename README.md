@@ -16,14 +16,122 @@ validated against the official 2D layout poster) and **2026 AU NATS V3 Polished*
 - Race gates as 2 m square frames (white; dive gates red with yellow tips),
   flags as printed feather flags, checkered start/finish with crossed flags
   and a yellow direction arrow
-- Racing line through every gate aperture, crossing perpendicular to each frame,
-  plus a flat ground projection to read altitude
-- **Fly lap** — camera flight along the racing line at race-ish pace
+- Optimised racing line through every gate aperture (TOGT-inspired, see
+  [Racing line](#racing-line)) with an estimated race-pace lap time, plus a
+  flat ground projection to read altitude
+- **Fly lap** — camera flight along the racing line that brakes into corners
+  and sprints the straights, following the optimiser's speed profile
 - Layer toggles: gates, flags, sequence numbers, racing line, scenery,
   hidden checkpoints
 - Track materials card (poster style): gate/flag/dive counts, lap length,
   course area, max altitude
 - Multiple tracks via a dropdown (driven by `tracks/manifest.json`)
+- **Open track** — view any VelociDrone `.trk` track file or MRSIM `.xml`
+  track (header button or drag-and-drop it onto the page). Files are decoded
+  entirely in the browser; nothing is uploaded anywhere.
+- **🌐 Browse** — search VelociDrone's ~2000 official public tracks and view
+  any of them with one click (catalogue format documented by
+  [bolagnaise/vdrone-tracks](https://github.com/bolagnaise/vdrone-tracks);
+  the AES-encrypted list is decoded client-side, downloads come straight
+  from VelociDrone's public API).
+- **⇄ Convert** — convert the displayed track to the other sim's format and
+  download it: MRSIM `.xml` → VelociDrone `.trk` (encrypted, ready to import
+  in-game) or VelociDrone → MRSIM `.xml`. The environment selector next to
+  the button picks the target scene (Empty Scene Day/Night… for VD; Empty
+  Grass World / Baylands Park / Hardesty BMX for MRSIM).
+
+## Racing line
+
+The racing line is generated with the method of the
+**[TOGT-Planner](https://github.com/FSC-Lab/TOGT-Planner)** by
+[FSC-Lab](https://github.com/FSC-Lab) (Flight Systems & Control Lab,
+University of Toronto) — credit to them for the key idea:
+
+> Chao Qin, Maxime S.J. Michet, Jingxiang Chen, Hugh H.-T. Liu,
+> *"Time-Optimal Gate-Traversing Planner for Autonomous Drone Racing"*,
+> IEEE International Conference on Robotics and Automation (ICRA), 2024.
+
+Instead of forcing the line through gate centres, each gate is treated as a
+**crossing region**: the crossing point is a free variable inside the gate's
+aperture, kept there by a tanh map (as in TOGT's gate-region
+parameterisation) and optimised **jointly** with the rest of the trajectory
+against a lap-time objective. That is what makes the line cut to the inside
+edge of gates on turns and straighten S-sections, like a real race line.
+
+`raceline.js` is an independent JavaScript re-implementation of that idea,
+simplified so it runs client-side in milliseconds (their C++/Eigen planner
+can't run on a static page): the trajectory is a dense polyline rather than
+MINCO polynomials, lap time is estimated with a curvature-limited speed
+model `v = min(v_max, √(a_lat/κ))` instead of full quadrotor dynamics, and
+optimisation is Adam with local finite-difference gradients instead of
+L-BFGS with analytic gradients. The pre-optimisation line (perpendicular
+centre crossings) seeds the optimiser and remains as a fallback. The same
+speed profile drives the fly-lap pacing and the "est. race pace" readout —
+treat that number as a time-optimal bound, not a human lap prediction.
+
+Its parameters (`DEFAULTS` in `raceline.js`, overridable at runtime via
+`globalThis.__RL`) are calibrated so the generated line tracks real human
+world-record flights: a moderate lateral-acceleration limit gives the wide,
+flowing arcs a pilot actually flies, and the gate entry/exit helpers are
+vertically damped so steeply-tilted dive gates don't balloon the line above
+the course. Against the bundled WR lines it sits ~1.5 m (2024 AU NATS Quali)
+to ~2.3 m (2022 Mission Foods) from the human line on average.
+
+## Human world-record line
+
+Alongside the computed line, the viewer can overlay a **real human racing
+line** — the actual world-record flight from the VelociDrone leaderboard,
+drawn in cyan with the pilot's name and lap time, a **WR lap** button that
+replays it in first person at its true recorded pace, and a **Fetch WR line**
+button that pulls the current record live.
+
+VelociDrone stores a leaderboard flight ("ghost") as
+`base64( zlib( .NET-BinaryFormatter( List<TransformRecord> ) ) )`, where each
+`TransformRecord` carries a position (Unity metres, same world space as the
+track), quaternion, throttle and timing.
+
+### Live fetch (Fetch WR line)
+
+`getLeaderBoard` / `getFlight` take a single AES-encrypted `post_data` field
+(key seed `Bat Cave Games`) and `ghostfetch.js` decodes the reply — zlib +
+a small MS-NRBF reader — entirely in the browser. Two catches shape the
+setup:
+
+- `getFlight`'s POST response carries **no CORS header**, so a browser can't
+  read it cross-origin.
+- `getFlight` needs your **account email** in `post_data`, and that field is
+  only AES-encrypted with a *public* key — so a third-party CORS proxy could
+  read it.
+
+So the live fetch goes through **`serve.py`**, which serves the viewer and
+proxies `/vd/*` to VelociDrone on the same origin. Your email travels browser
+→ your own localhost → VelociDrone, never a third party:
+
+```bash
+python3 serve.py            # http://localhost:8099  (viewer + /vd proxy)
+```
+
+The button appears for tracks whose online leaderboard id is known (any track
+opened via **🌐 Browse**, plus the bundled AU NATS Quali). `getFlight` only
+returns a flight for a `(track, race_mode)` **you have your own leaderboard
+time on** — the same rule as in-game Nemesis — so it works for tracks you've
+flown. `protected_track_value` is 1 for official tracks, 2 for user tracks.
+
+### Offline (bundled / captured)
+
+Without `serve.py`, a line can also be prepared offline and bundled:
+
+```bash
+# in vd-ghost-capture/ : decode a captured getFlight payload
+python3 ghost_decode.py out/021_getFlight.txt --which faster --out line.json
+```
+
+`ghost_decode.py` (uses the `nrbf` package) emits a compact
+`{pilot, lap_time, frames:[{t, p:[x,y,z]}]}`. Drop it at
+`ghosts/<track-slug>-wr.json` (e.g. `ghosts/2024-au-nats-quali-wr.json`) and
+the viewer loads it automatically. `ghost_extract.py` instead pulls ghosts
+from the local `user11.db` after a Nemesis race. Bundled: **IQ0's 26.30 s
+WR** for the 2024 AU NATS Quali.
 
 ## Quick start (local)
 
@@ -31,7 +139,8 @@ Browsers block `fetch()` from `file://`, so serve the folder over HTTP:
 
 ```bash
 cd track-viewer
-python3 -m http.server 8099
+python3 serve.py            # viewer + /vd proxy (needed for live Fetch WR line)
+# or: python3 -m http.server 8099   (everything except live fetch)
 # open http://localhost:8099
 ```
 
@@ -49,6 +158,12 @@ python3 -m http.server 8099
 
 ## Adding / updating tracks
 
+The quickest way to view a track is **Open .trk** in the header (or drop the
+file onto the page): VelociDrone's shared `.trk` files are AES-encrypted
+(`trk.js` decodes them client-side, format documented in
+[FPVTracksideCore](https://github.com/uewepuep/FPVTracksideCore)). Imported
+tracks are session-only; to publish one on the site, export it as JSON:
+
 Track layouts live in the VelociDrone user database
 (`~/.config/unity3d/velocidrone/velocidrone/user11.db`, table `tracks`, column
 `value` = plain JSON of `gates` + `barriers`). Export with:
@@ -59,6 +174,58 @@ python3 export_tracks.py 2864 2863     # export these ids into tracks/ + manifes
 ```
 
 Commit the new `tracks/*.json` + `tracks/manifest.json` and push.
+
+## MRSIM tracks
+
+[MRSIM](https://store.steampowered.com/app/2338080/MRSIM/) (Multi Rotor SIM)
+tracks are plain-XML `<Simulation>` scene graphs: nested `<Transform>`s place
+entities that `<Include>` library objects (`5x5Gate.xml`, `Flag.xml`,
+`7x7Mat.xml`…) or `<Instance>` macros (`PaddedPole`, `PipeDoubleCube`…).
+Coordinates are metres, right-handed **Z-up**; rotations are axis-angle
+attributes (`rz="-1" angleDegrees="110"`).
+
+`mrsim.js` walks the scene graph and renders each object's **collision
+primitives** — the thin `<Box>`es are exactly the gate fabric panels and the
+`<Cylinder>`s the PVC pipes / padded poles, so every object type (gates,
+pole cubes, ladders, hurdles, dive gates…) draws faithfully with no
+per-type code. The `<CheckpointList>` names (`trkCube1.lower.backEntry`)
+resolve to `<Checkpoint>` reference points and crossing directions, so the
+racing line is exact — including multi-pass elements and cube entries/exits.
+
+The library objects are embedded in `mrsim-lib.js`, extracted from the
+game's `MRSIM.dkb` archive (a simple file-table format). After a game
+update, regenerate with:
+
+```bash
+python3 export_mrsim_lib.py   # reads ~/.local/share/Steam/steamapps/common/MRSIM/MRSIM.dkb
+```
+
+## Converting between sims
+
+The **⇄ Convert** button translates the loaded track to the other sim,
+driven by what defines the race — the ordered checkpoint crossings
+(position + crossing direction) plus the object type at each one:
+
+| VelociDrone | MRSIM |
+|---|---|
+| MultiGP gate (285) | 7x6 gate (closest aperture), same tilt for dive gates |
+| 4 m flag (170) | `Flag.xml` on a pole riser at the exact scaled height + sensor plane |
+| invisible checkpoint (88) | library-style `<Box>` sensor entity with a `<Checkpoint>` |
+| building blocks (all 13 colours) | coloured `<Box>` entities, exact size + orientation |
+| MGP hurdles | grey panel `<Box>` at the exact scaled size |
+| decorative flags | `Flag.xml` (+ riser to the scaled height) |
+| blocks | ← pipe cube PVC structure |
+
+MRSIM→VD: every checkpoint-list entry becomes a VD sequence gate — repeat
+passes through the same element (cubes, double-sided gates) become invisible
+checkpoints so the lap is preserved exactly; pole/flag passes become flags;
+the `.trk` is AES-encrypted in the browser and imports straight into the
+game (Empty Scene Day). VD→MRSIM emits a ready-to-fly `<Simulation>` XML on
+Empty Grass World with a launch pad behind the start gate — scenery
+barriers convert too (VD dive-gate towers are built from blocks, so they
+carry over intact). Fixed-size objects mean scaled VD gates export at
+MRSIM's native size; nets and other objects with no equivalent are skipped
+(the export lists exactly what was dropped).
 
 ## Data interpretation (verified against the official 2024 poster)
 
@@ -76,11 +243,20 @@ Commit the new `tracks/*.json` + `tracks/manifest.json` and push.
   `trackprefabs`: 3394 prefabs with name/type/gate-flag, plus scene titles).
   Objects classify from it: type `Invisible` → hidden checkpoint, `Tools` →
   editor helpers (not rendered), names containing `Flag` → flags.
-- `models/*.glb` are the **actual in-game meshes** (MultiGP gates, 4 m flags,
-  WDC gates, hurdles, start grids…) extracted from the Unity asset bundles in
-  `StreamingAssets/assetbundles/{gates,barriers}` with UnityPy, converted to
-  GLB with textures. Stretchable blocks/nets generate their meshes at runtime
-  in-game, so they render as boxes using the exact material colours.
+- `models/*.glb` are the **actual in-game meshes** (gates, flags, hurdles,
+  trees, cones, rocks, gazebos, banners… ~250 prefabs) extracted from the
+  Unity asset bundles in `StreamingAssets/assetbundles/*` by
+  `export_models.py` (UnityPy → GLB with textures; the set covers every
+  scenery prefab used by ≥2 of the top-130 official tracks plus all cones,
+  trees, rocks and fast foliage). Stretchable blocks/nets/neon generate their
+  meshes at runtime in-game, so they render procedurally using the exact
+  material colours (all 13 block colours, name-derived neon tints, sphere
+  primitives).
+- `tracks/prefab-dims.json` (also from `export_models.py --dims`) holds the
+  real local-space bounding box + a representative colour for **every**
+  prefab in the catalog, so scenery without an extracted model still draws as
+  a correctly sized, category-tinted box instead of a raw-scale cube.
+  Particle-only prefabs (fog, smoke) are skipped entirely.
 - Click any object in the viewer to open the **inspector** with its raw
   database values (position, quaternion, scale, prefab id/name) and derived info.
 
@@ -90,7 +266,14 @@ Commit the new `tracks/*.json` + `tracks/manifest.json` and push.
 |------|---------|
 | `index.html` | UI shell, poster-style cards, import map |
 | `app.js` | Three.js scene, track builder, fly-through |
+| `raceline.js` | Racing-line optimiser ([TOGT](https://github.com/FSC-Lab/TOGT-Planner)-inspired) |
+| `trk.js` | VelociDrone `.trk` decoder/encoder (base64 + AES-128-ECB, pure JS) |
+| `mrsim.js` | MRSIM `.xml` track decoder (scene-graph walker) |
+| `mrsim-lib.js` | Embedded MRSIM object library (generated) |
+| `convert.js` | VelociDrone ⇄ MRSIM track converter |
 | `tracks/manifest.json` | Tracks shown in the dropdown |
 | `tracks/*.json` | Exported layouts (`meta` + `gates` + `barriers`) |
 | `export_tracks.py` | Export tracks from the VelociDrone user DB |
+| `export_models.py` | Extract prefab GLBs + `prefab-dims.json` from the asset bundles |
+| `export_mrsim_lib.py` | Regenerate `mrsim-lib.js` from `MRSIM.dkb` |
 | `.nojekyll` | Serve files verbatim on GitHub Pages |
