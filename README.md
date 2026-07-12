@@ -2,7 +2,7 @@
 
 A static, browser-based 3D viewer compatible with
 [VelociDrone](https://www.velocidrone.com/) and
-[MRSIM](https://store.steampowered.com/app/2338080/MRSIM/) tracks, built with
+[MRSIM]() tracks, built with
 [Three.js](https://threejs.org/) and hosted on **GitHub Pages**.
 Styled after the official AUFPV / Mission Foods Australian Drone Nationals track
 posters: green grid mat (1 m / 5 m lines), khaki racing line, white Mission gates,
