@@ -1,4 +1,4 @@
-# VelociDrone Track Viewer
+# FPV Track Viewer
 
 A static, browser-based 3D viewer compatible with
 [VelociDrone](https://www.velocidrone.com/) and
