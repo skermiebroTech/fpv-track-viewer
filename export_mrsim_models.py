@@ -4,11 +4,21 @@
 (gates, mats, stands, flags, canopy, poles, trees...) with these instead of the
 procedural pipe-prim stand-ins.
 
-MRSIM .model layout (reverse-engineered): little-endian. Header, then per
-material submesh: a vec3 position stream, a vec3 normal stream, a vec2 uv
-stream, and a u32 index buffer. Submeshes are delimited by material-name
-strings (DefaultMaterial / Fabric / PVC / ...). Vertices are kept in raw MRSIM
-Z-up local space — the viewer's `three(m)=Z_UP_TO_Y_UP·m` matrix orients them.
+MRSIM .model layout (reverse-engineered, verified across all 37 models):
+little-endian, a sequence of named PARTS. Each part is
+
+    [u32 6][u32 12]{a, components, totalLen}   stream preamble
+    [u32 posBytes]  position data (vec3 f32)   -> ends at the first record
+    per extra stream: [u32 4][u32 24]{backPtr, id, stride, 0, comp, total}
+                      {t, totalBytes, dataBytes/count} + data
+    [u32 nameLen][name][0xff?]                 part name
+    [u32 5][u32 92] footer: {partEnd, idxDataStart, streamCount N, rec1..recN}
+
+The LAST record offset is always the index record; POSITIONS end at the
+first record (at the index record when N==1 — collision meshes have no
+normals/uvs). At idxDataStart sits {type, totalBytes, count}: index element
+size = (totalBytes-12)/count, 2 or 4 bytes. Vertices are raw MRSIM Z-up
+local space — the viewer's `three(m)=Z_UP_TO_Y_UP·m` matrix orients them.
 
     venv/bin/python export_mrsim_models.py
 """
@@ -21,11 +31,8 @@ ROOT = Path(__file__).parent
 OUTDIR = ROOT/"models"/"mrsim"
 INDEX = OUTDIR/"models.json"
 
-# material-name strings that delimit a submesh (extend as new ones appear)
-MATERIALS = {'DefaultMaterial','Fabric','PVC','Metal','Foam','Tape','Pole','Mat',
-             'Padding','Plastic','Rubber','Glass','Chrome','Banner','Carbon',
-             'Aluminium','Aluminum','Steel','Wood','Concrete','Canvas','Mesh',
-             'Leaf','Bark','Trunk','Ground','Grass','Cloth','Sponsor','Led','LED'}
+# non-visual marker parts (the checkpoint aperture quad inside gate models)
+SKIP_PARTS = {'PassageGeometry'}
 
 
 def read_dkb(path):
@@ -38,68 +45,57 @@ def read_dkb(path):
     return data, ent, pos
 
 
-def strings(b):
+def parts(b):
+    """(name, footerPayloadOffset) for every part: a length-prefixed printable
+    string followed (within a couple of pad bytes) by the [5][92] footer tag."""
     out=[]; p=0
-    while p<len(b)-4:
+    while p<len(b)-8:
         v=struct.unpack_from('<I',b,p)[0]
-        if 2<=v<=40 and p+4+v<=len(b) and all(32<=c<127 for c in b[p+4:p+4+v]):
-            out.append((p, b[p+4:p+4+v].decode())); p+=4+v; continue
+        if 1<=v<=48 and p+4+v<=len(b) and all(32<=c<127 for c in b[p+4:p+4+v]):
+            name=b[p+4:p+4+v].decode()
+            for skip in (0,1,2,3):
+                q=p+4+v+skip
+                if q+8<=len(b) and struct.unpack_from('<II',b,q)==(5,92):
+                    out.append((name, q+8)); break
         p+=1
     return out
 
 
-def _coord_ok(u):
-    if u == 0: return True
-    f, = struct.unpack('<f', struct.pack('<I', u))
-    return abs(f) >= 1e-19 and np.isfinite(f) and abs(f) < 1e4
-
-
 def decode(b):
-    """-> list of (positions Nx3 float32, indices Mx uint32) submeshes."""
-    W = np.frombuffer(b[:len(b)//4*4], dtype='<u4')
-    F = np.frombuffer(b[:len(b)//4*4], dtype='<f4')
-    ok = np.fromiter((_coord_ok(int(u)) for u in W), dtype=bool, count=len(W))
-    runs=[]; i=0; n=len(W)
-    while i<n:
-        k=ok[i]; j=i
-        while j<n and ok[j]==k: j+=1
-        runs.append((k,i,j)); i=j
-    matmarks = sorted(p for p,s in strings(b) if s in MATERIALS)
-    regions=[]
-    for idx,mp in enumerate(matmarks):
-        end = matmarks[idx+1] if idx+1<len(matmarks) else len(b)
-        regions.append((mp, end))
-    if regions:
-        regions[0] = (0, regions[0][1] if len(matmarks)<2 else matmarks[1])
-    subs=[]
-    for (rs,re) in regions:
-        rw0, rw1 = rs//4, re//4
-        # position stream = first coord run in region
-        pos=None
-        for (k,i,j) in runs:
-            if j<=rw0 or i>=rw1: continue
-            if k and (j-i)>=30: pos=(i,j); break
-        if not pos: continue
-        pi,pj=pos; plen=((pj-pi)//3)*3
-        P=F[pi:pi+plen].reshape(-1,3); V=len(P)
-        # index buffer = longest contiguous run of (u32 < V) after the position
-        # stream. Float streams (normals/uvs) are huge-u32 nonzero, so they don't
-        # match; only the real u32 index block (incl. 0-indices) forms a long run.
-        idxlike = W[pj:rw1] < max(V, 1)
-        best=(0,0); i=0; m=len(idxlike)
-        while i<m:
-            if idxlike[i]:
-                j=i
-                while j<m and idxlike[j]: j+=1
-                if j-i>best[1]-best[0]: best=(i,j)
-                i=j
-            else: i+=1
-        if best[1]-best[0]>=3:
-            I=W[pj+best[0]:pj+best[1]]; I=I[:(len(I)//3)*3]
-        else:
-            I=np.arange((V//3)*3, dtype=np.uint32)
-        if len(I)>=3: subs.append((P.astype('<f4'), I.astype('<u4')))
-    return subs
+    """-> ([(name, positions Nx3 f32, indices M u32)], [notes])."""
+    subs=[]; notes=[]
+    for name, foot in parts(b):
+        partEnd, idxData, nStreams = struct.unpack_from('<3I', b, foot)
+        if not (1 <= nStreams <= 8 and idxData < partEnd <= len(b)):
+            notes.append(f'{name}: implausible footer'); continue
+        recs = struct.unpack_from(f'<{nStreams}I', b, foot+12)
+        if name in SKIP_PARTS: continue
+        firstRec, idxRec = recs[0], recs[-1]
+        if idxData != idxRec+24:
+            notes.append(f'{name}: idxData {idxData} != idxRec+24'); continue
+        # positions: vec3 f32 block ending at the first record, preceded by its
+        # own byte length — scan for the u32 that says "the rest, up to firstRec"
+        posStart=None
+        lo=max(0, firstRec-0x400000)
+        for p in range(firstRec-8, lo, -4):
+            if struct.unpack_from('<I',b,p)[0] == firstRec-(p+4):
+                posStart=p+4; break
+        if posStart is None or (firstRec-posStart) % 12:
+            notes.append(f'{name}: no position preamble'); continue
+        P=np.frombuffer(b[posStart:firstRec], dtype='<f4').reshape(-1,3)
+        V=len(P)
+        # indices: {type, totalBytes, count} then data, u16 or u32 elements
+        _t, totalB, count = struct.unpack_from('<3I', b, idxData)
+        if count<3 or totalB<=12 or (totalB-12)//max(count,1) not in (2,4):
+            notes.append(f'{name}: bad index header ({_t},{totalB},{count})'); continue
+        esz=(totalB-12)//count
+        I=np.frombuffer(b[idxData+12:idxData+12+count*esz],
+                        dtype='<u2' if esz==2 else '<u4').astype('<u4')
+        I=I[:(len(I)//3)*3]
+        if len(I)<3 or int(I.max())>=V or not np.isfinite(P).all() or (np.abs(P)>=1e5).any():
+            notes.append(f'{name}: invalid geometry V={V} I={len(I)}'); continue
+        subs.append((name, np.ascontiguousarray(P, dtype='<f4'), I))
+    return subs, notes
 
 
 def _pad(buf,n=4,fill=b'\x00'):
@@ -114,7 +110,7 @@ def write_glb(path, subs):
         off=len(bin_); bin_=_pad(bin_+data)
         views.append({"buffer":0,"byteOffset":off,"byteLength":len(data),"target":target})
         return len(views)-1
-    for P,I in subs:
+    for _name,P,I in subs:
         vv=add(P.tobytes(),34962)
         accessors.append({"bufferView":vv,"componentType":5126,"count":len(P),
                           "type":"VEC3","min":P.min(0).tolist(),"max":P.max(0).tolist()})
@@ -147,19 +143,20 @@ def main():
         nm=full.split('/')[-1][:-6]
         off,size=ent[full]; b=data[ds+off:ds+off+size]
         try:
-            subs=decode(b)
+            subs,notes=decode(b)
         except Exception as e:
             print(f"  ! {nm}: {e}"); skip+=1; continue
+        for n in notes: print(f"    ! {nm}/{n}")
         if not subs:
             print(f"  (no geometry) {nm}"); skip+=1; continue
         fn=f"{nm}.glb"
         write_glb(OUTDIR/fn, subs)
-        allP=np.concatenate([P for P,_ in subs])
+        allP=np.concatenate([P for _,P,_ in subs])
         index[nm]={"file":f"models/mrsim/{fn}",
                    "min":[round(float(v),3) for v in allP.min(0)],
                    "max":[round(float(v),3) for v in allP.max(0)]}
-        tris=sum(len(I)//3 for _,I in subs)
-        print(f"  ✓ {nm}: {len(allP)} verts, {tris} tris")
+        tris=sum(len(I)//3 for _,_,I in subs)
+        print(f"  ✓ {nm}: {len(subs)} parts, {len(allP)} verts, {tris} tris")
         done+=1
     json.dump(index, open(INDEX,'w'), indent=1)
     print(f"\n{done} models -> {OUTDIR} ({skip} skipped); index {INDEX}")
