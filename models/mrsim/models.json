@@ -9,7 +9,20 @@
   "max": [
    0.0,
    0.0,
-   0.099
+   0.1
+  ]
+ },
+ "MRSIMLogo": {
+  "file": "models/mrsim/MRSIMLogo.glb",
+  "min": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "max": [
+   26.0,
+   6.0,
+   0.0
   ]
  },
  "MRSIMTopMenu": {
@@ -17,7 +30,7 @@
   "min": [
    0.0,
    0.0,
-   -0.159
+   -0.16
   ],
   "max": [
    4.0,
@@ -46,21 +59,21 @@
    0.0
   ],
   "max": [
-   0.4,
+   3.02,
    0.02,
-   1.79
+   2.32
   ]
  },
  "7x7ClimbGate": {
   "file": "models/mrsim/7x7ClimbGate.glb",
   "min": [
    -1.37,
-   -1.3,
+   -1.37,
    -0.02
   ],
   "max": [
    1.37,
-   1.3,
+   1.37,
    0.02
   ]
  },
@@ -68,12 +81,12 @@
   "file": "models/mrsim/7x7DiveGate.glb",
   "min": [
    -1.52,
-   -1.45,
+   -1.52,
    -0.02
   ],
   "max": [
    1.52,
-   1.45,
+   1.52,
    0.02
   ]
  },
@@ -93,27 +106,40 @@
  "Hydra": {
   "file": "models/mrsim/Hydra.glb",
   "min": [
-   -0.023,
-   -0.052,
-   -0.001
+   -0.101,
+   -0.126,
+   -0.039
   ],
   "max": [
-   -0.007,
-   -0.034,
-   0.014
+   0.101,
+   0.126,
+   0.062
   ]
  },
  "KronosAlpha": {
   "file": "models/mrsim/KronosAlpha.glb",
   "min": [
-   -0.008,
-   -0.052,
-   -0.001
+   -0.072,
+   -0.085,
+   -0.039
   ],
   "max": [
-   0.008,
-   -0.034,
-   0.014
+   0.072,
+   0.085,
+   0.049
+  ]
+ },
+ "ExoCollision": {
+  "file": "models/mrsim/ExoCollision.glb",
+  "min": [
+   -0.014,
+   -0.029,
+   0.032
+  ],
+  "max": [
+   0.014,
+   0.039,
+   0.044
   ]
  },
  "Fin": {
@@ -145,20 +171,20 @@
  "OZR-5XV2": {
   "file": "models/mrsim/OZR-5XV2.glb",
   "min": [
-   -0.07,
-   -0.078,
-   -0.003
+   -0.072,
+   -0.081,
+   -0.039
   ],
   "max": [
-   0.07,
-   0.078,
-   0.009
+   0.072,
+   0.081,
+   0.047
   ]
  },
  "Prop5Inch": {
   "file": "models/mrsim/Prop5Inch.glb",
   "min": [
-   -0.035,
+   -0.064,
    -0.055,
    0.0
   ],
@@ -168,30 +194,43 @@
    0.008
   ]
  },
+ "FlipHatCollision": {
+  "file": "models/mrsim/FlipHatCollision.glb",
+  "min": [
+   -0.014,
+   -0.03,
+   0.034
+  ],
+  "max": [
+   0.014,
+   0.03,
+   0.056
+  ]
+ },
  "MOTION": {
   "file": "models/mrsim/MOTION.glb",
   "min": [
-   -0.015,
-   0.02,
-   0.007
+   -0.071,
+   -0.078,
+   -0.039
   ],
   "max": [
-   0.015,
-   0.044,
-   0.037
+   0.071,
+   0.078,
+   0.046
   ]
  },
  "Flag": {
   "file": "models/mrsim/Flag.glb",
   "min": [
-   -0.8,
-   -0.005,
-   0.5
+   -0.807,
+   -0.04,
+   -0.5
   ],
   "max": [
-   0.0,
-   0.005,
-   4.016
+   0.04,
+   0.04,
+   4.041
   ]
  },
  "BlueGumTree": {
@@ -210,14 +249,14 @@
  "BlueGumTreeCollision": {
   "file": "models/mrsim/BlueGumTreeCollision.glb",
   "min": [
-   -0.425,
-   -1.233,
-   12.462
+   -9.604,
+   -11.962,
+   0.0
   ],
   "max": [
-   0.483,
-   -0.383,
-   21.394
+   7.797,
+   9.55,
+   29.348
   ]
  },
  "ShadeCanopy": {
@@ -250,7 +289,7 @@
   "file": "models/mrsim/Champs25Gate.glb",
   "min": [
    -1.271,
-   -0.25,
+   -0.27,
    -0.001
   ],
   "max": [
@@ -262,14 +301,14 @@
  "Champs25Pole": {
   "file": "models/mrsim/Champs25Pole.glb",
   "min": [
-   -0.02,
-   -0.02,
+   -0.048,
+   -0.048,
    -0.5
   ],
   "max": [
-   0.02,
-   0.02,
-   0.5
+   0.048,
+   0.048,
+   3.5
   ]
  },
  "ChampionshipLaunchStand": {
@@ -282,19 +321,19 @@
   "max": [
    0.2,
    0.45,
-   0.86
+   0.862
   ]
  },
  "ChampionshipLaunchStandCollision": {
   "file": "models/mrsim/ChampionshipLaunchStandCollision.glb",
   "min": [
-   -0.089,
-   0.001,
-   0.8
+   -0.199,
+   -0.049,
+   0.0
   ],
   "max": [
-   -0.051,
-   0.249,
+   0.199,
+   0.451,
    0.862
   ]
  },
@@ -308,33 +347,33 @@
   "max": [
    0.093,
    0.25,
-   0.073
+   0.075
   ]
  },
  "BaylandsPark": {
   "file": "models/mrsim/BaylandsPark.glb",
   "min": [
-   -380.226,
+   -411.632,
    -274.094,
    -0.854
   ],
   "max": [
    749.709,
-   436.206,
-   5.193
+   548.176,
+   5.466
   ]
  },
  "HardestyBMXTrack": {
   "file": "models/mrsim/HardestyBMXTrack.glb",
   "min": [
-   -42.107,
-   -87.2,
+   -43.108,
+   -87.52,
    -0.5
   ],
   "max": [
-   47.893,
-   62.8,
-   8.0
+   48.894,
+   63.12,
+   20.45
   ]
  },
  "Motor26mm": {
@@ -342,12 +381,12 @@
   "min": [
    -0.013,
    -0.013,
-   0.009
+   -0.006
   ],
   "max": [
    0.013,
    0.013,
-   0.013
+   0.025
   ]
  },
  "NextGateIndicator": {
@@ -363,6 +402,19 @@
    0.5
   ]
  },
+ "RaceLEDs": {
+  "file": "models/mrsim/RaceLEDs.glb",
+  "min": [
+   -0.003,
+   -0.02,
+   0.0
+  ],
+  "max": [
+   0.003,
+   0.02,
+   0.002
+  ]
+ },
  "Motor33mm": {
   "file": "models/mrsim/Motor33mm.glb",
   "min": [
@@ -373,39 +425,39 @@
   "max": [
    0.016,
    0.016,
-   0.013
+   0.028
   ]
  },
  "ProSpec": {
   "file": "models/mrsim/ProSpec.glb",
   "min": [
-   -0.034,
-   -0.084,
-   0.009
+   -0.13,
+   -0.13,
+   0.0
   ],
   "max": [
-   0.034,
-   0.061,
-   0.012
+   0.13,
+   0.13,
+   0.049
   ]
  },
  "ProSpecMassCollision": {
   "file": "models/mrsim/ProSpecMassCollision.glb",
   "min": [
-   -0.022,
-   -0.085,
-   0.012
+   -0.129,
+   -0.13,
+   0.0
   ],
   "max": [
-   0.022,
-   0.058,
+   0.129,
+   0.13,
    0.049
   ]
  },
  "Prop7Inch": {
   "file": "models/mrsim/Prop7Inch.glb",
   "min": [
-   -0.049,
+   -0.089,
    -0.077,
    0.0
   ],
@@ -413,6 +465,19 @@
    0.089,
    0.079,
    0.011
+  ]
+ },
+ "Transmitter": {
+  "file": "models/mrsim/Transmitter.glb",
+  "min": [
+   -0.09,
+   -0.0,
+   -0.03
+  ],
+  "max": [
+   0.09,
+   0.09,
+   0.056
   ]
  }
 }
