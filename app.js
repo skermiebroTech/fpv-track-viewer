@@ -1056,6 +1056,22 @@ function finishBuild(courseBox, matBox, groundY) {
   applyLayerVisibility();
 }
 
+// Where to draw the ground mat (metres): the lowest gate base that isn't an
+// isolated sink far below the rest. VelociDrone lets a track bury a single tall
+// gate well under the course — the 2025 MultiGP European Champs sinks a ~10 m
+// RF gate 1.8 m down while everything else rests near 0 — and the raw minimum
+// would drop the mat to that gate and leave every other gate visibly floating.
+// Dropping bases more than 0.75 m below the median rejects such a sink; for a
+// track whose lowest object really is the ground, nothing is dropped and this
+// equals Math.min(0, …), so the reference tracks are untouched.
+function groundFromBases(basesM) {
+  if (!basesM.length) return 0;
+  const sorted = basesM.slice().sort((a, b) => a - b);
+  const median = sorted[sorted.length >> 1];
+  const lowest = sorted.find(y => y >= median - 0.75);   // first non-sunk base
+  return Math.min(0, lowest ?? sorted[0]);
+}
+
 // ---------------------------------------------------------------------------
 // Build a track from parsed JSON
 // ---------------------------------------------------------------------------
@@ -1065,10 +1081,10 @@ function buildTrack(data) {
   const seq = [...data.gates].sort((a, b) => a.gate - b.gate);
   const kinds = seq.map(classifySeq);
 
-  // scene ground level = lowest object base (the 2026 scene sits at y=-0.86 m)
-  const groundY = seq.length
-    ? Math.min(0, ...seq.map(g => g.trans.pos[1] * CM))
-    : 0;
+  // scene ground level, robust to a gate sunk far below the rest (a buried tall
+  // gate in the 2025 MultiGP Euro Champs otherwise dropped the mat 1.8 m and
+  // left every other gate floating) — see groundFromBases
+  const groundY = groundFromBases(seq.map(g => g.trans.pos[1] * CM));
 
   const counts = { gate: 0, dive: 0, flag: 0, checkpoint: 0, tool: 0 };
   seqSelectables = [];
