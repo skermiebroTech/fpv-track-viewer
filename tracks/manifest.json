@@ -34,6 +34,13 @@
       "scene": "Dynamic Weather",
       "gates": 32,
       "barriers": 714
+    },
+    {
+      "file": "tracks/dutch-drone-madness-2021-race1.json",
+      "name": "Dutch Drone Madness 2021 Race 1",
+      "scene": "Scene16",
+      "gates": 35,
+      "barriers": 451
     }
   ]
 }
