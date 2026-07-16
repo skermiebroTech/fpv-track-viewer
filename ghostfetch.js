@@ -225,7 +225,9 @@ class NRBF {
   }
 }
 
-// TransformRecord list -> [{ t: seconds-from-start, p: [x, y, z] }]
+// TransformRecord list -> [{ t: seconds-from-start, p: [x,y,z], q: [x,y,z,w] }]
+// q is the drone's recorded orientation (Unity quaternion) — kept so a replay
+// can bank the view with the real roll it was flown at.
 function recordsToFrames(list) {
   const items = (list._items || list).filter(Boolean).slice(0, list._size ?? undefined);
   if (!items.length) throw new Error('flight had no frames');
@@ -233,6 +235,7 @@ function recordsToFrames(list) {
   return items.map(r => ({
     t: +(r.time - t0).toFixed(4),
     p: [r._position.x, r._position.y, r._position.z],
+    q: r._quaternion ? [r._quaternion.x, r._quaternion.y, r._quaternion.z, r._quaternion.w] : null,
   }));
 }
 
