@@ -343,12 +343,16 @@ function assemble(st, fileName) {
     const segs = name.split('.');
     const cp = st.checkpoints.find(c => contiguousRun(c.path, segs));
     if (!cp) { note(st, `unresolved checkpoint ${name}`); return; }
-    const mm = three(cp.m);
+    // crossing frame comes from the CheckpointReference: its position is the
+    // gate centre and its local +Y is the fly-through normal. Most references
+    // are a pure offset (same orientation as the gate), but some — the dive
+    // gate's rx=-90 — rotate the normal (straight down), so read both from it.
+    const refM = three(cp.refM);
     seq.push({
       name,
       seqNum: i + 1,
-      pos: new THREE.Vector3().setFromMatrixPosition(three(cp.refM)),
-      dir: new THREE.Vector3().setFromMatrixColumn(mm, 1).normalize(),
+      pos: new THREE.Vector3().setFromMatrixPosition(refM),
+      dir: new THREE.Vector3().setFromMatrixColumn(refM, 1).normalize(),
       elemIndex: cp.elem != null && elemIndex.has(cp.elem) ? elemIndex.get(cp.elem) : -1,
     });
   });
