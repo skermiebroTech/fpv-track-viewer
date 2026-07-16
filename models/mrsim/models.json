@@ -1,0 +1,418 @@
+{
+ "MRSIMBottomMenu": {
+  "file": "models/mrsim/MRSIMBottomMenu.glb",
+  "min": [
+   -3.5,
+   0.0,
+   0.0
+  ],
+  "max": [
+   0.0,
+   0.0,
+   0.099
+  ]
+ },
+ "MRSIMTopMenu": {
+  "file": "models/mrsim/MRSIMTopMenu.glb",
+  "min": [
+   0.0,
+   0.0,
+   -0.159
+  ],
+  "max": [
+   4.0,
+   0.0,
+   0.0
+  ]
+ },
+ "5x5Gate": {
+  "file": "models/mrsim/5x5Gate.glb",
+  "min": [
+   -0.02,
+   -0.02,
+   0.0
+  ],
+  "max": [
+   2.12,
+   0.02,
+   1.82
+  ]
+ },
+ "7x6Gate": {
+  "file": "models/mrsim/7x6Gate.glb",
+  "min": [
+   -0.02,
+   -0.02,
+   0.0
+  ],
+  "max": [
+   0.4,
+   0.02,
+   1.79
+  ]
+ },
+ "7x7ClimbGate": {
+  "file": "models/mrsim/7x7ClimbGate.glb",
+  "min": [
+   -1.37,
+   -1.3,
+   -0.02
+  ],
+  "max": [
+   1.37,
+   1.3,
+   0.02
+  ]
+ },
+ "7x7DiveGate": {
+  "file": "models/mrsim/7x7DiveGate.glb",
+  "min": [
+   -1.52,
+   -1.45,
+   -0.02
+  ],
+  "max": [
+   1.52,
+   1.45,
+   0.02
+  ]
+ },
+ "7x7Mat": {
+  "file": "models/mrsim/7x7Mat.glb",
+  "min": [
+   -1.52,
+   -1.52,
+   0.0
+  ],
+  "max": [
+   1.52,
+   1.52,
+   0.04
+  ]
+ },
+ "Hydra": {
+  "file": "models/mrsim/Hydra.glb",
+  "min": [
+   -0.023,
+   -0.052,
+   -0.001
+  ],
+  "max": [
+   -0.007,
+   -0.034,
+   0.014
+  ]
+ },
+ "KronosAlpha": {
+  "file": "models/mrsim/KronosAlpha.glb",
+  "min": [
+   -0.008,
+   -0.052,
+   -0.001
+  ],
+  "max": [
+   0.008,
+   -0.034,
+   0.014
+  ]
+ },
+ "Fin": {
+  "file": "models/mrsim/Fin.glb",
+  "min": [
+   -0.016,
+   -0.002,
+   0.032
+  ],
+  "max": [
+   0.016,
+   0.029,
+   0.069
+  ]
+ },
+ "OZR-5XExo": {
+  "file": "models/mrsim/OZR-5XExo.glb",
+  "min": [
+   -0.015,
+   -0.029,
+   0.02
+  ],
+  "max": [
+   0.015,
+   0.043,
+   0.044
+  ]
+ },
+ "OZR-5XV2": {
+  "file": "models/mrsim/OZR-5XV2.glb",
+  "min": [
+   -0.07,
+   -0.078,
+   -0.003
+  ],
+  "max": [
+   0.07,
+   0.078,
+   0.009
+  ]
+ },
+ "Prop5Inch": {
+  "file": "models/mrsim/Prop5Inch.glb",
+  "min": [
+   -0.035,
+   -0.055,
+   0.0
+  ],
+  "max": [
+   0.064,
+   0.057,
+   0.008
+  ]
+ },
+ "MOTION": {
+  "file": "models/mrsim/MOTION.glb",
+  "min": [
+   -0.015,
+   0.02,
+   0.007
+  ],
+  "max": [
+   0.015,
+   0.044,
+   0.037
+  ]
+ },
+ "Flag": {
+  "file": "models/mrsim/Flag.glb",
+  "min": [
+   -0.8,
+   -0.005,
+   0.5
+  ],
+  "max": [
+   0.0,
+   0.005,
+   4.016
+  ]
+ },
+ "BlueGumTree": {
+  "file": "models/mrsim/BlueGumTree.glb",
+  "min": [
+   -9.604,
+   -11.962,
+   0.0
+  ],
+  "max": [
+   7.797,
+   9.55,
+   29.348
+  ]
+ },
+ "BlueGumTreeCollision": {
+  "file": "models/mrsim/BlueGumTreeCollision.glb",
+  "min": [
+   -0.425,
+   -1.233,
+   12.462
+  ],
+  "max": [
+   0.483,
+   -0.383,
+   21.394
+  ]
+ },
+ "ShadeCanopy": {
+  "file": "models/mrsim/ShadeCanopy.glb",
+  "min": [
+   -1.524,
+   -1.524,
+   0.0
+  ],
+  "max": [
+   1.524,
+   1.524,
+   2.993
+  ]
+ },
+ "ShadeCanopyCollision": {
+  "file": "models/mrsim/ShadeCanopyCollision.glb",
+  "min": [
+   -1.524,
+   -1.524,
+   2.0
+  ],
+  "max": [
+   1.524,
+   1.524,
+   3.0
+  ]
+ },
+ "Champs25Gate": {
+  "file": "models/mrsim/Champs25Gate.glb",
+  "min": [
+   -1.271,
+   -0.25,
+   -0.001
+  ],
+  "max": [
+   1.271,
+   0.25,
+   2.541
+  ]
+ },
+ "Champs25Pole": {
+  "file": "models/mrsim/Champs25Pole.glb",
+  "min": [
+   -0.02,
+   -0.02,
+   -0.5
+  ],
+  "max": [
+   0.02,
+   0.02,
+   0.5
+  ]
+ },
+ "ChampionshipLaunchStand": {
+  "file": "models/mrsim/ChampionshipLaunchStand.glb",
+  "min": [
+   -0.2,
+   -0.05,
+   0.0
+  ],
+  "max": [
+   0.2,
+   0.45,
+   0.86
+  ]
+ },
+ "ChampionshipLaunchStandCollision": {
+  "file": "models/mrsim/ChampionshipLaunchStandCollision.glb",
+  "min": [
+   -0.089,
+   0.001,
+   0.8
+  ],
+  "max": [
+   -0.051,
+   0.249,
+   0.862
+  ]
+ },
+ "MetalLaunchStand": {
+  "file": "models/mrsim/MetalLaunchStand.glb",
+  "min": [
+   -0.093,
+   0.0,
+   0.0
+  ],
+  "max": [
+   0.093,
+   0.25,
+   0.073
+  ]
+ },
+ "BaylandsPark": {
+  "file": "models/mrsim/BaylandsPark.glb",
+  "min": [
+   -380.226,
+   -274.094,
+   -0.854
+  ],
+  "max": [
+   749.709,
+   436.206,
+   5.193
+  ]
+ },
+ "HardestyBMXTrack": {
+  "file": "models/mrsim/HardestyBMXTrack.glb",
+  "min": [
+   -42.107,
+   -87.2,
+   -0.5
+  ],
+  "max": [
+   47.893,
+   62.8,
+   8.0
+  ]
+ },
+ "Motor26mm": {
+  "file": "models/mrsim/Motor26mm.glb",
+  "min": [
+   -0.013,
+   -0.013,
+   0.009
+  ],
+  "max": [
+   0.013,
+   0.013,
+   0.013
+  ]
+ },
+ "NextGateIndicator": {
+  "file": "models/mrsim/NextGateIndicator.glb",
+  "min": [
+   -0.5,
+   0.0,
+   -0.5
+  ],
+  "max": [
+   0.5,
+   0.0,
+   0.5
+  ]
+ },
+ "Motor33mm": {
+  "file": "models/mrsim/Motor33mm.glb",
+  "min": [
+   -0.016,
+   -0.016,
+   0.0
+  ],
+  "max": [
+   0.016,
+   0.016,
+   0.013
+  ]
+ },
+ "ProSpec": {
+  "file": "models/mrsim/ProSpec.glb",
+  "min": [
+   -0.034,
+   -0.084,
+   0.009
+  ],
+  "max": [
+   0.034,
+   0.061,
+   0.012
+  ]
+ },
+ "ProSpecMassCollision": {
+  "file": "models/mrsim/ProSpecMassCollision.glb",
+  "min": [
+   -0.022,
+   -0.085,
+   0.012
+  ],
+  "max": [
+   0.022,
+   0.058,
+   0.049
+  ]
+ },
+ "Prop7Inch": {
+  "file": "models/mrsim/Prop7Inch.glb",
+  "min": [
+   -0.049,
+   -0.077,
+   0.0
+  ],
+  "max": [
+   0.089,
+   0.079,
+   0.011
+  ]
+ }
+}
