@@ -4,3 +4,24 @@ tracks/2026-au-nats-v3-polished.json
 tracks/manifest.local.json
 tracks/*.xml
 tracks/_test-*.json
+# local model-extraction venv (UnityPy etc.) — never commit
+venv/
+# Extracted prefab models: only the shipped subset listed in models/models.json
+# is committed (its .glb files were already tracked). The full ~3300-model
+# extraction stays local as a cache — new .glb files are ignored here, and the
+# full index lives in the gitignored models.local.json overlay the viewer
+# prefers when present. To ship a new track's model: `git add -f models/<x>.glb`
+# and add its entry to models/models.json.
+models/*.glb
+models/models.local.json
+# MRSIM object meshes decoded from MRSIM.dkb (export_mrsim_models.py) — local
+# model cache like the VelociDrone GLBs; MRSIM tracks are local-only too
+models/mrsim/
+# local node test scaffolding (viewer itself runs from a CDN import map)
+node_modules/
+package.json
+package-lock.json
+_*.mjs
+# tool droppings
+__pycache__/
+.wrangler/
