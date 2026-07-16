@@ -13,6 +13,27 @@
       "scene": "Scene16",
       "gates": 38,
       "barriers": 655
+    },
+    {
+      "file": "tracks/ddr-race-series-track-5.json",
+      "name": "DDR Race Series - Track 5 by NelisFPV",
+      "scene": "Empty Scene Day",
+      "gates": 27,
+      "barriers": 236
+    },
+    {
+      "file": "tracks/fai-world-cup-italy-2024.json",
+      "name": "FAI World Cup Italy 2024",
+      "scene": "Dynamic Weather",
+      "gates": 42,
+      "barriers": 729
+    },
+    {
+      "file": "tracks/2025-multigp-european-champs.json",
+      "name": "2025 MultiGP European Champs",
+      "scene": "Dynamic Weather",
+      "gates": 32,
+      "barriers": 714
     }
   ]
 }

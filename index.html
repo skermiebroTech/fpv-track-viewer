@@ -113,7 +113,8 @@
     white-space: nowrap; }
   #brStatus { font-size: 12px; color: var(--muted); font-weight: 600;
     padding: 8px 2px 0; }
-  #brMore { margin-top: 8px; }
+  #brLoadAll { margin-top: 8px; }
+  #brLoadAll:disabled { opacity: .6; cursor: default; }
 
   /* ---- Cards ---- */
   .card {
@@ -377,6 +378,7 @@
   <div class="li" id="legGhost" style="display:none"><span class="sw" style="background:#19e0ff"></span> Human line (world record)</div>
   <div class="li"><span class="sw" style="background:repeating-linear-gradient(90deg,#ffd83d 0 6px,transparent 6px 10px)"></span> Ground trace</div>
   <div class="li"><span class="sw" style="background:repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0/8px 8px"></span> Start / finish</div>
+  <div class="li"><span class="sw" style="background:#42a06d;background-image:linear-gradient(#0d5c38 1px,transparent 1px),linear-gradient(90deg,#0d5c38 1px,transparent 1px);background-size:7px 7px"></span> Grid — 1 m squares, 5 m major lines</div>
   </div>
 </div>
 
@@ -398,7 +400,7 @@
     </select>
   </div>
   <div id="brList"></div>
-  <button class="act" id="brMore" style="display:none">Load more</button>
+  <button class="act" id="brLoadAll">⟳ Load all official tracks</button>
   <div id="brStatus"></div>
 </div>
 
@@ -457,6 +459,6 @@
 <!-- bump ?v= together with the importmap entries above whenever the modules
      change — plain dev servers send no cache headers and browsers happily
      serve stale modules otherwise -->
-<script type="module" src="app.js?v=16"></script>
+<script type="module" src="app.js?v=20"></script>
 </body>
 </html>
