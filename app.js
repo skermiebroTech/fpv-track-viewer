@@ -400,6 +400,70 @@ function buildGate({ isStart = false, isDive = false, brand = 'wlc' } = {}) {
   return g;
 }
 
+// ---------------------------------------------------------------------------
+// Neon gates: glowing square / circle / triangle rings.
+// The DefaultNeon* prefabs ship no extractable mesh, so buildGate() used to
+// stand a solid WLC frame in for them — wrong for a coloured neon ring. Draw
+// the real shape here, tinted by the colour letter on the name (…SquareB=blue,
+// …CircleG=green). Placement matches buildGate exactly (base origin, aperture
+// on local +Z), so the stored gate quaternion orients it like every other gate.
+// ---------------------------------------------------------------------------
+const NEON = { geo: {}, mat: {} };
+function neonShape(name) {
+  if (/triangle/i.test(name)) return 'triangle';
+  if (/circle|ring|deca/i.test(name)) return 'circle';   // decagon/semicircle ≈ round hoop
+  return 'square';
+}
+function neonHex(name) {
+  return NAME_COLORS[name?.match(NAME_COLOR_RE)?.[1]] || '#28d9ff';   // colourless → cyan
+}
+function neonGeo(shape) {
+  if (NEON.geo[shape]) return NEON.geo[shape];
+  const r = GATE_SIZE / 2;               // 1 m radius → 2 m aperture
+  let geo;
+  if (shape === 'circle') {
+    geo = new THREE.TorusGeometry(r * 0.94, 0.06, 12, 56);   // tube hoop, aperture on Z
+  } else {
+    const bar = 0.09, depth = 0.09;
+    const tri = rad => [0, 1, 2].map(k => {
+      const a = Math.PI / 2 + k * (Math.PI * 2 / 3);         // apex up, CCW
+      return [Math.cos(a) * rad, Math.sin(a) * rad];
+    });
+    const sq = h => [[-h, -h], [h, -h], [h, h], [-h, h]];    // CCW, like frameGeometry
+    const outer = shape === 'triangle' ? tri(r) : sq(r);
+    const inner = shape === 'triangle' ? tri(r - bar * 1.8) : sq(r - bar);
+    const s = new THREE.Shape();
+    s.moveTo(outer[0][0], outer[0][1]);
+    for (let k = 1; k < outer.length; k++) s.lineTo(outer[k][0], outer[k][1]);
+    s.closePath();
+    const hole = new THREE.Path();
+    hole.moveTo(inner[0][0], inner[0][1]);
+    for (let k = 1; k < inner.length; k++) hole.lineTo(inner[k][0], inner[k][1]);
+    hole.closePath();
+    s.holes.push(hole);
+    geo = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false });
+    geo.translate(0, 0, -depth / 2);
+  }
+  NEON.geo[shape] = geo;
+  return geo;
+}
+function neonMat(hex) {
+  if (!NEON.mat[hex]) NEON.mat[hex] = new THREE.MeshStandardMaterial({
+    color: hex, emissive: hex, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0,
+  });
+  return NEON.mat[hex];
+}
+function buildNeonGate(name) {
+  const g = new THREE.Group();
+  const inner = new THREE.Group();
+  inner.position.y = GATE_SIZE / 2;      // base origin, matching buildGate
+  g.add(inner);
+  const ring = new THREE.Mesh(neonGeo(neonShape(name)), neonMat(neonHex(name)));
+  ring.castShadow = true;
+  inner.add(ring);
+  return g;
+}
+
 // A feather flag: pole + printed cloth.
 function buildFlag() {
   const g = new THREE.Group();
@@ -549,6 +613,7 @@ let flyActive = false;
 let humanLines = [];     // [{ id, kind, pilot, lapTime, isWr, color, curve, profile, group }]
 let ghostPath = null;    // replay curve (the WR / primary line) for the ▶ WR lap
 let ghostProfile = null; // {t, s, T, S} true-timing replay profile of ghostPath
+let ghostQuats = null;   // per-frame recorded orientation of the primary line (for roll)
 let ghostMeta = null;    // { pilot, lap_time } of the primary line, for the info panel
 let ghostActive = false;
 let ghostT = 0;
@@ -624,6 +689,37 @@ async function preloadModels(prefabIds) {
 }
 function modelInstance(id) {
   const tpl = modelTemplates.get(id);
+  return tpl ? tpl.clone() : null;
+}
+
+// MRSIM object meshes (gates / mats / stands / flags / canopy…) decoded from
+// MRSIM.dkb by export_mrsim_models.py, keyed by BinaryModelRenderer basename.
+// Vertices are raw MRSIM Z-up local space, so the element's three()-converted
+// matrix orients them exactly like the collision prims they replace.
+let MRSIM_MODELS = {};
+const mrsimTemplates = new Map();
+async function preloadMrsimModels(data) {
+  const names = new Set();
+  (data.elements || []).forEach(el => (el.models || []).forEach(m => names.add(m.model)));
+  const wanted = [...names].filter(n => MRSIM_MODELS[n] && !mrsimTemplates.has(n));
+  await Promise.all(wanted.map(async n => {
+    try {
+      const gltf = await gltfLoader.loadAsync(MRSIM_MODELS[n].file);
+      gltf.scene.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        o.material = new THREE.MeshStandardMaterial({
+          color: '#e9e9e3', roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide,
+        });
+        if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+        o.userData.shared = true;   // cached geometry/material — never disposed
+      });
+      mrsimTemplates.set(n, gltf.scene);
+    } catch (e) { console.warn('mrsim model load failed', n, e); }
+  }));
+}
+function mrsimModelInstance(name) {
+  const tpl = mrsimTemplates.get(name);
   return tpl ? tpl.clone() : null;
 }
 
@@ -782,6 +878,11 @@ function pickColor(spec) {
 function addLine(spec) {
   const pts = spec.frames.map(f => new THREE.Vector3(f.p[0], f.p[1], -f.p[2]));
   if (pts.length < 3) return null;
+  // recorded drone orientation per frame, mapped into three-space the same way
+  // positions are (z flipped): Unity (x,y,z,w) -> (−x,−y,z,w). Used to bank the
+  // WR-lap replay with the roll it was actually flown at.
+  const quats = spec.frames.map(f => f.q
+    ? new THREE.Quaternion(-f.q[0], -f.q[1], f.q[2], f.q[3]).normalize() : null);
   const color = spec.color || pickColor(spec);
   const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
   const group = new THREE.Group();
@@ -803,7 +904,7 @@ function addLine(spec) {
   const T = spec.frames[spec.frames.length - 1].t || 1;
   const line = { id: ++lineSeq, kind: spec.kind, pilot: spec.pilot, lapTime: spec.lapTime,
     isWr: !!spec.isWr, color, baseColor: color, tubeMat, dotMat, curve, group,
-    frames: spec.frames,
+    frames: spec.frames, quats: quats.some(Boolean) ? quats : null,
     profile: { t: spec.frames.map(f => f.t), s, T, S: s[s.length - 1] } };
   humanLines.push(line);
   syncPrimaryLine();
@@ -858,6 +959,7 @@ function syncPrimaryLine() {
   const w = wrLine();
   ghostPath = w?.curve || null;
   ghostProfile = w?.profile || null;
+  ghostQuats = w?.quats || null;
   ghostMeta = w ? { pilot: w.pilot, lap_time: w.lapTime } : null;
 }
 
@@ -1011,10 +1113,10 @@ function buildTrack(data) {
       labelY = 2.9 * sc[1] / 100 + 0.6;
       groups.flags.add(obj);
     } else {
-      obj = buildGate({
-        isStart, isDive: kind === 'dive',
-        brand: GATE_BRAND[g.prefab] ?? 'wlc',
-      });
+      const nm = prefabInfo(g.prefab)?.name || '';
+      obj = /^DefaultNeon/i.test(nm)
+        ? buildNeonGate(nm)
+        : buildGate({ isStart, isDive: kind === 'dive', brand: GATE_BRAND[g.prefab] ?? 'wlc' });
       obj.position.copy(pos); obj.quaternion.copy(quat);
       obj.scale.set(sc[0] / 100, sc[1] / 100, sc[2] / 100);
       labelY = GATE_SIZE * sc[1] / 100 + 0.7;
@@ -1422,7 +1524,11 @@ function buildTrackMrsim(data) {
       bbox, isStart: el.isStart,
     };
 
-    el.prims.forEach(p => {
+    // when a real extracted mesh backs this element, it IS the visual — the
+    // collision prims (pipe cylinders / fabric boxes) would only double up
+    const hasMesh = (el.models || []).some(md => mrsimTemplates.has(md.model));
+
+    if (!hasMesh) el.prims.forEach(p => {
       const hint = p.hint;
       if (hint === 'panelTop') {
         // gate top banner: checker for start/finish, sponsor plate otherwise
@@ -1458,8 +1564,16 @@ function buildTrackMrsim(data) {
       });
     });
 
-    // the few modelled visuals we substitute procedurally
     el.models.forEach(md => {
+      // real extracted mesh (raw MRSIM Z-up local space; md.matrix orients it)
+      const inst = mrsimModelInstance(md.model);
+      if (inst) {
+        inst.applyMatrix4(md.matrix);
+        inst.traverse(o => { o.userData.debug = debug; });
+        layer.add(inst);
+        return;
+      }
+      // procedural stand-ins for meshes we couldn't extract
       if (md.model === 'Flag') {
         // feather flag cloth hanging along the 3.3 m pole
         const geo = new THREE.PlaneGeometry(0.55, 2.5);
@@ -1905,6 +2019,8 @@ function stopGhost() {
   ghostActive = false;
   btnGhost.textContent = '▶ WR lap';
   btnGhost.classList.remove('primary');
+  camera.up.set(0, 1, 0);   // undo the banking roll
+  controls.update();
 }
 // Replay the human line at its true recorded pace: the frame timestamps drive
 // the position along the curve, so it slows and accelerates exactly as flown.
@@ -1913,6 +2029,16 @@ function updateGhost(dt) {
   ghostT = (ghostT + dt / ghostProfile.T) % 1;
   const pos = ghostPath.getPointAt(flyU2(ghostProfile, ghostT));
   const ahead = ghostPath.getPointAt(flyU2(ghostProfile, Math.min(1, ghostT + 0.012)));
+  // bank the view with the drone's recorded roll: aim the camera's up at the
+  // drone's up vector so the horizon tilts into turns, like real FPV footage
+  if (ghostQuats) {
+    const { t } = ghostProfile, tp = ghostT * ghostProfile.T;
+    let lo = 0, hi = t.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (t[mid] <= tp) lo = mid; else hi = mid; }
+    const q = ghostQuats[lo] || ghostQuats[hi];
+    // VelociDrone's drone frame is Z-up: its local +Z is the thrust/up axis
+    if (q) camera.up.lerp(new THREE.Vector3(0, 0, 1).applyQuaternion(q), 0.2).normalize();
+  }
   camera.position.lerp(pos.clone().add(new THREE.Vector3(0, 0.4, 0)), 0.3);
   controls.target.lerp(ahead, 0.35);
   controls.update();
@@ -2183,6 +2309,8 @@ async function presentTrack(data, gen) {
   resetBoardUI();   // the open leaderboard (and any running scan) is stale now
   populateEnvSelector(data.format);
   if (data.format === 'mrsim') {
+    await preloadMrsimModels(data);
+    if (gen !== loadGen) return;
     const counts = buildTrackMrsim(data);
     frameTrack();
     const items = [];
@@ -2210,7 +2338,8 @@ async function presentTrack(data, gen) {
   const counts = buildTrack(data);
   frameTrack();
   const meta = data.meta || {};
-  const sceneName = CATALOG.scenes[meta.scene_id] || meta.scene || '?';
+  // saved tracks use scene_id; tolerate the sceneId alias some import paths emit
+  const sceneName = CATALOG.scenes[meta.scene_id ?? meta.sceneId] || meta.scene || '?';
   const items = [];
   if (counts.gate) items.push([counts.gate, 'x Gates']);
   if (counts.flag) items.push([counts.flag, 'x Flags']);
@@ -2292,6 +2421,14 @@ function importFile(file) {
 // ---------------------------------------------------------------------------
 // Convert the displayed track to the other sim's format and download it
 // ---------------------------------------------------------------------------
+// loaded human lines as three-space point arrays for the converter's checkpoint
+// fitting (skip the derived average line so it doesn't double-count)
+function humanLinesForConvert() {
+  return humanLines
+    .filter(l => l.kind !== 'avg' && l.frames?.length > 3)
+    .map(l => l.frames.map(f => new THREE.Vector3(f.p[0], f.p[1], -f.p[2])));
+}
+
 function convertCurrent() {
   if (!currentTrack) throw new Error('no track loaded');
   const env = document.getElementById('convEnv').value;
@@ -2303,11 +2440,22 @@ function convertCurrent() {
       content: buildTrk(sceneId, name, json),
     };
   }
+  // hand the converter the loaded human lines (each a 3-lap ghost) so flag and
+  // invisible-checkpoint sensors sit on the field's real crossing point and are
+  // sized to catch it — load the top times first (Fetch WR / leaderboard) for a
+  // tighter fit
+  const humanLines = humanLinesForConvert();
+  // native gate width (max_x − min_x) so the converter picks 5x5 vs 7x6 by size
+  const gateWidthFor = prefab => {
+    const d = PREFAB_DIMS[prefab];
+    return d ? d[3] - d[0] : 3.2;
+  };
   const { xml, warnings } = vdToMrsim(
     currentTrack, classifySeq, id => prefabInfo(id)?.name ?? '',
-    { location: env || undefined });
+    { location: env || undefined, humanLines, gateWidthFor });
   const name = currentTrack.meta?.name || 'track';
-  return { fileName: `${name}-VelociDrone.xml`, type: 'text/xml', warnings, content: xml };
+  const extra = humanLines.length ? [`fitted to ${humanLines.length} human line(s)`] : [];
+  return { fileName: `${name}-MRSIM.xml`, type: 'text/xml', warnings: [...warnings, ...extra], content: xml };
 }
 
 document.getElementById('btnConvert').addEventListener('click', () => {
@@ -2382,34 +2530,90 @@ const browserEl = document.getElementById('browser');
 const brSearch = document.getElementById('brSearch');
 const brSort = document.getElementById('brSort');
 const brList = document.getElementById('brList');
-const brMore = document.getElementById('brMore');
+const brLoadAll = document.getElementById('brLoadAll');
 const brStatus = document.getElementById('brStatus');
-const br = { shown: 0, busy: false };
-const BR_PAGE = 100;
+const br = { busy: false };
+// The whole official-track index is one ~220 KB list. We keep it in
+// localStorage so, once loaded, search works instantly and offline over EVERY
+// track across sessions — the "Load all" button re-fetches it to refresh.
+const CATALOGUE_CACHE = 'vd_catalogue';
+const BR_RENDER_CAP = 800;      // max rows drawn at once (search narrows beyond this)
 
-let cataloguePromise = null;
-function loadCatalogue() {
-  // single-flight: opening the browser while a fetch is running must not
-  // start a second 500 KB download
-  cataloguePromise ??= (async () => {
-    // public data, no email involved — a third-party CORS proxy is acceptable
-    // here, but prefer the user's own worker when one is configured
-    const proxy = getProxyBase();
-    const res = await fetch(proxy ? `${proxy}/get_official_tracks`
-                                  : corsProxy(`${VD_API}/api/get_official_tracks`));
-    if (!res.ok) throw new Error(`catalogue unavailable (${res.status})`);
-    const data = JSON.parse(decryptTrk(await res.text(), 'Bat Cave Games'));
-    if (!data.success || !Array.isArray(data.tracks)) {
-      throw new Error('catalogue response was not successful');
-    }
-    return data.tracks.map(t => ({
-      id: t.track_id, name: (t.track_name || '').trim(), sceneId: t.scene_id,
-      scene: CATALOG.scenes[t.scene_id] || VD_SCENE_DIRS[t.scene_id] || `Scene ${t.scene_id}`,
-      rating: Number(t.rating) || 0, count: Number(t.count) || 0,
-      date: String(t.date || ''),
-    }));
-  })().catch(e => { cataloguePromise = null; throw e; });
-  return cataloguePromise;
+let catalogue = null;           // the full index, in memory once loaded
+let catalogueAt = 0;            // epoch ms the cached index was fetched
+
+// scene display name for a catalogue entry (scene ids resolve via the prefab
+// catalog, then the download-folder map, so the cached index only stores the id)
+const sceneOf = t => CATALOG.scenes[t.sceneId] || VD_SCENE_DIRS[t.sceneId] || `Scene ${t.sceneId}`;
+
+function relTime(ms) {
+  if (!ms) return 'unknown';
+  const s = Math.max(1, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.round(s / 60); if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60); if (h < 24) return `${h} h ago`;
+  return `${Math.round(h / 24)} d ago`;
+}
+
+// the saved index from a previous session, or null if none/corrupt
+function readCachedCatalogue() {
+  try {
+    const o = JSON.parse(localStorage.getItem(CATALOGUE_CACHE) || 'null');
+    // reject caches from before dlName existed (v<2) so they re-fetch and
+    // downloads use the exact server filename again
+    if (!o || o.v !== 2 || !Array.isArray(o.tracks) || !o.tracks.length) return null;
+    catalogueAt = o.fetchedAt || 0;
+    return o.tracks;
+  } catch { return null; }
+}
+
+// (re)download the whole catalogue from VelociDrone and persist it
+async function fetchCatalogue() {
+  // public data, no email involved — a third-party CORS proxy is acceptable
+  // here, but prefer the user's own worker when one is configured
+  const proxy = getProxyBase();
+  const res = await fetch(proxy ? `${proxy}/get_official_tracks`
+                                : corsProxy(`${VD_API}/api/get_official_tracks`));
+  if (!res.ok) throw new Error(`catalogue unavailable (${res.status})`);
+  const data = JSON.parse(decryptTrk(await res.text(), 'Bat Cave Games'));
+  if (!data.success || !Array.isArray(data.tracks)) {
+    throw new Error('catalogue response was not successful');
+  }
+  const tracks = data.tracks.map(t => ({
+    // `name` is trimmed for display/search; `dlName` keeps the RAW catalogue
+    // name because the download path must match the server filename exactly —
+    // some tracks are stored with leading/trailing spaces (e.g. " FAI World
+    // Cup Italy 2024 "), and trimming them 404s the .trk download
+    id: t.track_id, name: (t.track_name || '').trim(), dlName: t.track_name || '',
+    sceneId: t.scene_id, rating: Number(t.rating) || 0, count: Number(t.count) || 0,
+    date: String(t.date || ''),
+  }));
+  catalogueAt = Date.now();
+  try {
+    localStorage.setItem(CATALOGUE_CACHE, JSON.stringify({ v: 2, fetchedAt: catalogueAt, tracks }));
+  } catch { /* storage full / disabled — still usable in memory this session */ }
+  return tracks;
+}
+
+// fetch fresh, save, and re-render — the "Load all" action
+async function refreshCatalogue() {
+  if (br.busy) return;
+  br.busy = true;
+  brLoadAll.disabled = true;
+  const label = brLoadAll.textContent;
+  brLoadAll.textContent = '⟳ Loading…';
+  brStatus.textContent = 'Fetching the full official-track index…';
+  try {
+    catalogue = await fetchCatalogue();
+    brRender();
+  } catch (e) {
+    console.error(e);
+    brStatus.textContent = `Could not load the catalogue: ${e.message}`;
+  } finally {
+    br.busy = false;
+    brLoadAll.disabled = false;
+    brLoadAll.textContent = label;
+  }
 }
 
 const BR_SORTS = {
@@ -2419,10 +2623,10 @@ const BR_SORTS = {
   name: (a, b) => a.name.localeCompare(b.name),
 };
 
-function brFiltered(catalogue) {
+function brFiltered(list) {
   const q = brSearch.value.trim().toLowerCase();
-  return catalogue
-    .filter(t => !q || t.name.toLowerCase().includes(q) || t.scene.toLowerCase().includes(q))
+  return list
+    .filter(t => !q || t.name.toLowerCase().includes(q) || sceneOf(t).toLowerCase().includes(q))
     .sort(BR_SORTS[brSort.value] || BR_SORTS.popularity);
 }
 
@@ -2433,7 +2637,7 @@ function brRow(t) {
   row.innerHTML = `<b></b><span class="scene"></span>` +
     `<span class="stars">★ ${t.rating.toFixed(1)} (${t.count})</span>`;
   row.querySelector('b').textContent = t.name;
-  row.querySelector('.scene').textContent = t.scene;
+  row.querySelector('.scene').textContent = sceneOf(t);
   row.addEventListener('click', () => {
     if (br.busy) return;
     br.busy = true;
@@ -2445,7 +2649,7 @@ function brRow(t) {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          file_path: `downloads/scenes/${dir}/official_tracks/${t.name}.trk`,
+          file_path: `downloads/scenes/${dir}/official_tracks/${t.dlName ?? t.name}.trk`,
         }),
       });
       if (!res.ok) throw new Error(`download failed (${res.status})`);
@@ -2464,37 +2668,44 @@ function brRow(t) {
   return row;
 }
 
-async function brRender(reset) {
-  if (reset) { br.shown = 0; brList.innerHTML = ''; }
-  brStatus.textContent = 'Loading…';
-  brMore.style.display = 'none';
-  try {
-    const list = brFiltered(await loadCatalogue());
-    const next = list.slice(br.shown, br.shown + BR_PAGE);
-    next.forEach(t => brList.appendChild(brRow(t)));
-    br.shown += next.length;
-    brStatus.textContent = `${br.shown} of ${list.length} official tracks`;
-    brMore.style.display = br.shown < list.length ? '' : 'none';
-  } catch (e) {
-    console.error(e);
-    brStatus.textContent = `Could not load the catalogue: ${e.message}`;
+// draw the current search over the whole saved index at once (a DocumentFragment
+// keeps even a 2000-row unfiltered list to a single reflow); search over the
+// full catalogue means any track is findable whether or not it's on screen
+function brRender() {
+  brList.innerHTML = '';
+  if (!catalogue) {
+    brStatus.textContent = 'No saved index yet — press “Load all official tracks”.';
+    return;
   }
+  const list = brFiltered(catalogue);
+  const frag = document.createDocumentFragment();
+  list.slice(0, BR_RENDER_CAP).forEach(t => frag.appendChild(brRow(t)));
+  brList.appendChild(frag);
+  const capped = list.length > BR_RENDER_CAP ? ` (showing ${BR_RENDER_CAP} — narrow your search)` : '';
+  const q = brSearch.value.trim();
+  brStatus.textContent = q
+    ? `${list.length} match${list.length === 1 ? '' : 'es'} of ${catalogue.length}${capped}`
+    : `${catalogue.length} official tracks · index updated ${relTime(catalogueAt)}${capped}`;
 }
 
 document.getElementById('btnBrowse').addEventListener('click', () => {
   const open = browserEl.classList.toggle('open');
-  if (open && !brList.children.length) brRender(true);
-  if (open) brSearch.focus();
+  if (open) {
+    // load the saved index instantly; first-ever open with no cache fetches once
+    if (!catalogue) catalogue = readCachedCatalogue();
+    if (catalogue) brRender(); else refreshCatalogue();
+    brSearch.focus();
+  }
 });
 document.getElementById('brClose').addEventListener('click', () =>
   browserEl.classList.remove('open'));
 let brDebounce = 0;
 brSearch.addEventListener('input', () => {
   clearTimeout(brDebounce);
-  brDebounce = setTimeout(() => brRender(true), 250);
+  brDebounce = setTimeout(brRender, 200);
 });
-brSort.addEventListener('change', () => brRender(true));
-brMore.addEventListener('click', () => brRender(false));
+brSort.addEventListener('change', brRender);
+brLoadAll.addEventListener('click', refreshCatalogue);
 
 // ---------------------------------------------------------------------------
 // Render loop
@@ -2524,10 +2735,21 @@ window.addEventListener('resize', () => {
   // prefab catalog + extracted-model index (both optional — fallbacks exist)
   try { CATALOG = await (await fetch('tracks/prefabs.json')).json(); }
   catch (e) { console.warn('prefabs.json unavailable, using fallback classification'); }
-  try { MODELS_INDEX = await (await fetch('models/models.json')).json(); }
+  try {
+    MODELS_INDEX = await (await fetch('models/models.json')).json();
+    // the shipped models.json lists only the subset committed to the repo; the
+    // full local extraction (gitignored, all ~3300 prefabs) is an overlay the
+    // viewer prefers when present — same split as manifest.json/.local.json
+    try {
+      const local = await fetch('models/models.local.json');
+      if (local.ok) MODELS_INDEX = await local.json();
+    } catch (e) { /* no local overlay — ship subset only */ }
+  }
   catch (e) { console.warn('models.json unavailable, using procedural meshes'); }
   try { PREFAB_DIMS = await (await fetch('tracks/prefab-dims.json')).json(); }
   catch (e) { console.warn('prefab-dims.json unavailable, scenery boxes use raw scale'); }
+  try { MRSIM_MODELS = await (await fetch('models/mrsim/models.json')).json(); }
+  catch (e) { /* no MRSIM meshes — element models fall back to procedural */ }
   const tracks = await loadManifest();
   if (tracks.length) {
     await loadTrack(tracks[0].file);
