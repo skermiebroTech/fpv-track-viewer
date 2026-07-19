@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { parseTrk, buildTrk, decryptTrk } from './trk.js?v=11';
 import { parseMrsim } from './mrsim.js';
-import { vdToMrsim, mrsimToVd, MRSIM_LOCATIONS, VD_SCENES } from './convert.js';
+import { vdToMrsim, mrsimToVd, validateMrsim, MRSIM_LOCATIONS, VD_SCENES } from './convert.js';
 import { computeRaceline, planeBasis } from './raceline.js';
 import { fetchLeaderboard, searchLeaderboard, fetchFlightFor, averageLaps,
   parseGhostBytes, getProxyBase, setProxyBase, needsProxySetup } from './ghostfetch.js?v=13';
@@ -1541,10 +1541,14 @@ function buildTrackMrsim(data) {
     };
 
     // when a real extracted mesh backs this element, it IS the visual — the
-    // collision prims (pipe cylinders / fabric boxes) would only double up
-    const hasMesh = (el.models || []).some(md => mrsimTemplates.has(md.model));
+    // collision prims from the SAME library file are its collision shadow and
+    // would only double up. Prims from other sources (e.g. the converter's
+    // riser pole under a lifted flag) are additions and still draw.
+    const meshSrcs = new Set((el.models || [])
+      .filter(md => mrsimTemplates.has(md.model)).map(md => md.src));
 
-    if (!hasMesh) el.prims.forEach(p => {
+    el.prims.forEach(p => {
+      if (meshSrcs.has(p.src)) return;
       const hint = p.hint;
       if (hint === 'panelTop') {
         // gate top banner: checker for start/finish, sponsor plate otherwise
@@ -2241,6 +2245,7 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     hideInspector();
     document.getElementById('browser').classList.remove('open');
+    document.getElementById('convReport').classList.remove('open');
   }
 });
 document.getElementById('insClose').addEventListener('click', hideInspector);
@@ -2425,6 +2430,7 @@ function registerUpload(data, icon = '📂') {
 }
 
 function importFile(file) {
+  document.getElementById('convReport')?.classList.remove('open');
   return runLoad(async () => {
     const text = await file.text();
     const data = /\.xml$/i.test(file.name)
@@ -2452,8 +2458,9 @@ function convertCurrent() {
     const { sceneId, name, json, warnings } =
       mrsimToVd(currentTrack, { sceneId: Number(env) || undefined });
     return {
-      fileName: `${name}.trk`, type: 'text/plain', warnings,
+      fileName: `${name}.trk`, type: 'text/plain', warnings, target: 'vd',
       content: buildTrk(sceneId, name, json),
+      counts: { checkpoints: json.gates.length, scenery: json.barriers.length },
     };
   }
   // hand the converter the loaded human lines (each a 3-lap ghost) so flag and
@@ -2466,24 +2473,89 @@ function convertCurrent() {
     const d = PREFAB_DIMS[prefab];
     return d ? d[3] - d[0] : 3.2;
   };
-  const { xml, warnings } = vdToMrsim(
+  // native prefab height (flag poles) so flag visuals lift to the VD height
+  const heightFor = prefab => {
+    const d = PREFAB_DIMS[prefab];
+    return d ? d[4] - d[1] : undefined;
+  };
+  const { xml, warnings, summary, normal } = vdToMrsim(
     currentTrack, classifySeq, id => prefabInfo(id)?.name ?? '',
-    { location: env || undefined, humanLines, gateWidthFor });
+    { location: env || undefined, humanLines, gateWidthFor, heightFor,
+      sceneName: CATALOG.scenes[currentTrack.meta?.scene_id] });
   const name = currentTrack.meta?.name || 'track';
   const extra = humanLines.length ? [`fitted to ${humanLines.length} human line(s)`] : [];
-  return { fileName: `${name}-MRSIM.xml`, type: 'text/xml', warnings: [...warnings, ...extra], content: xml };
+  return { fileName: `${name}-MRSIM.xml`, type: 'text/xml', target: 'mrsim',
+    warnings: [...warnings, ...extra], content: xml, summary, normal, humanLines };
 }
+
+// ---------------------------------------------------------------------------
+// Conversion report panel: counts, warnings and validation results
+// ---------------------------------------------------------------------------
+const convReport = document.getElementById('convReport');
+function showConvReport(res) {   // uses the shared esc() HTML escaper
+  const rows = [];
+  const badge = ok => ok
+    ? '<span class="cvBadge ok">VALID</span>'
+    : '<span class="cvBadge bad">CHECK FAILED</span>';
+  let validation = null;
+  if (res.target === 'mrsim' && res.summary) {
+    // validate what we just emitted: re-parse with the MRSIM parser and check
+    // every checkpoint resolves exactly where the converter aimed
+    validation = validateMrsim(res.content,
+      { summary: res.summary, normal: res.normal, humanLines: res.humanLines });
+    const k = res.summary.counts;
+    rows.push(`<div class="cvTitle">${esc(res.fileName)} ${badge(validation.ok)}</div>`);
+    rows.push('<div class="cvGrid">' +
+      `<b>${k.crossings}</b><span>checkpoints (${k.gates} gates, ${k.dives} dive/climb, ` +
+      `${k.flags} flags, ${k.checkpoints} sensors)${k.merged ? ` — ${k.merged} duplicate(s) merged` : ''}</span>` +
+      `<b>${k.blocks + k.nets + k.hurdles + k.decoFlags}</b><span>of ${k.sourceScenery} scenery objects ` +
+      `(${k.blocks} blocks, ${k.nets} nets, ${k.hurdles} hurdles, ${k.decoFlags} flags)</span>` +
+      `<b>${res.summary.location}</b><span>${res.summary.isCircuit ? 'circuit' : 'sprint'}` +
+      `${res.summary.groundRaise > 0.005 ? ` · raised ${res.summary.groundRaise.toFixed(2)} m onto the floor` : ''}</span>` +
+      '</div>');
+  } else {
+    rows.push(`<div class="cvTitle">${esc(res.fileName)}</div>`);
+    rows.push('<div class="cvGrid">' +
+      `<b>${res.counts.checkpoints}</b><span>sequence checkpoints</span>` +
+      `<b>${res.counts.scenery}</b><span>scenery objects</span></div>`);
+    rows.push('<div class="cvNote">VelociDrone imports are checked by the game on load ' +
+      '(insert via the track editor\'s Import option).</div>');
+  }
+  if (res.warnings.length) {
+    rows.push('<h3>Warnings</h3><ul>' +
+      res.warnings.map(w => `<li>${esc(w)}</li>`).join('') + '</ul>');
+  }
+  if (validation) {
+    const worst = validation.comparison.reduce((a, c) => Math.max(a, c.posDelta), 0);
+    rows.push('<h3>Validation</h3><ul>' +
+      `<li>${validation.stats.checkpoints ?? 0}/${validation.stats.listed ?? '?'} ` +
+      `checkpoint-list entries resolved by the MRSIM parser, in order</li>` +
+      (validation.comparison.length
+        ? `<li>worst checkpoint placement error ${worst.toFixed(3)} m</li>` : '') +
+      validation.errors.map(e => `<li class="err">${esc(e)}</li>`).join('') +
+      validation.warnings.map(w => `<li>${esc(w)}</li>`).join('') +
+      '</ul>');
+    if (validation.ok) {
+      rows.push('<div class="cvNote">Copy the XML into Documents/MRSIM/Tracks/ and it ' +
+        'appears in MRSIM\'s track list.</div>');
+    }
+  }
+  document.getElementById('cvBody').innerHTML = rows.join('');
+  convReport.classList.add('open');
+}
+document.getElementById('cvClose').addEventListener('click',
+  () => convReport.classList.remove('open'));
 
 document.getElementById('btnConvert').addEventListener('click', () => {
   try {
-    const { fileName, content, type, warnings } = convertCurrent();
+    const res = convertCurrent();
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([content], { type }));
-    a.download = fileName;
+    a.href = URL.createObjectURL(new Blob([res.content], { type: res.type }));
+    a.download = res.fileName;
     a.click();
     URL.revokeObjectURL(a.href);
-    document.getElementById('trackSub').textContent =
-      [`Exported ${fileName}`, ...warnings].join(' · ');
+    document.getElementById('trackSub').textContent = `Exported ${res.fileName}`;
+    showConvReport(res);
   } catch (e) {
     console.error(e);
     document.getElementById('trackSub').textContent = `Convert failed: ${e.message}`;
@@ -2505,6 +2577,7 @@ window.addEventListener('drop', e => {
 });
 
 trackSelect.addEventListener('change', () => {
+  convReport.classList.remove('open');   // a stale report would mislead
   const v = trackSelect.value;
   if (v.startsWith('upload:')) {
     runLoad(async () => uploads[+v.slice(7)], () => 'Failed to load track.');
@@ -2768,7 +2841,11 @@ window.addEventListener('resize', () => {
   catch (e) { /* no MRSIM meshes — element models fall back to procedural */ }
   const tracks = await loadManifest();
   if (tracks.length) {
-    await loadTrack(tracks[0].file);
+    // deep link: ?track=<manifest file> opens that track directly
+    const want = new URLSearchParams(location.search).get('track');
+    const first = tracks.find(t => t.file === want) ?? tracks[0];
+    trackSelect.value = first.file;
+    await loadTrack(first.file);
   } else {
     loadingEl.querySelector('.spin')?.remove();   // stop the spinner on fatal errors
     document.getElementById('loadingMsg').textContent =

@@ -36,7 +36,8 @@ const num = (el, name, dflt = 0) => {
   return v === null || v === '' ? dflt : parseFloat(v);
 };
 
-// <Transform>/<WorldFromEntityComponent> attributes -> local matrix (T * R)
+// <Transform>/<WorldFromEntityComponent> attributes -> local matrix (T * R * S).
+// s="0.8" is the engine's uniform scale (Baylands trees, menu UI use it).
 function localMatrix(el) {
   let x = num(el, 'x'), y = num(el, 'y'), z = num(el, 'z');
   const v = el.getAttribute('v');
@@ -51,6 +52,8 @@ function localMatrix(el) {
   if ((ax || ay || az) && angle) {
     m.makeRotationAxis(new THREE.Vector3(ax, ay, az).normalize(), angle);
   }
+  const s = num(el, 's', 1);
+  if (s !== 1) m.multiply(new THREE.Matrix4().makeScale(s, s, s));
   m.setPosition(x, y, z);
   return m;
 }
@@ -214,7 +217,7 @@ function walkEntity(node, ctx, st) {
   if (wf) m = m.clone().multiply(localMatrix(wf));
   let elem = ctx.elem;
   if (!elem && name && name !== 'Track') {
-    elem = { name, tags: new Set(ctx.tags), prims: [], models: [], cps: [] };
+    elem = { name, tags: new Set(ctx.tags), prims: [], models: [], cps: [], sensors: [] };
     st.elements.push(elem);
   }
   const c2 = { ...ctx, m, elem, path: name ? [...ctx.path, name] : ctx.path };
@@ -254,17 +257,23 @@ function processComponents(node, ctx, st) {
     const tpl = st.groups.get(g);
     return tpl && (directChild(tpl.el, 'Box') || directChild(tpl.el, 'Cylinder'));
   });
-  if (contact !== '-1' && !tplHasShapes) {  // contactMaterial -1 = sensor volume
+  if (contact === '-1') {
+    // sensor volume (checkpoint trigger) — invisible in-game, but kept so an
+    // editor can show and manipulate the actual trigger extent
+    for (const s of shapes) elem?.sensors.push({ ...s, m: ctx.m.clone(), src: ctx.src });
+  } else if (!tplHasShapes) {
     for (const s of shapes) {
       if (!elem) { note(st, 'shape outside any entity'); continue; }
       elem.prims.push({
         ...s, m: ctx.m.clone(), hint: matHint(s.shape, s.dims, material, ctx.tags),
+        src: ctx.src,
+        solid: contact != null,   // render-only shapes carry no StaticContact
       });
     }
   }
   for (const f of models) {
     if (!elem) continue;
-    elem.models.push({ model: basename(f).replace(/\.model$/, ''), m: ctx.m.clone() });
+    elem.models.push({ model: basename(f).replace(/\.model$/, ''), m: ctx.m.clone(), src: ctx.src });
   }
   for (const g of instRefs) {
     const tpl = st.groups.get(g);
@@ -322,7 +331,8 @@ function parseCpList(node, st) {
 function assemble(st, fileName) {
   const three = m => Z_UP_TO_Y_UP.clone().multiply(m);
 
-  const kept = st.elements.filter(e => e.prims.length || e.models.length || e.cps.length);
+  const kept = st.elements.filter(e =>
+    e.prims.length || e.models.length || e.cps.length || e.sensors.length);
   const elemIndex = new Map(kept.map((e, i) => [e, i]));
   const elements = kept.map(e => ({
     name: e.name,
@@ -332,9 +342,13 @@ function assemble(st, fileName) {
     isStart: [...e.tags].some(t => /StartFinish/.test(t)),
     tags: [...e.tags],
     prims: e.prims.map(p => ({
-      shape: p.shape, dims: p.dims, hint: p.hint, matrix: three(p.m),
+      shape: p.shape, dims: p.dims, hint: p.hint, matrix: three(p.m), src: p.src,
+      solid: p.solid !== false,
     })),
-    models: e.models.map(md => ({ model: md.model, matrix: three(md.m) })),
+    models: e.models.map(md => ({ model: md.model, matrix: three(md.m), src: md.src })),
+    sensors: e.sensors.map(s => ({
+      shape: s.shape, dims: s.dims, matrix: three(s.m), src: s.src,
+    })),
   }));
 
   // resolve the checkpoint sequence to world crossings

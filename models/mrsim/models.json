@@ -1,6 +1,10 @@
 {
  "MRSIMBottomMenu": {
   "file": "models/mrsim/MRSIMBottomMenu.glb",
+  "parts": [
+   "Cube",
+   "WhitePanelCube"
+  ],
   "min": [
    -3.5,
    0.0,
@@ -14,6 +18,13 @@
  },
  "MRSIMLogo": {
   "file": "models/mrsim/MRSIMLogo.glb",
+  "parts": [
+   "M1",
+   "R",
+   "S",
+   "I",
+   "M2"
+  ],
   "min": [
    0.0,
    0.0,
@@ -27,6 +38,10 @@
  },
  "MRSIMTopMenu": {
   "file": "models/mrsim/MRSIMTopMenu.glb",
+  "parts": [
+   "Cube",
+   "WhitePanelCube"
+  ],
   "min": [
    0.0,
    0.0,
@@ -40,6 +55,10 @@
  },
  "5x5Gate": {
   "file": "models/mrsim/5x5Gate.glb",
+  "parts": [
+   "Fabric",
+   "PVC"
+  ],
   "min": [
    -0.02,
    -0.02,
@@ -53,6 +72,13 @@
  },
  "7x6Gate": {
   "file": "models/mrsim/7x6Gate.glb",
+  "parts": [
+   "LeftPanel",
+   "RightPanel",
+   "TopPanel",
+   "PVC",
+   "TopPanelBack"
+  ],
   "min": [
    -0.02,
    -0.02,
@@ -66,6 +92,12 @@
  },
  "7x7ClimbGate": {
   "file": "models/mrsim/7x7ClimbGate.glb",
+  "parts": [
+   "SquarePanel",
+   "FrontPanel",
+   "BackPanel",
+   "PVC"
+  ],
   "min": [
    -1.37,
    -1.37,
@@ -79,6 +111,12 @@
  },
  "7x7DiveGate": {
   "file": "models/mrsim/7x7DiveGate.glb",
+  "parts": [
+   "SquarePanel",
+   "FrontPanel",
+   "BackPanel",
+   "PVC"
+  ],
   "min": [
    -1.52,
    -1.52,
@@ -92,6 +130,10 @@
  },
  "7x7Mat": {
   "file": "models/mrsim/7x7Mat.glb",
+  "parts": [
+   "Panel",
+   "PVC"
+  ],
   "min": [
    -1.52,
    -1.52,
@@ -105,6 +147,38 @@
  },
  "Hydra": {
   "file": "models/mrsim/Hydra.glb",
+  "parts": [
+   "XT60",
+   "XT60Battery",
+   "OtherWires",
+   "Pads",
+   "PlugLeadNegative",
+   "PlugLeadPositive",
+   "Solder",
+   "BalanceConnector",
+   "MotorWires.001-0BalanceWires",
+   "MotorWires.001-1BalanceWires",
+   "Battery",
+   "BatteryLeadNegative",
+   "BatteryLeadPositive",
+   "BatteryShrinkWrap",
+   "CameraBoard-0CameraBoard",
+   "CameraBoard-1CameraBoard",
+   "Cap-0Cap",
+   "Cap-1Cap",
+   "Cap-2Cap",
+   "Lens",
+   "CameraScrews",
+   "MotorWires",
+   "Carbon-0Carbon",
+   "Carbon-1Carbon",
+   "Hardware",
+   "Standoffs",
+   "TPU",
+   "VTXAntenna",
+   "Gummies",
+   "Stack"
+  ],
   "min": [
    -0.101,
    -0.126,
@@ -118,6 +192,38 @@
  },
  "KronosAlpha": {
   "file": "models/mrsim/KronosAlpha.glb",
+  "parts": [
+   "XT60",
+   "XT60Battery",
+   "OtherWires",
+   "Pads",
+   "PlugLeadNegative",
+   "PlugLeadPositive",
+   "Solder",
+   "BalanceConnector",
+   "MotorWires.001-0BalanceWires",
+   "MotorWires.001-1BalanceWires",
+   "Battery",
+   "BatteryLeadNegative",
+   "BatteryLeadPositive",
+   "BatteryShrinkWrap",
+   "CameraBoard-0CameraBoard",
+   "CameraBoard-1CameraBoard",
+   "Cap-0Cap",
+   "Cap-1Cap",
+   "Cap-2Cap",
+   "Lens",
+   "Gummies",
+   "Stack",
+   "CameraScrews",
+   "MotorWires",
+   "Carbon-0Carbon",
+   "Carbon-1Carbon",
+   "TPU",
+   "Standoffs",
+   "Hardware",
+   "VTXAntenna"
+  ],
   "min": [
    -0.072,
    -0.085,
@@ -131,6 +237,9 @@
  },
  "ExoCollision": {
   "file": "models/mrsim/ExoCollision.glb",
+  "parts": [
+   "ExoCollision"
+  ],
   "min": [
    -0.014,
    -0.029,
@@ -144,6 +253,10 @@
  },
  "Fin": {
   "file": "models/mrsim/Fin.glb",
+  "parts": [
+   "OZR-5X Fin",
+   "FinScrews"
+  ],
   "min": [
    -0.016,
    -0.002,
@@ -157,6 +270,10 @@
  },
  "OZR-5XExo": {
   "file": "models/mrsim/OZR-5XExo.glb",
+  "parts": [
+   "Exo 55 Wide",
+   "ExoHardware"
+  ],
   "min": [
    -0.015,
    -0.029,
@@ -170,6 +287,47 @@
  },
  "OZR-5XV2": {
   "file": "models/mrsim/OZR-5XV2.glb",
+  "parts": [
+   "Hardware",
+   "CenterDamper",
+   "VTX-0VTX",
+   "VTX-1VTX",
+   "VTX-2VTX",
+   "XT60",
+   "XT60Battery",
+   "OtherWires",
+   "Pads",
+   "PlugLeadNegative",
+   "PlugLeadPositive",
+   "Solder",
+   "BalanceConnector",
+   "MotorWires.001-0BalanceWires",
+   "MotorWires.001-1BalanceWires",
+   "Battery",
+   "BatteryLeadNegative",
+   "BatteryLeadPositive",
+   "BatteryShrinkWrap",
+   "Cap-0Cap",
+   "Cap-1Cap",
+   "Cap-2Cap",
+   "ESC",
+   "FC-0FC",
+   "FC-1FC",
+   "Gummies",
+   "FoxeerVTXAntenna",
+   "FoxeerVTXAntennaTPU",
+   "Foxeer VTX Antenna.001FoxeerVTXAntennaWire",
+   "CylinderVTXAntennaConnector",
+   "MotorWires",
+   "CylinderStandoffs",
+   "V2Carbon-0V2Carbon",
+   "V2Carbon-1V2Carbon",
+   "V2CameraTPU",
+   "V2CameraTPUHardware",
+   "WideLens55",
+   "WideCameraBoard55",
+   "Nano90Base55"
+  ],
   "min": [
    -0.072,
    -0.081,
@@ -183,6 +341,10 @@
  },
  "Prop5Inch": {
   "file": "models/mrsim/Prop5Inch.glb",
+  "parts": [
+   "PropCCW",
+   "PropCW"
+  ],
   "min": [
    -0.064,
    -0.055,
@@ -196,6 +358,9 @@
  },
  "FlipHatCollision": {
   "file": "models/mrsim/FlipHatCollision.glb",
+  "parts": [
+   "FlipHatCollision"
+  ],
   "min": [
    -0.014,
    -0.03,
@@ -209,6 +374,47 @@
  },
  "MOTION": {
   "file": "models/mrsim/MOTION.glb",
+  "parts": [
+   "TPU50",
+   "Carbon-0Carbon",
+   "Carbon-1Carbon",
+   "Standoffs",
+   "Hardware",
+   "Body4.003RedScrews",
+   "Pressnuts",
+   "XT60Battery",
+   "XT60",
+   "CylinderVTXAntennaConnector",
+   "VTX-0VTX",
+   "VTX-1VTX",
+   "VTX-2VTX",
+   "Solder",
+   "PlugLeadPositive",
+   "PlugLeadNegative",
+   "Pads",
+   "MotorWires",
+   "Gummies",
+   "Foxeer VTX Antenna.001FoxeerVTXAntennaWire",
+   "FoxeerVTXAntennaTPU",
+   "FoxeerVTXAntenna",
+   "FC-0FC",
+   "FC-1FC",
+   "ESC",
+   "Cap-0Cap",
+   "Cap-1Cap",
+   "Cap-2Cap",
+   "OtherWires",
+   "Nano90Base55",
+   "WideCameraBoard55",
+   "WideLens55",
+   "BalanceConnector",
+   "MotorWires.001-0BalanceWires",
+   "MotorWires.001-1BalanceWires",
+   "Battery",
+   "BatteryLeadNegative",
+   "BatteryLeadPositive",
+   "BatteryShrinkWrap"
+  ],
   "min": [
    -0.071,
    -0.078,
@@ -222,6 +428,11 @@
  },
  "Flag": {
   "file": "models/mrsim/Flag.glb",
+  "parts": [
+   "Flag",
+   "Stalk",
+   "Sleeve"
+  ],
   "min": [
    -0.807,
    -0.04,
@@ -235,6 +446,10 @@
  },
  "BlueGumTree": {
   "file": "models/mrsim/BlueGumTree.glb",
+  "parts": [
+   "Trunk",
+   "Leaves"
+  ],
   "min": [
    -9.604,
    -11.962,
@@ -248,6 +463,71 @@
  },
  "BlueGumTreeCollision": {
   "file": "models/mrsim/BlueGumTreeCollision.glb",
+  "parts": [
+   "CollisionTrunk",
+   "CollisionTrunk.001",
+   "CollisionTrunk.002",
+   "CollisionTrunk.003",
+   "CollisionTrunk.004",
+   "CollisionTrunk.005",
+   "CollisionTrunk.006",
+   "CollisionTrunk.007",
+   "CollisionTrunk.008",
+   "CollisionTrunk.009",
+   "CollisionTrunk.010",
+   "CollisionTrunk.011",
+   "CollisionTrunk.012",
+   "CollisionTrunk.013",
+   "CollisionTrunk.014",
+   "CollisionTrunk.015",
+   "CollisionTrunk.016",
+   "CollisionTrunk.017",
+   "CollisionTrunk.018",
+   "CollisionTrunk.019",
+   "CollisionTrunk.020",
+   "CollisionTrunk.021",
+   "CollisionTrunk.022",
+   "CollisionTrunk.023",
+   "CollisionTrunk.024",
+   "CollisionTrunk.025",
+   "CollisionTrunk.026",
+   "CollisionTrunk.027",
+   "CollisionTrunk.028",
+   "CollisionTrunk.029",
+   "CollisionTrunk.030",
+   "CollisionTrunk.031",
+   "CollisionTrunk.032",
+   "CollisionTrunk.033",
+   "CollisionTrunk.034",
+   "CollisionLeaves.001",
+   "CollisionLeaves.002",
+   "CollisionLeaves.003",
+   "CollisionLeaves.004",
+   "CollisionLeaves.005",
+   "CollisionLeaves.006",
+   "CollisionLeaves.007",
+   "CollisionLeaves.008",
+   "CollisionLeaves.009",
+   "CollisionLeaves.010",
+   "CollisionLeaves.011",
+   "CollisionLeaves.012",
+   "CollisionLeaves.013",
+   "CollisionLeaves.014",
+   "CollisionLeaves.015",
+   "CollisionLeaves.016",
+   "CollisionLeaves.017",
+   "CollisionLeaves.018",
+   "CollisionLeaves.019",
+   "CollisionLeaves.020",
+   "CollisionLeaves.021",
+   "CollisionLeaves.022",
+   "CollisionLeaves.023",
+   "CollisionLeaves.024",
+   "CollisionLeaves.025",
+   "CollisionLeaves.026",
+   "CollisionLeaves.027",
+   "CollisionLeaves.028"
+  ],
   "min": [
    -9.604,
    -11.962,
@@ -261,6 +541,11 @@
  },
  "ShadeCanopy": {
   "file": "models/mrsim/ShadeCanopy.glb",
+  "parts": [
+   "Fabric",
+   "Feet",
+   "Legs"
+  ],
   "min": [
    -1.524,
    -1.524,
@@ -274,6 +559,9 @@
  },
  "ShadeCanopyCollision": {
   "file": "models/mrsim/ShadeCanopyCollision.glb",
+  "parts": [
+   "FabricCollision"
+  ],
   "min": [
    -1.524,
    -1.524,
@@ -287,6 +575,10 @@
  },
  "Champs25Gate": {
   "file": "models/mrsim/Champs25Gate.glb",
+  "parts": [
+   "Gate",
+   "LEDGate"
+  ],
   "min": [
    -1.271,
    -0.27,
@@ -300,6 +592,10 @@
  },
  "Champs25Pole": {
   "file": "models/mrsim/Champs25Pole.glb",
+  "parts": [
+   "Stalk",
+   "Sleeve"
+  ],
   "min": [
    -0.048,
    -0.048,
@@ -313,6 +609,10 @@
  },
  "ChampionshipLaunchStand": {
   "file": "models/mrsim/ChampionshipLaunchStand.glb",
+  "parts": [
+   "ChampionshipLaunchStand",
+   "FoamChampionshipLaunchStand"
+  ],
   "min": [
    -0.2,
    -0.05,
@@ -326,6 +626,12 @@
  },
  "ChampionshipLaunchStandCollision": {
   "file": "models/mrsim/ChampionshipLaunchStandCollision.glb",
+  "parts": [
+   "TopLeftBeam",
+   "LeftSide",
+   "RightSide",
+   "TopRightBeam"
+  ],
   "min": [
    -0.199,
    -0.049,
@@ -339,6 +645,11 @@
  },
  "MetalLaunchStand": {
   "file": "models/mrsim/MetalLaunchStand.glb",
+  "parts": [
+   "Body2",
+   "Body3",
+   "Body4"
+  ],
   "min": [
    -0.093,
    0.0,
@@ -352,6 +663,17 @@
  },
  "BaylandsPark": {
   "file": "models/mrsim/BaylandsPark.glb",
+  "parts": [
+   "Terrain",
+   "SandyPathTerrain",
+   "GreenGrassTerrain",
+   "ConcreteTerrain",
+   "AsphaltTerrain",
+   "WaterTerrain",
+   "PlaygroundBathroom",
+   "SWBathroom",
+   "SEBathroom"
+  ],
   "min": [
    -411.632,
    -274.094,
@@ -365,6 +687,18 @@
  },
  "HardestyBMXTrack": {
   "file": "models/mrsim/HardestyBMXTrack.glb",
+  "parts": [
+   "Hardesty_Bmx_Track",
+   "ConcreteHardesty_Bmx_Track",
+   "ClayHardesty_Bmx_Track",
+   "TurnsHardesty_Bmx_Track",
+   "Hardesty_BMX_Building",
+   "WhitePaintHardesty_BMX_Building",
+   "FinishGateFlag",
+   "FinishGateLeft",
+   "FinishGateRight",
+   "FinishGatePassageGeometry"
+  ],
   "min": [
    -43.108,
    -87.52,
@@ -378,6 +712,17 @@
  },
  "Motor26mm": {
   "file": "models/mrsim/Motor26mm.glb",
+  "parts": [
+   "BellTop",
+   "Nut",
+   "Shaft",
+   "Bearing",
+   "Insulator",
+   "Copper",
+   "Mount",
+   "Mount",
+   "BellSide"
+  ],
   "min": [
    -0.013,
    -0.013,
@@ -391,6 +736,10 @@
  },
  "NextGateIndicator": {
   "file": "models/mrsim/NextGateIndicator.glb",
+  "parts": [
+   "RightWay",
+   "WrongWay"
+  ],
   "min": [
    -0.5,
    0.0,
@@ -404,6 +753,10 @@
  },
  "RaceLEDs": {
   "file": "models/mrsim/RaceLEDs.glb",
+  "parts": [
+   "PCB",
+   "LEDs"
+  ],
   "min": [
    -0.003,
    -0.02,
@@ -417,6 +770,11 @@
  },
  "Motor33mm": {
   "file": "models/mrsim/Motor33mm.glb",
+  "parts": [
+   "Bell",
+   "ColorBBell",
+   "Nut"
+  ],
   "min": [
    -0.016,
    -0.016,
@@ -430,6 +788,22 @@
  },
  "ProSpec": {
   "file": "models/mrsim/ProSpec.glb",
+  "parts": [
+   "MidPlate",
+   "BottomPlate",
+   "ArmRR",
+   "ArmRL",
+   "ArmFR",
+   "ArmFL",
+   "CameraTPU",
+   "TopLEDPlate",
+   "TopLEDs",
+   "CameraBoard",
+   "BlackPlasticCameraBoard",
+   "Lens",
+   "PodSideLGeneric",
+   "PodSideRGeneric"
+  ],
   "min": [
    -0.13,
    -0.13,
@@ -443,6 +817,14 @@
  },
  "ProSpecMassCollision": {
   "file": "models/mrsim/ProSpecMassCollision.glb",
+  "parts": [
+   "Pod",
+   "Plates",
+   "MassArmFL",
+   "MassArmFR",
+   "MassArmRL",
+   "MassArmRR"
+  ],
   "min": [
    -0.129,
    -0.13,
@@ -456,6 +838,10 @@
  },
  "Prop7Inch": {
   "file": "models/mrsim/Prop7Inch.glb",
+  "parts": [
+   "PropCCW",
+   "PropCW"
+  ],
   "min": [
    -0.089,
    -0.077,
@@ -469,6 +855,13 @@
  },
  "Transmitter": {
   "file": "models/mrsim/Transmitter.glb",
+  "parts": [
+   "Chassis",
+   "GimbalLeft",
+   "StickLeft",
+   "GimbalRight",
+   "StickRight"
+  ],
   "min": [
    -0.09,
    -0.0,

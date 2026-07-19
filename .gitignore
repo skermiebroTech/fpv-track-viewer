@@ -1,6 +1,7 @@
 .claude/
 # unpublished tracks stay local-only
 tracks/2026-au-nats-v3-polished.json
+tracks/aus-nats.json
 tracks/manifest.local.json
 tracks/*.xml
 tracks/_test-*.json
@@ -17,11 +18,11 @@ models/models.local.json
 # MRSIM object meshes decoded from MRSIM.dkb (export_mrsim_models.py) — local
 # model cache like the VelociDrone GLBs; MRSIM tracks are local-only too
 models/mrsim/
-# local node test scaffolding (viewer itself runs from a CDN import map)
+# node deps for the converter CLI + tests (`npm install && npm test`); the
+# viewer itself still runs from a CDN import map with no build step
 node_modules/
-package.json
-package-lock.json
-_*.mjs
+# ad-hoc local runner scripts stay out of the repo (root only)
+/_*.mjs
 # tool droppings
 __pycache__/
 .wrangler/
