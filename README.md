@@ -207,9 +207,37 @@ the `.trk` is AES-encrypted in the browser and imports straight into the
 game (Empty Scene Day). VD→MRSIM emits a ready-to-fly `<Simulation>` XML on
 Empty Grass World with a launch pad behind the start gate — scenery
 barriers convert too (VD dive-gate towers are built from blocks, so they
-carry over intact). Fixed-size objects mean scaled VD gates export at
-MRSIM's native size; nets and other objects with no equivalent are skipped
-(the export lists exactly what was dropped).
+carry over intact; nets become solid dark panels). Fixed-size objects mean
+scaled VD gates export at MRSIM's native size; objects with no equivalent
+are skipped and the report lists exactly what was dropped.
+
+The conversion logic lives in `convert/` as separate modules (coordinate
+maths → normalisation → object mapping → XML emission → validation), so the
+same code runs in the browser, from Node, and under the test suite. After
+every VD→MRSIM export the viewer shows a **conversion report**: object and
+checkpoint counts, every warning, and a validation pass that re-parses the
+emitted XML with the game-library-driven MRSIM parser and confirms each
+checkpoint resolves exactly where the converter aimed.
+
+Command line (same engine, no browser needed):
+
+```bash
+npm install                                  # three + @xmldom/xmldom
+node convert-cli.mjs "My Track.trk"          # → "My Track-MRSIM.xml" + report
+node convert-cli.mjs track.json -l BaylandsPark -g ghosts/wr.json -s report.json
+npm test                                     # converter test suite
+```
+
+Copy the exported XML into `Documents/MRSIM/Tracks/` and it appears in
+MRSIM's track list.
+
+VD invisible checkpoints store a near-vertical crossing axis (turn poles,
+flat "stay low" squares); a plane sensor with that heading could be flown
+past edge-on, so poles export as column volumes and flat squares as thick
+horizontal slabs — both impossible to miss, yawed to the lap direction so
+the guidance arrow still points along the course. Consecutive checkpoints
+stacked on the same spot (VD fires both in one pass) are merged into one
+sensor so the MRSIM lap counts exactly like the VD lap.
 
 ## Data interpretation (verified against the official 2024 poster)
 
@@ -254,7 +282,10 @@ MRSIM's native size; nets and other objects with no equivalent are skipped
 | `trk.js` | VelociDrone `.trk` decoder/encoder (base64 + AES-128-ECB, pure JS) |
 | `mrsim.js` | MRSIM `.xml` track decoder (scene-graph walker) |
 | `mrsim-lib.js` | Embedded MRSIM object library (generated) |
-| `convert.js` | VelociDrone ⇄ MRSIM track converter |
+| `convert.js` | VelociDrone ⇄ MRSIM track converter (façade over `convert/`) |
+| `convert/*.js` | Converter modules: spaces, mapping, normalise, emit, validate |
+| `convert-cli.mjs` | Node CLI: `.trk`/`.json` → validated MRSIM XML |
+| `test/` | Converter test suite (`npm test`, node:test) |
 | `ghostfetch.js` | Live leaderboard/flight fetch + ghost decoding (zlib + MS-NRBF) |
 | `serve.py` | Local dev server: static files + same-origin `/vd` proxy |
 | `proxy-worker.js` | Personal Cloudflare Worker proxy for flight fetch on a hosted viewer |

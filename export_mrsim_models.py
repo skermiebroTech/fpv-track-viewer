@@ -1,38 +1,58 @@
 #!/usr/bin/env python3
 """Extract MRSIM object meshes (.model) from MRSIM.dkb into models/mrsim/*.glb
-+ models/mrsim/models.json. The viewer renders element BinaryModelRenderer refs
-(gates, mats, stands, flags, canopy, poles, trees...) with these instead of the
-procedural pipe-prim stand-ins.
++ models/mrsim/models.json (+ models/mrsim/tex/*.png gate atlases). The viewer
+renders element BinaryModelRenderer refs (gates, mats, stands, flags, canopy,
+poles, trees...) with these instead of the procedural pipe-prim stand-ins.
+
+Each GLB keeps ONE NAMED NODE PER PART (the .model's named submeshes: "PVC",
+"Fabric", "TopPanel", "LeftPanel"...) carrying POSITION + NORMAL + TEXCOORD_0,
+so the viewer can assign each part its real MRSIM material (colours from
+DroneTrackMaterials.xml, atlas texture + per-instance sub-rect for the fabric).
+This is a superset of the old position-only export — older consumers that just
+traverse+clone the scene still work.
 
 MRSIM .model layout (reverse-engineered, verified across all 37 models):
-little-endian, a sequence of named PARTS. Each part is
+little-endian, a sequence of named PARTS. Each part is a run of attribute
+streams (positions first) each terminated by a 24-byte descriptor record, then
+the index stream:
 
-    [u32 6][u32 12]{a, components, totalLen}   stream preamble
-    [u32 posBytes]  position data (vec3 f32)   -> ends at the first record
-    per extra stream: [u32 4][u32 24]{backPtr, id, stride, 0, comp, total}
-                      {t, totalBytes, dataBytes/count} + data
-    [u32 nameLen][name][0xff?]                 part name
-    [u32 5][u32 92] footer: {partEnd, idxDataStart, streamCount N, rec1..recN}
+    positions (vec3 f32) ....... [24B rec: tag=4 sz=24 dataOff id=0x40000 stride=12 _ comp=3]
+    <attr> (normal/uv/tangent) . [24B rec: ...                 id stride _ comp]
+    ...
+    <last attr> ................ [24B rec = recs[-1]]
+    index data at recs[-1]+24 .. {type, totalBytes, count}      (u16 or u32)
+    [u32 nameLen][name][0xff?]
+    [u32 5][u32 92] footer: {partEnd, idxDataStart, streamCount N, rec0..recN-1}
 
-The LAST record offset is always the index record; POSITIONS end at the
-first record (at the index record when N==1 — collision meshes have no
-normals/uvs). At idxDataStart sits {type, totalBytes, count}: index element
-size = (totalBytes-12)/count, 2 or 4 bytes. Vertices are raw MRSIM Z-up
-local space — the viewer's `three(m)=Z_UP_TO_Y_UP·m` matrix orients them.
+Key rule: **each attribute stream's data ENDS exactly at its descriptor record**,
+so start = recOffset - vertCount*comp*4. recs[0] terminates positions; recs[1:]
+are the extra attributes (normal 0x40001, uv 0x40002, tangent 0x40003); the index
+follows recs[-1]. Vertices are raw MRSIM Z-up local space — the viewer's
+`three(m)=Z_UP_TO_Y_UP·m` matrix orients them.
 
     venv/bin/python export_mrsim_models.py
 """
-import struct, json, os
+import struct, json
 import numpy as np
 from pathlib import Path
 
 DKB = Path.home()/".local/share/Steam/steamapps/common/MRSIM/MRSIM.dkb"
 ROOT = Path(__file__).parent
 OUTDIR = ROOT/"models"/"mrsim"
+TEXDIR = OUTDIR/"tex"
 INDEX = OUTDIR/"models.json"
 
 # non-visual marker parts (the checkpoint aperture quad inside gate models)
 SKIP_PARTS = {'PassageGeometry'}
+
+# gate/flag artwork atlases + the launch-mat texture, copied out for the viewer
+TEXTURES = [
+    'Data/Simulations/Multirotor/GatePaint/5x5GateAtlas.png',
+    'Data/Simulations/Multirotor/GatePaint/FlagAtlas.png',
+    'Data/Simulations/Multirotor/GatePaint/7x7Mat.png',
+]
+
+STREAM = {0x40000: 'POSITION', 0x40001: 'NORMAL', 0x40002: 'TEXCOORD_0', 0x40003: 'TANGENT'}
 
 
 def read_dkb(path):
@@ -62,7 +82,7 @@ def parts(b):
 
 
 def decode(b):
-    """-> ([(name, positions Nx3 f32, indices M u32)], [notes])."""
+    """-> ([{name, P Nx3, N Nx3|None, UV Nx2|None, I M}], [notes])."""
     subs=[]; notes=[]
     for name, foot in parts(b):
         partEnd, idxData, nStreams = struct.unpack_from('<3I', b, foot)
@@ -84,6 +104,16 @@ def decode(b):
             notes.append(f'{name}: no position preamble'); continue
         P=np.frombuffer(b[posStart:firstRec], dtype='<f4').reshape(-1,3)
         V=len(P)
+        # extra per-vertex attributes: each ends AT its descriptor record
+        attrs={}
+        for rec in recs[1:]:
+            _tag,_sz,_off,sid,_stride,_pad,comp = struct.unpack_from('<7I', b, rec)
+            key=STREAM.get(sid)
+            if key not in ('NORMAL','TEXCOORD_0') or comp not in (2,3): continue
+            start=rec - V*comp*4
+            if start < 0: continue
+            a=np.frombuffer(b[start:rec], dtype='<f4').reshape(-1,comp)
+            if len(a)==V and np.isfinite(a).all(): attrs[key]=np.ascontiguousarray(a,dtype='<f4')
         # indices: {type, totalBytes, count} then data, u16 or u32 elements
         _t, totalB, count = struct.unpack_from('<3I', b, idxData)
         if count<3 or totalB<=12 or (totalB-12)//max(count,1) not in (2,4):
@@ -94,7 +124,8 @@ def decode(b):
         I=I[:(len(I)//3)*3]
         if len(I)<3 or int(I.max())>=V or not np.isfinite(P).all() or (np.abs(P)>=1e5).any():
             notes.append(f'{name}: invalid geometry V={V} I={len(I)}'); continue
-        subs.append((name, np.ascontiguousarray(P, dtype='<f4'), I))
+        subs.append({'name':name, 'P':np.ascontiguousarray(P,dtype='<f4'),
+                     'N':attrs.get('NORMAL'), 'UV':attrs.get('TEXCOORD_0'), 'I':I})
     return subs, notes
 
 
@@ -104,25 +135,31 @@ def _pad(buf,n=4,fill=b'\x00'):
 
 
 def write_glb(path, subs):
-    bin_=b''; accessors=[]; views=[]; prims=[]
+    bin_=b''; accessors=[]; views=[]; meshes=[]; nodes=[]
     def add(data,target):
         nonlocal bin_
         off=len(bin_); bin_=_pad(bin_+data)
         views.append({"buffer":0,"byteOffset":off,"byteLength":len(data),"target":target})
         return len(views)-1
-    for _name,P,I in subs:
-        vv=add(P.tobytes(),34962)
-        accessors.append({"bufferView":vv,"componentType":5126,"count":len(P),
-                          "type":"VEC3","min":P.min(0).tolist(),"max":P.max(0).tolist()})
-        pa=len(accessors)-1
-        iv=add(I.tobytes(),34963)
-        accessors.append({"bufferView":iv,"componentType":5125,"count":len(I),"type":"SCALAR"})
-        prims.append({"attributes":{"POSITION":pa},"indices":len(accessors)-1,"material":0})
+    def acc(view,ctype,count,typ,mn=None,mx=None):
+        a={"bufferView":view,"componentType":ctype,"count":count,"type":typ}
+        if mn is not None: a["min"]=mn; a["max"]=mx
+        accessors.append(a); return len(accessors)-1
+    for s in subs:
+        P,N,UV,I=s['P'],s['N'],s['UV'],s['I']
+        attrs={"POSITION":acc(add(P.tobytes(),34962),5126,len(P),"VEC3",
+                              P.min(0).tolist(),P.max(0).tolist())}
+        if N is not None:  attrs["NORMAL"]=acc(add(N.tobytes(),34962),5126,len(N),"VEC3")
+        if UV is not None: attrs["TEXCOORD_0"]=acc(add(UV.tobytes(),34962),5126,len(UV),"VEC2")
+        idx=acc(add(I.tobytes(),34963),5125,len(I),"SCALAR")
+        meshes.append({"name":s['name'],
+                       "primitives":[{"attributes":attrs,"indices":idx,"material":0}]})
+        nodes.append({"name":s['name'],"mesh":len(meshes)-1})
     gltf={"asset":{"version":"2.0","generator":"export_mrsim_models.py"},
-          "scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
-          "meshes":[{"primitives":prims}],
-          "materials":[{"pbrMetallicRoughness":{"baseColorFactor":[0.9,0.9,0.88,1],
-                        "metallicFactor":0.05,"roughnessFactor":0.7},"doubleSided":True}],
+          "scene":0,"scenes":[{"nodes":list(range(len(nodes)))}],"nodes":nodes,
+          "meshes":meshes,
+          "materials":[{"pbrMetallicRoughness":{"baseColorFactor":[0.7,0.7,0.7,1],
+                        "metallicFactor":0.0,"roughnessFactor":0.6},"doubleSided":True}],
           "accessors":accessors,"bufferViews":views,"buffers":[{"byteLength":len(bin_)}]}
     jbin=_pad(json.dumps(gltf,separators=(',',':')).encode(),4,b' ')
     bbin=_pad(bin_)
@@ -133,9 +170,20 @@ def write_glb(path, subs):
     return len(out)
 
 
+def export_textures(data, ent, ds):
+    TEXDIR.mkdir(parents=True, exist_ok=True)
+    for full in TEXTURES:
+        key=next((k for k in ent if k.lstrip('/')==full), None)
+        if key is None: print(f"  ! texture missing {full}"); continue
+        off,size=ent[key]
+        (TEXDIR/full.split('/')[-1]).write_bytes(data[ds+off:ds+off+size])
+        print(f"  ~ tex {full.split('/')[-1]} ({size} B)")
+
+
 def main():
     OUTDIR.mkdir(parents=True, exist_ok=True)
     data, ent, ds = read_dkb(DKB)
+    export_textures(data, ent, ds)
     models=[k for k in ent if k.endswith('.model')]
     index={}
     done=skip=0
@@ -151,12 +199,14 @@ def main():
             print(f"  (no geometry) {nm}"); skip+=1; continue
         fn=f"{nm}.glb"
         write_glb(OUTDIR/fn, subs)
-        allP=np.concatenate([P for _,P,_ in subs])
+        allP=np.concatenate([s['P'] for s in subs])
         index[nm]={"file":f"models/mrsim/{fn}",
+                   "parts":[s['name'] for s in subs],
                    "min":[round(float(v),3) for v in allP.min(0)],
                    "max":[round(float(v),3) for v in allP.max(0)]}
-        tris=sum(len(I)//3 for _,_,I in subs)
-        print(f"  ✓ {nm}: {len(subs)} parts, {len(allP)} verts, {tris} tris")
+        tris=sum(len(s['I'])//3 for s in subs)
+        uv=sum(s['UV'] is not None for s in subs)
+        print(f"  ✓ {nm}: {len(subs)} parts, {len(allP)} verts, {tris} tris, {uv} uv'd")
         done+=1
     json.dump(index, open(INDEX,'w'), indent=1)
     print(f"\n{done} models -> {OUTDIR} ({skip} skipped); index {INDEX}")

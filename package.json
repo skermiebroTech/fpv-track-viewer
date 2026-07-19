@@ -1,0 +1,11 @@
+{
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'test/*.test.mjs'",
+    "convert": "node convert-cli.mjs"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.10",
+    "three": "^0.161.0"
+  }
+}

@@ -116,6 +116,35 @@
   #brLoadAll { margin-top: 8px; }
   #brLoadAll:disabled { opacity: .6; cursor: default; }
 
+  /* ---- Conversion report ---- */
+  #convReport {
+    display: none; position: absolute; z-index: 16;
+    top: calc(var(--headerH, 64px) + 14px); left: 50%; transform: translateX(-50%);
+    width: min(460px, calc(100vw - 32px));
+    flex-direction: column;
+    max-height: calc(100dvh - var(--headerH, 64px) - 46px);
+  }
+  #convReport.open { display: flex; }
+  #convReport h2 { display: flex; align-items: center; justify-content: space-between; }
+  #cvClose { border: none; background: none; color: var(--muted); font-size: 18px;
+    cursor: pointer; line-height: 1; padding: 0 2px; font-weight: 700; }
+  #cvClose:hover { color: var(--red); }
+  #cvBody { overflow-y: auto; font-size: 13px; }
+  #cvBody .cvTitle { font-weight: 800; margin-bottom: 8px; }
+  #cvBody .cvBadge { display: inline-block; border-radius: 6px; padding: 2px 8px;
+    font-size: 11.5px; font-weight: 800; letter-spacing: .5px; margin-left: 6px; }
+  #cvBody .cvBadge.ok { background: var(--green); color: #fff; }
+  #cvBody .cvBadge.bad { background: var(--red); color: #fff; }
+  #cvBody .cvGrid { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px;
+    margin: 6px 0 10px; }
+  #cvBody .cvGrid b { text-align: right; color: var(--green); font-weight: 800; }
+  #cvBody h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--green); font-style: italic; margin: 10px 0 4px; font-weight: 900; }
+  #cvBody ul { margin: 0 0 6px; padding-left: 18px; }
+  #cvBody li { margin: 2px 0; }
+  #cvBody li.err { color: var(--red); font-weight: 700; }
+  #cvBody .cvNote { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
   /* ---- Cards ---- */
   .card {
     position: absolute; z-index: 10; background: var(--card);
@@ -290,6 +319,7 @@
   <button id="btnTrk" title="View a VelociDrone .trk or MRSIM .xml track file">📂<span class="btxt"> Open track</span></button>
   <select id="convEnv" title="Environment for the converted track"></select>
   <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)">⇄<span class="btxt"> Convert</span></button>
+  <button id="btnEditor" title="3D track editor — place MRSIM gates and checkpoints, edit the lap, import VelociDrone or MRSIM tracks" onclick="location.href='mrsim-test.html'">🛠<span class="btxt"> Editor</span></button>
   <button id="btnTheme" title="Toggle dark mode">🌙</button>
   <input type="file" id="trkFile" accept=".trk,.xml" hidden>
 </div>
@@ -388,6 +418,11 @@
   <b>Drop</b> a VelociDrone .trk or MRSIM .xml anywhere
 </div>
 
+<div id="convReport" class="card">
+  <h2><span>Conversion report</span><button id="cvClose" title="Close (Esc)">×</button></h2>
+  <div id="cvBody"></div>
+</div>
+
 <div id="browser" class="card">
   <h2><span>Official VelociDrone tracks</span><button id="brClose" title="Close (Esc)">×</button></h2>
   <div id="brBar">
@@ -449,16 +484,24 @@
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
 
-    "./trk.js": "./trk.js?v=6",
-    "./mrsim.js": "./mrsim.js?v=7",
+    "./trk.js": "./trk.js?v=11",
+    "./mrsim.js": "./mrsim.js?v=9",
     "./mrsim-lib.js": "./mrsim-lib.js?v=6",
-    "./convert.js": "./convert.js?v=7"
+    "./convert.js": "./convert.js?v=9",
+    "./convert/index.js": "./convert/index.js?v=2",
+    "./convert/space.js": "./convert/space.js?v=2",
+    "./convert/mapping.js": "./convert/mapping.js?v=2",
+    "./convert/vd-classify.js": "./convert/vd-classify.js?v=2",
+    "./convert/vd-normalize.js": "./convert/vd-normalize.js?v=2",
+    "./convert/emit-mrsim.js": "./convert/emit-mrsim.js?v=2",
+    "./convert/mrsim-to-vd.js": "./convert/mrsim-to-vd.js?v=2",
+    "./convert/validate.js": "./convert/validate.js?v=2"
   }
 }
 </script>
 <!-- bump ?v= together with the importmap entries above whenever the modules
      change — plain dev servers send no cache headers and browsers happily
      serve stale modules otherwise -->
-<script type="module" src="app.js?v=20"></script>
+<script type="module" src="app.js?v=23"></script>
 </body>
 </html>

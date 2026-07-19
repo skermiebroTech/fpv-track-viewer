@@ -1,0 +1,1651 @@
+<meta charset="utf-8">
+<title>MRSIM 3D track editor</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden;
+    font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: #0d0f14; color: #dfe3ea; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  /* ---- controls bar ---- */
+  #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; gap: 8px; align-items: center; padding: 8px 10px;
+    background: linear-gradient(#0d0f14ee, #0d0f1490); backdrop-filter: blur(3px); }
+  #bar select, #bar button, #bar label.file {
+    background: #1a1e28; color: #dfe3ea; border: 1px solid #2b3242;
+    border-radius: 5px; padding: 5px 9px; font: inherit; cursor: pointer; }
+  #bar button:hover, #bar label.file:hover, #bar select:hover { border-color: #4a83ff; }
+  #bar button.on { background: #24406e; border-color: #4a83ff; }
+  #bar .title { font-weight: 600; color: #fff; margin-right: 4px; }
+  #bar .spacer { flex: 1; }
+  #bar .status { color: #8a93a6; }
+  #file { display: none; }
+
+  /* ---- diagnostics panel ---- */
+  #diag { position: fixed; top: 46px; right: 10px; width: 380px; z-index: 5;
+    max-height: calc(100vh - 58px); overflow: auto;
+    background: #12151dee; border: 1px solid #262c3a; border-radius: 8px;
+    padding: 10px 12px; backdrop-filter: blur(4px); }
+  #diag.hidden { display: none; }
+  #diag h1 { font-size: 15px; margin: 0 0 2px; color: #fff; }
+  #diag .sub { color: #8a93a6; margin-bottom: 8px; }
+  #diag section { border-top: 1px solid #222836; padding: 7px 0; }
+  #diag section:first-of-type { border-top: none; }
+  #diag .k { color: #8a93a6; }
+  #diag .row { display: flex; justify-content: space-between; gap: 8px; }
+  #diag .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  #diag .chip { background: #1c2230; border: 1px solid #2b3242; border-radius: 4px;
+    padding: 2px 7px; }
+  #diag .issue { color: #ff8a7a; }
+  #diag .ok { color: #6bd08a; }
+  #diag table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  #diag td, #diag th { text-align: left; padding: 1px 4px 1px 0; white-space: nowrap; }
+  #diag th { color: #8a93a6; font-weight: 500; }
+  #diag .num { color: #4a83ff; }
+  #diag .start { color: #ff6b6b; }
+  #diag details summary { cursor: pointer; color: #8a93a6; }
+  #err { color: #ff8a7a; padding: 4px 0; white-space: pre-wrap; }
+  #legend { position: fixed; bottom: 8px; left: 10px; z-index: 5; color: #6a7488; }
+
+  /* ---- edit panel ---- */
+  #editPanel { position: fixed; top: 46px; left: 10px; width: 268px; z-index: 5;
+    max-height: calc(100vh - 58px); overflow: auto;
+    background: #12151dee; border: 1px solid #3a4a2a; border-radius: 8px;
+    padding: 10px 12px; backdrop-filter: blur(4px); display: none; }
+  #editPanel.show { display: block; }
+  #editPanel h3 { font-size: 12px; margin: 10px 0 4px; color: #b7e07a;
+    border-top: 1px solid #222836; padding-top: 8px; }
+  #editPanel .pal { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  #editPanel .pal button { background: #1a1e28; color: #dfe3ea; text-align: left;
+    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 6px;
+    font: inherit; font-size: 11px; cursor: pointer; }
+  #editPanel .pal button:hover { border-color: #7ab648; }
+  #editPanel .pal button.arm { background: #2a4a1e; border-color: #7ab648; }
+  #editPanel .lapRow { display: flex; align-items: center; gap: 4px; padding: 1px 0;
+    font-size: 11.5px; }
+  #editPanel .lapRow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; cursor: pointer; }
+  #editPanel .lapRow .nm:hover { color: #fff; }
+  #editPanel .lapRow.sel .nm { color: #b7e07a; }
+  #editPanel .lapRow button { background: none; border: none; color: #8a93a6;
+    cursor: pointer; padding: 0 2px; font: inherit; }
+  #editPanel .lapRow button:hover { color: #fff; }
+  #editPanel .btnRow { display: flex; gap: 5px; margin-top: 6px; }
+  #editPanel .btnRow button { flex: 1; background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 0; font: inherit;
+    font-size: 11.5px; cursor: pointer; }
+  #editPanel .btnRow button:hover { border-color: #4a83ff; }
+  #editPanel .btnRow button.danger:hover { border-color: #ff6b6b; color: #ff8a7a; }
+  #editPanel .lapCk { display: flex; align-items: center; gap: 6px; margin-top: 5px;
+    color: #8a93a6; font-size: 11.5px; }
+  #editPanel h2 { font-size: 13px; margin: 0 0 6px; color: #b7e07a; }
+  #editPanel .hint { color: #8a93a6; font-size: 11px; margin-top: 6px; }
+  #editPanel .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  #editPanel label { width: 44px; color: #8a93a6; }
+  #editPanel input { flex: 1; width: 60px; background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 6px; font: inherit; }
+  #editPanel input:focus { border-color: #4a83ff; outline: none; }
+  #editPanel .locked { color: #ff8a7a; }
+  #editPanel .modes { display: flex; gap: 5px; margin: 6px 0; }
+  #editPanel .modes button { flex: 1; background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 0; font: inherit; cursor: pointer; }
+  #editPanel .modes button.on { background: #2a4a1e; border-color: #7ab648; }
+  #bar button.edit-on { background: #2a4a1e; border-color: #7ab648; }
+</style>
+
+<div id="app"></div>
+<div id="bar">
+  <span class="title">MRSIM editor</span>
+  <select id="track"></select>
+  <label class="file">import<input id="file" type="file" accept=".xml,.trk,.json"></label>
+  <button id="btnNew">new track</button>
+  <button id="btnTop">top view</button>
+  <button id="btnCp" class="on">checkpoints</button>
+  <button id="btnDiag" class="on">diagnostics</button>
+  <button id="btnEdit">✎ edit</button>
+  <button id="btnExport">⤓ export .xml</button>
+  <span class="spacer"></span>
+  <span class="status" id="status">…</span>
+</div>
+<div id="diag" class="hidden"></div>
+<div id="editPanel">
+  <h2 id="edTitle">nothing selected</h2>
+  <div class="modes">
+    <button id="edModeT" class="on">move</button>
+    <button id="edModeR">rotate</button>
+    <button id="edModeS">scale</button>
+  </div>
+  <div class="row"><label>x</label><input id="edX" type="number" step="0.1"></div>
+  <div class="row"><label>y</label><input id="edY" type="number" step="0.1"></div>
+  <div class="row"><label>z</label><input id="edZ" type="number" step="0.1"></div>
+  <div class="row"><label>yaw °</label><input id="edYaw" type="number" step="1"></div>
+  <div class="row"><label>pitch °</label><input id="edPitch" type="number" step="1"></div>
+  <div class="row"><label>roll °</label><input id="edRoll" type="number" step="1"></div>
+  <div class="row"><label>scale</label><input id="edS" type="number" step="0.05" min="0.2" max="5"></div>
+  <div class="row" id="edWHRow" style="display:none">
+    <label>w × h</label><input id="edW" type="number" step="0.1" min="0.5">
+    <input id="edH" type="number" step="0.1" min="0.5"></div>
+  <div class="btnRow">
+    <button id="edLapAdd">+ lap</button>
+    <button id="edDup">duplicate</button>
+    <button id="edDel" class="danger">✕ delete</button>
+  </div>
+  <div class="hint" id="edHint">click an object or checkpoint ring to select ·
+    keys: <b>g</b> move / <b>r</b> rotate / <b>s</b> scale / <b>Esc</b> deselect /
+    <b>Ctrl-Z</b> undo · MRSIM coords (z up), yaw = angleDegrees</div>
+
+  <h3>place object <span style="color:#8a93a6;font-weight:400">(click canvas · shift = multi)</span></h3>
+  <div class="pal" id="palette"></div>
+
+  <h3>lap — checkpoint order</h3>
+  <div id="lapList"></div>
+  <div class="lapCk"><input type="checkbox" id="lapCircuit"> <label for="lapCircuit"
+    style="width:auto">circuit (lap closes back to #1)</label></div>
+</div>
+<div id="legend"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
+    "./mrsim.js": "./mrsim.js?v=9",
+    "./mrsim-lib.js": "./mrsim-lib.js?v=6"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { parseMrsim } from './mrsim.js';
+
+// ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
+// Any file that parses as <Simulation>. Add to this list or use ?track=<path>
+// / the file picker. These are the converter outputs + a community track.
+const BUNDLED = [
+  ['tracks/First practice with a double cube-sloogus.xml', 'community: double-cube (sloogus)'],
+  ['tracks/converted-au-nats.xml',       'converted: 2024 AU Nats Quali'],
+  ['tracks/converted-2026-au-nats.xml',  'converted: 2026 AU Nats'],
+  ['tracks/converted-aus-nats.xml',      'converted: AUS Nats'],
+  ['tracks/converted-dutch.xml',         'converted: Dutch Drone Madness'],
+];
+
+// ---------------------------------------------------------------------------
+// three.js scene
+// ---------------------------------------------------------------------------
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(1);   // 1:1 — high-DPI backbuffers stall headless capture
+renderer.shadowMap.enabled = true;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0d0f14');
+scene.fog = new THREE.Fog('#0d0f14', 90, 320);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight('#c9d6ff', '#20242c', 1.0));
+const sun = new THREE.DirectionalLight('#fff', 1.4);
+sun.position.set(40, 80, 30); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120, near: 1, far: 300 });
+scene.add(sun);
+
+// ground grid at z=0 (MRSIM tracks sit on the ground plane)
+const grid = new THREE.GridHelper(400, 80, '#2a3446', '#1a2130');
+grid.position.y = 0;
+scene.add(grid);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000),
+  new THREE.MeshStandardMaterial({ color: '#151922', roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.01; ground.receiveShadow = true;
+scene.add(ground);
+scene.add(new THREE.AxesHelper(3));   // origin marker: +x red, +y(up) green, +z blue
+
+const trackGroup = new THREE.Group();  scene.add(trackGroup);
+const cpGroup = new THREE.Group();     scene.add(cpGroup);
+const terrainGroup = new THREE.Group(); scene.add(terrainGroup);
+const sensorGroup = new THREE.Group(); sensorGroup.visible = false; scene.add(sensorGroup);
+window.__scene = scene; window.__THREE = THREE; window.__camera = camera; window.__controls = controls;   // headless inspection hooks
+
+// mrsim Z-up right-handed <-> three Y-up (same basis mrsim.js applies to elements)
+const Z_UP_TO_Y_UP = new THREE.Matrix4().makeBasis(
+  new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0));
+const Y_UP_TO_Z_UP = Z_UP_TO_Y_UP.clone().invert();
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+window.__renderer = renderer;
+(function loop() {
+  requestAnimationFrame(loop);
+  controls.update();
+  if (!window.__paused) renderer.render(scene, camera);
+})();
+
+// ---------------------------------------------------------------------------
+// MRSIM object meshes (real decoded geometry, models/mrsim/*.glb).
+// Only MRSIM's own assets — nothing from VelociDrone.
+// ---------------------------------------------------------------------------
+const gltfLoader = new GLTFLoader();
+const texLoader = new THREE.TextureLoader();
+let MODELS = {};
+const templates = new Map();
+try { MODELS = await (await fetch('models/mrsim/models.json')).json(); }
+catch { console.warn('no models/mrsim/models.json — falling back to collision prims'); }
+
+// --- exact MRSIM materials (Data/Simulations/Multirotor/DroneTrackMaterials.xml).
+// PBR baseColor values are LINEAR — feed them to three as linear so they show
+// the same as in-game. One shared instance per material (textured parts clone). --
+const lin = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.LinearSRGBColorSpace);
+const pbr = (r, g, b, rough, metal) => new THREE.MeshStandardMaterial({
+  color: lin(r, g, b), roughness: rough, metalness: metal, side: THREE.DoubleSide });
+const MRMAT = {
+  PVC:       pbr(.5, .5, .5, .1, 0),      // structural PVC pipe (grey)
+  GateSide:  pbr(.6, .6, .6, .4, 0),      // 7x6 side/back + dive square panels
+  GateTop:   pbr(0, 0, .2, .4, 0),        // 7x6 top banner (dark blue)
+  StartTop:  pbr(.2, .025, 0, .4, 0),     // start/finish top (dark red)
+  FlagStalk: pbr(.5, .5, .5, .2, 1),      // metal ground stalk
+  FlagPole:  pbr(.05, .05, .05, .5, 0),   // near-black inner pole
+  PoleWhite: pbr(.8, .8, .8, .4, 0),
+  GateLED:   Object.assign(pbr(.85, .85, .95, .1, 0), { emissive: lin(.5, .5, .7) }),
+  Deco:      pbr(.55, .55, .55, .6, 0),   // launch stands, canopy, misc meshes
+};
+
+// atlas textures, loaded once (Data/Simulations/Multirotor/GatePaint/*)
+const texCache = new Map();
+function atlasTex(file) {
+  if (!texCache.has(file)) {
+    const t = texLoader.load('models/mrsim/tex/' + file);
+    t.colorSpace = THREE.SRGBColorSpace; t.flipY = false;   // glTF UV convention
+    texCache.set(file, t);
+  }
+  return texCache.get(file);
+}
+
+// per-instance atlas sub-rects (u0,v0,du,dv) — from each object's SimC
+// EntitySetRenderInstanceData(entity, 0u, entries[entity % mod]).
+const GATE5_SUB = [[.25,.5,.25,.5],[.5,.5,.25,.5],[.75,.5,.25,.5],[0,0,.25,.5],[.25,0,.25,.5],[.5,0,.25,.5]];
+const FLAG_SUB  = [[0,0,.5,1],[.25,0,.5,1],[.5,0,.5,1]];
+
+// model -> part name -> material spec (Data/.../DroneTrackInstanceGroups.xml).
+// string = MRMAT key; object = textured (atlas + optional per-instance sub-rect).
+const DIVE = { PVC:'PVC', SquarePanel:'GateSide', FrontPanel:'GateTop', BackPanel:'GateTop' };
+const PART_MAT = {
+  '5x5Gate': { PVC:'PVC', Fabric:{ tex:'5x5GateAtlas.png', sub:GATE5_SUB } },
+  '7x6Gate': { PVC:'PVC', TopPanel:'GateTop', TopPanelBack:'GateSide', LeftPanel:'GateSide', RightPanel:'GateSide' },
+  '7x7DiveGate': DIVE, '7x7ClimbGate': DIVE,
+  'Flag': { Stalk:'FlagStalk', Sleeve:'FlagPole', Flag:{ tex:'FlagAtlas.png', sub:FLAG_SUB } },
+  '7x7Mat': { Panel:{ tex:'7x7Mat.png' }, PVC:'PVC' },
+  'Champs25Gate': { LEDGate:'GateLED', Gate:'GateSide' },
+  'Champs25Pole': { Sleeve:'GateLED', Stalk:'FlagStalk' },
+};
+
+async function preloadModels(names) {
+  await Promise.all([...names].filter(n => MODELS[n] && !templates.has(n)).map(async n => {
+    try {
+      const gltf = await gltfLoader.loadAsync(MODELS[n].file);
+      gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true;
+        if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals(); } });
+      templates.set(n, gltf.scene);
+    } catch (e) { console.warn('model load failed', n, e); }
+  }));
+}
+
+// clone a model template and paint each named part with its real MRSIM material.
+// isStart recolours the gate top banner red; elemIndex varies the atlas artwork.
+function modelInstance(name, elemIndex = 0, isStart = false) {
+  const tpl = templates.get(name);
+  if (!tpl) return null;
+  const inst = tpl.clone(true);
+  const map = PART_MAT[name];
+  inst.traverse(o => {
+    if (!o.isMesh) return;
+    const part = o.name || o.parent?.name || '';
+    let spec = map && map[part];
+    if (!spec) { o.material = MRMAT.Deco; return; }
+    if (typeof spec === 'string') {
+      o.material = (isStart && spec === 'GateTop') ? MRMAT.StartTop : MRMAT[spec];
+      return;
+    }
+    // textured part: clone material + a per-instance sub-rect of the atlas
+    const t = atlasTex(spec.tex).clone(); t.needsUpdate = true;
+    if (spec.sub) {
+      const [u0, v0, du, dv] = spec.sub[elemIndex % spec.sub.length];
+      t.repeat.set(du, dv);
+      t.offset.set(u0, 1 - v0 - dv);       // flipY=false → V measured from top
+    }
+    o.material = new THREE.MeshStandardMaterial({
+      map: t, roughness: .4, metalness: 0, side: THREE.DoubleSide });
+  });
+  return inst;
+}
+
+// ---------------------------------------------------------------------------
+// materials for collision-primitive fallback (game colours, poster-brightened)
+// ---------------------------------------------------------------------------
+const mkMat = (c, emissive = 0.2, extra = {}) => new THREE.MeshStandardMaterial({
+  color: c, roughness: 0.6, emissive: c, emissiveIntensity: emissive, ...extra });
+const MATS = {
+  pvc: mkMat('#f2f2ee'), pad: mkMat('#f5f5f2'),
+  tapeBlue: mkMat('#1b49c8', 0.3), tapeRed: mkMat('#d23b3b', 0.3),
+  dark: mkMat('#23242a', 0), stalk: mkMat('#8b9094', 0.1), sleeve: mkMat('#f5f5f2'),
+  panelTop: mkMat('#eeeeea', 0.22, { side: THREE.DoubleSide }),
+  panelSide: mkMat('#eeeeea', 0.22, { side: THREE.DoubleSide }),
+  padMat: mkMat('#20264f', 0.1),
+};
+const BLOCK_HEX = { Black:'#0d0d0d', White:'#e6e6e6', Red:'#e60000', Orange:'#e67300',
+  Yellow:'#e6e600', Green:'#00cc00', Cyan:'#00d9d9', Blue:'#0000e6', Purple:'#8c00e6',
+  Pink:'#f280bf', RedPink:'#e61a66', LightBlue:'#0566e6', DarkGreen:'#006619' };
+function matFor(hint) {
+  if (MATS[hint]) return MATS[hint];
+  const b = hint.match(/^blk:(\w+)$/);
+  if (b) return (MATS[hint] = mkMat(BLOCK_HEX[b[1]] || '#9a9a9a', 0.15));
+  return MATS.dark;
+}
+
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const unitCyl = new THREE.CylinderGeometry(1, 1, 1, 14); unitCyl.rotateX(Math.PI / 2);
+const sensorMat = new THREE.MeshBasicMaterial({
+  color: '#e0c040', transparent: true, opacity: 0.08,
+  depthWrite: false, side: THREE.DoubleSide });
+
+const KIND_LABEL = { gate:'gate', dive:'dive gate', cube:'pipe cube', pole:'pole',
+  flag:'flag', pass:'passage', deco:'scenery' };
+
+// ---------------------------------------------------------------------------
+// build the parsed track into the scene + compute diagnostics
+// ---------------------------------------------------------------------------
+function clearGroup(g) {
+  g.traverse(o => { if (o.geometry && o.geometry !== unitBox && o.geometry !== unitCyl) o.geometry.dispose?.(); });
+  while (g.children.length) g.remove(g.children[0]);
+}
+
+// per-element scene objects, rebuilt each build(): used for click-picking and
+// live-drag preview while editing. Entries: {obj, base} (matrix-driven object)
+// or {im, idx, base} (one slot of an InstancedMesh).
+let renderRefs = [];
+
+async function build(data, keepCamera = false) {
+  clearGroup(trackGroup); clearGroup(cpGroup); clearGroup(sensorGroup);
+  renderRefs = data.elements.map(() => []);
+
+  const modelNames = new Set();
+  data.elements.forEach(el => (el.models || []).forEach(m => modelNames.add(m.model)));
+  await preloadModels(modelNames);
+
+  const visits = new Map();
+  data.seq.forEach(s => {
+    if (s.elemIndex < 0) return;
+    (visits.get(s.elemIndex) || visits.set(s.elemIndex, []).get(s.elemIndex)).push(s.seqNum);
+  });
+
+  const buckets = new Map();
+  const V = new THREE.Vector3();
+  const courseBox = new THREE.Box3();
+  const gateWidths = [];
+  let groundY = Infinity;
+
+  data.elements.forEach((el, ei) => {
+    const bbox = new THREE.Box3();
+    el.prims.forEach(p => {
+      const c = new THREE.Vector3().setFromMatrixPosition(p.matrix);
+      const half = Math.max(...p.dims) / 2;
+      bbox.expandByPoint(c.clone().addScalar(half));
+      bbox.expandByPoint(c.clone().addScalar(-half));
+    });
+    el.models.forEach(m => bbox.expandByPoint(new THREE.Vector3().setFromMatrixPosition(m.matrix)));
+    if (el.kind !== 'deco') { if (!bbox.isEmpty()) courseBox.union(bbox); }
+    if (/gate|dive|flag|cube/.test(el.kind) && el.prims.length)
+      groundY = Math.min(groundY, bbox.min.y);
+    if (el.kind === 'gate' && !bbox.isEmpty())
+      gateWidths.push({ name: el.name, w: +(bbox.max.x - bbox.min.x).toFixed(2) || +(bbox.max.z - bbox.min.z).toFixed(2) });
+
+    // prims from the same library file as a rendered mesh are that mesh's
+    // collision shadow — drawing both doubles up. Sibling prims from OTHER
+    // sources (e.g. the converter's riser pole under a lifted flag) still draw.
+    const meshSrcs = new Set((el.models || [])
+      .filter(m => templates.has(m.model)).map(m => m.src));
+
+    el.prims.forEach(p => {
+      if (meshSrcs.has(p.src)) return;
+      const hint = p.hint;
+      let scale;
+      if (p.shape === 'cyl') {
+        const r = hint === 'pvc' ? Math.max(p.dims[0], 0.04) : p.dims[0];
+        scale = [r, r, p.dims[1]];
+      } else scale = p.dims.map(d => Math.max(d, 0.02));
+      const key = `${hint}|${p.shape}`;
+      if (!buckets.has(key))
+        buckets.set(key, { geo: p.shape === 'cyl' ? unitCyl : unitBox, mat: matFor(hint), list: [], elems: [] });
+      const b = buckets.get(key);
+      b.list.push(p.matrix.clone().scale(V.set(scale[0], scale[1], scale[2])));
+      b.elems.push(ei);
+    });
+
+    el.models.forEach(md => {
+      const inst = modelInstance(md.model, ei, el.isStart);
+      if (inst) {
+        inst.applyMatrix4(md.matrix);
+        inst.traverse(o => { o.userData.elemIndex = ei; });
+        trackGroup.add(inst);
+        renderRefs[ei].push({ obj: inst, base: inst.matrix.clone() });
+      }
+    });
+
+    // sensor trigger volumes (contactMaterial="-1") — shown in edit mode
+    (el.sensors || []).forEach(sn => {
+      const geo = sn.shape === 'cyl' ? unitCyl : unitBox;
+      const dims = sn.shape === 'cyl'
+        ? [sn.dims[0], sn.dims[0], sn.dims[1]] : sn.dims.map(d => Math.max(d, 0.05));
+      const mesh = new THREE.Mesh(geo, sensorMat);
+      mesh.matrixAutoUpdate = false;
+      mesh.matrix.copy(sn.matrix).scale(V.set(dims[0], dims[1], dims[2]));
+      mesh.userData.elemIndex = ei;
+      sensorGroup.add(mesh);
+      renderRefs[ei].push({ obj: mesh, base: mesh.matrix.clone() });
+    });
+  });
+
+  buckets.forEach(({ geo, mat, list, elems }) => {
+    const im = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach((m, i) => im.setMatrixAt(i, m));
+    im.instanceMatrix.needsUpdate = true; im.castShadow = true;
+    im.userData.elems = elems;               // instanceId -> element index
+    list.forEach((m, i) => renderRefs[elems[i]].push({ im, idx: i, base: m.clone() }));
+    trackGroup.add(im);
+  });
+
+  // --- checkpoints: ring + direction arrow + sequence label ---
+  const Z = new THREE.Vector3(0, 0, 1);
+  const ringGeo = new THREE.TorusGeometry(0.9, 0.05, 8, 32);
+  data.seq.forEach(s => {
+    const q = new THREE.Quaternion().setFromUnitVectors(Z, s.dir);
+    const isStart = s.seqNum === 1;
+    const col = isStart ? '#ff5555' : '#4a83ff';
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: col }));
+    ring.position.copy(s.pos); ring.quaternion.copy(q);
+    ring.userData.elemIndex = s.elemIndex;
+    cpGroup.add(ring);
+    const arrow = new THREE.ArrowHelper(s.dir, s.pos, 1.6, col, 0.5, 0.3);
+    cpGroup.add(arrow);
+    const label = makeLabel(String(s.seqNum), s.pos.clone().add(new THREE.Vector3(0, 1.4, 0)), col);
+    cpGroup.add(label);
+    if (s.elemIndex >= 0) {
+      ring.updateMatrix(); arrow.updateMatrix(); label.updateMatrix();
+      renderRefs[s.elemIndex].push({ obj: ring, base: ring.matrix.clone() });
+      renderRefs[s.elemIndex].push({ obj: arrow, base: arrow.matrix.clone() });
+      renderRefs[s.elemIndex].push({ obj: label, base: label.matrix.clone() });
+    }
+  });
+  // order line through the sequence
+  if (data.seq.length > 1) {
+    const pts = data.seq.map(s => s.pos);
+    if (data.meta.isCircuit) pts.push(pts[0]);
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: '#3a5a9a' }));
+    cpGroup.add(line);
+  }
+
+  if (!isFinite(groundY)) groundY = 0;
+  await loadTerrain(data.meta.location, groundY);
+  if (!keepCamera) frameCamera(courseBox.isEmpty() ? null : courseBox);
+
+  return { visits, gateWidths, groundY, courseBox };
+}
+
+// Render the world the track was built in. Empty Grass World (converter target)
+// has no mesh — just a flat ground plane. Named locations (Baylands Park,
+// Hardesty BMX Track) ship a real terrain mesh; load it at MRSIM world origin
+// (same Z-up->Y-up basis as the elements). Falls back to a plane at groundY.
+async function loadTerrain(location, groundY) {
+  clearGroup(terrainGroup);
+  grid.position.y = groundY;
+  ground.position.y = groundY - 0.01;
+  ground.visible = true;
+  const key = (location || '').replace(/\s+/g, '');
+  if (!key || !MODELS[key]) return;                 // flat world (e.g. Empty Grass)
+  await preloadModels(new Set([key]));
+  const tpl = templates.get(key);
+  if (!tpl) return;
+  const terrain = tpl.clone(true);
+  terrain.applyMatrix4(Z_UP_TO_Y_UP);
+  terrain.traverse(o => { if (o.isMesh) {
+    o.receiveShadow = true;
+    o.material = new THREE.MeshStandardMaterial({ color: '#3f4a37', roughness: 1 });
+  } });
+  terrainGroup.add(terrain);
+  ground.visible = false;                            // real terrain replaces the plane
+}
+
+function makeLabel(text, pos, color) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = color; g.font = 'bold 40px monospace';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 32, 34);
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+  spr.position.copy(pos); spr.scale.setScalar(1.5);
+  return spr;
+}
+
+function frameCamera(box) {
+  if (!box) { camera.position.set(20, 20, 20); controls.target.set(0, 0, 0); return; }
+  const c = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const r = Math.max(size.x, size.z, 8);
+  controls.target.copy(c);
+  camera.position.set(c.x + r * 0.6, c.y + r * 0.9, c.z + r * 1.1);
+  camera.far = r * 8 + 500; camera.updateProjectionMatrix();
+  scene.fog.far = r * 4 + 120;
+}
+
+// ---------------------------------------------------------------------------
+// diagnostics panel  (the point of this tool — inspectable headlessly)
+// ---------------------------------------------------------------------------
+const diagEl = document.getElementById('diag');
+function renderDiag(data, extra) {
+  const counts = {};
+  data.elements.forEach(e => counts[e.kind] = (counts[e.kind] || 0) + 1);
+  const startEl = data.elements.find(e => e.isStart);
+  const issues = data.issues || [];
+  const m = data.meta;
+
+  const chip = (k, v) => `<span class="chip">${k} <b>${v}</b></span>`;
+  const num3 = v => v.toFixed(2);
+
+  diagEl.innerHTML =
+    `<h1>${escapeHtml(m.name || 'track')}</h1>` +
+    `<div class="sub">${m.author ? 'by ' + escapeHtml(m.author) + ' · ' : ''}` +
+      `${m.location ? escapeHtml(m.location) + ' · ' : ''}` +
+      `${m.isCircuit ? 'circuit' : 'sprint'}</div>` +
+
+    `<section>` +
+      `<div class="row"><span class="k">elements</span><span>${data.elements.length}</span></div>` +
+      `<div class="row"><span class="k">checkpoints (lap)</span><span>${data.seq.length}</span></div>` +
+      `<div class="row"><span class="k">ground level (y)</span><span>${num3(extra.groundY)} m</span></div>` +
+      `<div class="row"><span class="k">start element</span>` +
+        `<span class="${startEl ? 'ok' : 'issue'}">${startEl ? escapeHtml(startEl.name) : 'NONE'}</span></div>` +
+      `<div class="chips">${Object.entries(counts).map(([k, v]) => chip(KIND_LABEL[k] || k, v)).join('')}</div>` +
+    `</section>` +
+
+    (issues.length
+      ? `<section><div class="issue">⚠ ${issues.length} parser issue(s)</div>` +
+          issues.map(i => `<div class="issue">· ${escapeHtml(i)}</div>`).join('') + `</section>`
+      : `<section><div class="ok">✓ no parser issues (all includes/macros/checkpoints resolved)</div></section>`) +
+
+    (extra.gateWidths.length
+      ? `<section><details><summary>gate widths (${extra.gateWidths.length})</summary>` +
+          `<table>${extra.gateWidths.map(g =>
+            `<tr><td>${escapeHtml(g.name)}</td><td class="${g.w >= 2.55 ? '' : (g.w < 2 ? 'issue' : '')}">${g.w} m</td></tr>`
+          ).join('')}</table></details></section>`
+      : '') +
+
+    `<section><details open><summary>checkpoint sequence (${data.seq.length})</summary>` +
+      `<table><tr><th>#</th><th>name</th><th>pos x,y,z</th><th>dir</th></tr>` +
+      data.seq.map(s =>
+        `<tr><td class="${s.seqNum === 1 ? 'start' : 'num'}">${s.seqNum}</td>` +
+        `<td>${escapeHtml(s.name)}${s.elemIndex < 0 ? ' <span class="issue">⚠no-elem</span>' : ''}</td>` +
+        `<td>${num3(s.pos.x)}, ${num3(s.pos.y)}, ${num3(s.pos.z)}</td>` +
+        `<td>${num3(s.dir.x)}, ${num3(s.dir.y)}, ${num3(s.dir.z)}</td></tr>`
+      ).join('') + `</table></details></section>`;
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => (
+  { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+
+// ---------------------------------------------------------------------------
+// loading
+// ---------------------------------------------------------------------------
+const statusEl = document.getElementById('status');
+const errEl = document.createElement('div'); errEl.id = 'err'; diagEl.prepend(errEl);
+
+// authoritative source XML DOM — edits mutate THIS, rebuilds re-parse a
+// serialization of it, export serializes it. Node references stay valid
+// across rebuilds, which keeps the undo stack simple.
+let editState = null;   // {doc, fileName, index: Map(name -> rec), dirty}
+let currentData = null;
+
+async function loadFromText(text, fileName, opts = {}) {
+  errEl.textContent = '';
+  let data;
+  try {
+    data = parseMrsim(text, fileName);
+  } catch (e) {
+    statusEl.textContent = 'parse error';
+    diagEl.classList.remove('hidden');
+    errEl.textContent = 'PARSE ERROR: ' + e.message;
+    window.__mrsim = { error: e.message, fileName };
+    return;
+  }
+  if (!opts.reuseDoc) {
+    editState = {
+      doc: new DOMParser().parseFromString(text, 'text/xml'),
+      fileName, index: new Map(), dirty: false, undo: [],
+    };
+  }
+  currentData = data;
+  buildEditIndex(data);
+  const extra = await build(data, opts.keepCamera);
+  renderDiag(data, extra);
+  statusEl.textContent =
+    `${data.elements.length} elements · ${data.seq.length} cps · ${data.issues.length} issues` +
+    (editState.dirty ? ' · EDITED' : '');
+  document.getElementById('legend').textContent =
+    'blue rings = checkpoints (arrow = fly-through dir) · red = start · axes at origin';
+  if (opts.keepSelection != null) selectElementByName(opts.keepSelection, true);
+  else if (editUi.selectedName) selectElementByName(editUi.selectedName, true);
+  renderLapPanel();
+  // expose everything for headless inspection via preview_eval
+  window.__mrsim = {
+    fileName, meta: data.meta,
+    elementCount: data.elements.length,
+    kinds: data.elements.reduce((a, e) => (a[e.kind] = (a[e.kind] || 0) + 1, a), {}),
+    checkpointCount: data.seq.length,
+    issues: data.issues,
+    groundY: extra.groundY,
+    startElement: (data.elements.find(e => e.isStart) || {}).name || null,
+    gateWidths: extra.gateWidths,
+    seq: data.seq.map(s => ({
+      n: s.seqNum, name: s.name, elemIndex: s.elemIndex,
+      pos: [s.pos.x, s.pos.y, s.pos.z].map(v => +v.toFixed(3)),
+      dir: [s.dir.x, s.dir.y, s.dir.z].map(v => +v.toFixed(3)),
+    })),
+    data,
+  };
+}
+
+async function loadFromUrl(url) {
+  statusEl.textContent = 'loading…';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    await loadFromText(await res.text(), url.split('/').pop());
+  } catch (e) {
+    statusEl.textContent = 'load error';
+    diagEl.classList.remove('hidden');
+    errEl.textContent = 'LOAD ERROR (' + url + '): ' + e.message;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// EDIT MODE — move / rotate(yaw) / scale(uniform, the engine's s=) track
+// objects by rewriting their wrapper <Transform> in the source XML, then
+// re-parsing. Export serializes the edited DOM for MRSIM / re-import.
+// ---------------------------------------------------------------------------
+const DEG = Math.PI / 180;
+
+// mirror of mrsim.js localMatrix (T * R * S) for DOM elements
+function localMatrixDom(el) {
+  const num = (n, d = 0) => {
+    const v = el.getAttribute(n);
+    return v === null || v === '' ? d : parseFloat(v);
+  };
+  let x = num('x'), y = num('y'), z = num('z');
+  const v = el.getAttribute('v');
+  if (v) { const p = v.split(',').map(parseFloat); x = p[0] || 0; y = p[1] || 0; z = p[2] || 0; }
+  const m = new THREE.Matrix4();
+  const ax = num('rx'), ay = num('ry'), az = num('rz');
+  const angle = el.hasAttribute('angleDegrees') ? num('angleDegrees') * DEG : num('angle');
+  if ((ax || ay || az) && angle)
+    m.makeRotationAxis(new THREE.Vector3(ax, ay, az).normalize(), angle);
+  const s = num('s', 1);
+  if (s !== 1) m.multiply(new THREE.Matrix4().makeScale(s, s, s));
+  m.setPosition(x, y, z);
+  return m;
+}
+
+// element name -> {trEl, A (mrsim-space ancestor matrix), yawOnly, reason}
+function buildEditIndex(data) {
+  const doc = editState.doc;
+  const index = editState.index;
+  index.clear();
+  const all = [...doc.getElementsByTagName('Entity')];
+  const byName = new Map();
+  for (const e of all) {
+    const n = e.getAttribute('name');
+    if (!n) continue;
+    byName.set(n, byName.has(n) ? 'dup' : e);
+  }
+  data.elements.forEach(el => {
+    const ent = byName.get(el.name);
+    if (!ent) { index.set(el.name, { reason: 'defined inside a library include' }); return; }
+    if (ent === 'dup') { index.set(el.name, { reason: 'duplicate entity name' }); return; }
+    // nearest ancestor <Transform> = the placement we edit
+    let tr = ent.parentElement;
+    while (tr && tr.tagName !== 'Transform') {
+      if (/^(Macro|ForEachTransform|Instance)$/.test(tr.tagName)) { tr = null; break; }
+      tr = tr.parentElement;
+    }
+    if (!tr) { index.set(el.name, { reason: 'no wrapper <Transform>' }); return; }
+    // accumulate everything ABOVE that transform (outer Transforms, entity WFECs)
+    const chain = [];
+    for (let a = tr.parentElement; a && a.tagName !== 'Simulation'; a = a.parentElement) {
+      if (a.tagName === 'Transform') chain.push(localMatrixDom(a));
+      else if (a.tagName === 'Entity') {
+        const wf = [...a.children].find(c => c.tagName === 'WorldFromEntityComponent');
+        if (wf) chain.push(localMatrixDom(wf));
+      } else { index.set(el.name, { reason: `nested in <${a.tagName}>` }); return; }
+    }
+    const A = new THREE.Matrix4();
+    for (let i = chain.length - 1; i >= 0; i--) A.multiply(chain[i]);
+    const yawOnly = !parseFloat(tr.getAttribute('rx') || 0) && !parseFloat(tr.getAttribute('ry') || 0);
+    index.set(el.name, { trEl: tr, A, yawOnly });
+  });
+}
+
+// ---- gizmo + selection ----
+const proxy = new THREE.Object3D(); scene.add(proxy);
+const tc = new TransformControls(camera, renderer.domElement);
+tc.setSize(0.8);
+scene.add(tc);
+const editUi = {
+  on: false, selectedName: null, startWorld: null, startScale: 1,
+  suppressClick: false,
+};
+tc.addEventListener('dragging-changed', e => {
+  controls.enabled = !e.value;
+  if (e.value) editUi.suppressClick = true;
+  else { commitEdit(); setTimeout(() => editUi.suppressClick = false, 0); }
+});
+tc.addEventListener('objectChange', () => {
+  if (tc.mode === 'scale') {
+    // MRSIM scale is UNIFORM (s=) — mirror the most-changed axis to all three
+    const sc = proxy.scale, s0 = editUi.startScale;
+    let best = 'x';
+    for (const c of ['y', 'z'])
+      if (Math.abs(sc[c] - s0) > Math.abs(sc[best] - s0)) best = c;
+    sc.setScalar(Math.min(5, Math.max(0.2, sc[best])));
+  }
+  applyLiveDelta();
+  refreshEditPanelNumbers(true);
+});
+
+function elemIndexByName(name) {
+  return currentData ? currentData.elements.findIndex(e => e.name === name) : -1;
+}
+
+function currentWorldThree(rec) {
+  // three-space world matrix of the wrapper transform: ZUP * A * L
+  return Z_UP_TO_Y_UP.clone().multiply(rec.A).multiply(localMatrixDom(rec.trEl));
+}
+
+function selectElementByName(name, silent = false) {
+  const rec = editState?.index.get(name);
+  editUi.selectedName = name;
+  const ei = elemIndexByName(name);
+  document.getElementById('edTitle').textContent =
+    name + (ei >= 0 ? ` · ${KIND_LABEL[currentData.elements[ei].kind] || ''}` : '');
+  if (!rec || !rec.trEl) {
+    tc.detach();
+    document.getElementById('edHint').innerHTML =
+      `<span class="locked">not editable: ${rec ? rec.reason : 'unknown element'}</span>`;
+    refreshEditPanelNumbers();
+    renderLapPanel(); refreshWHRow();
+    return;
+  }
+  const W = currentWorldThree(rec);
+  W.decompose(proxy.position, proxy.quaternion, proxy.scale);
+  editUi.startWorld = W.clone();
+  editUi.startScale = proxy.scale.x;
+  if (editUi.on) tc.attach(proxy);
+  document.getElementById('edHint').innerHTML = rec.yawOnly
+    ? 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo'
+    : 'tilted object: <span class="locked">move only</span> (rotation is not pure yaw)';
+  refreshEditPanelNumbers();
+  renderLapPanel(); refreshWHRow();
+}
+
+// bare custom checkpoints expose their sensor Box width x height directly
+function sensorBoxEl(name) {
+  const rec = editState?.index.get(name);
+  if (!rec?.trEl) return null;
+  const walk = el => {
+    for (const c of el.children || []) {
+      if (c.tagName === 'Entity' &&
+          [...c.children].some(k => k.tagName === 'Checkpoint') &&
+          [...c.children].some(k => k.tagName === 'StaticContact' && k.getAttribute('contactMaterial') === '-1')) {
+        const box = [...c.children].find(k => k.tagName === 'Box');
+        if (box) return box;
+      }
+      const hit = walk(c);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(rec.trEl);
+}
+function refreshWHRow() {
+  const box = editUi.selectedName ? sensorBoxEl(editUi.selectedName) : null;
+  document.getElementById('edWHRow').style.display = box ? 'flex' : 'none';
+  if (box) {
+    document.getElementById('edW').value = parseFloat(box.getAttribute('x') || 3).toFixed(1);
+    document.getElementById('edH').value = parseFloat(box.getAttribute('z') || 2.5).toFixed(1);
+  }
+}
+for (const [inputId, attr] of [['edW', 'x'], ['edH', 'z']]) {
+  document.getElementById(inputId).addEventListener('change', e => {
+    const box = sensorBoxEl(editUi.selectedName);
+    if (!box) return;
+    pushUndoOps([attrsOp(box)]);
+    box.setAttribute(attr, Math.max(0.5, parseFloat(e.target.value) || 1).toFixed(2));
+    editState.dirty = true;
+    rebuildFromDoc();
+  });
+}
+
+// live preview while dragging: delta(world) applied to every scene object of
+// the selected element; the XML is only written on release
+const _tmpM = new THREE.Matrix4(), _tmpM2 = new THREE.Matrix4();
+function applyLiveDelta() {
+  const ei = elemIndexByName(editUi.selectedName);
+  if (ei < 0 || !editUi.startWorld) return;
+  proxy.updateMatrix();
+  const delta = _tmpM.copy(proxy.matrix).multiply(_tmpM2.copy(editUi.startWorld).invert());
+  (renderRefs[ei] || []).forEach(r => {
+    if (r.im) {
+      r.im.setMatrixAt(r.idx, _tmpM2.copy(delta).multiply(r.base));
+      r.im.instanceMatrix.needsUpdate = true;
+    } else {
+      r.obj.matrixAutoUpdate = false;
+      r.obj.matrix.copy(delta).multiply(r.base);
+    }
+  });
+}
+
+// proxy world matrix -> new local T*R*S written into the wrapper <Transform>
+function commitEdit() {
+  const rec = editState?.index.get(editUi.selectedName);
+  if (!rec || !rec.trEl || !editUi.startWorld) return;
+  proxy.updateMatrix();
+  if (proxy.matrix.equals(editUi.startWorld)) return;   // no-op drag
+  // L' = A⁻¹ · ZUP⁻¹ · proxyWorld   (mrsim space)
+  const L = _tmpM.copy(rec.A).invert()
+    .multiply(_tmpM2.copy(Z_UP_TO_Y_UP).invert())
+    .multiply(proxy.matrix);
+  const e = L.elements;
+  const s = Math.hypot(e[0], e[1], e[2]);               // uniform scale
+  const c0 = { x: e[0] / s, y: e[1] / s };              // rotated X axis
+  const zAxisOk = Math.abs(e[10] / s - 1) < 2e-3 && Math.abs(e[8]) < 2e-3 * s && Math.abs(e[9]) < 2e-3 * s;
+  const tr = rec.trEl;
+  if (!rec.yawOnly || !zAxisOk) {
+    // tilted object (or a drag that left pure-yaw): translation only
+    const q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+    editUi.startWorld.decompose(v, q0, sc); proxy.matrix.decompose(v, q1, sc);
+    if (q0.angleTo(q1) > 0.01 || Math.abs(proxy.scale.x - editUi.startScale) > 0.01) {
+      selectElementByName(editUi.selectedName);         // revert the gizmo
+      document.getElementById('edHint').innerHTML =
+        '<span class="locked">only moving is allowed on tilted objects — rotation/scale reverted</span>';
+      rebuildFromDoc();
+      return;
+    }
+    pushUndo(tr);
+    setTransformPos(tr, e[12], e[13], e[14]);
+  } else {
+    pushUndo(tr);
+    setTransformPos(tr, e[12], e[13], e[14]);
+    const yaw = Math.atan2(c0.y, c0.x);                 // rotation about mrsim +z
+    ['angle', 'rx', 'ry'].forEach(a => tr.removeAttribute(a));
+    if (Math.abs(yaw) > 1e-4) {
+      tr.setAttribute('rz', '-1');
+      tr.setAttribute('angleDegrees', (-yaw / DEG).toFixed(2));
+    } else { tr.removeAttribute('rz'); tr.removeAttribute('angleDegrees'); }
+    // MRSIM's engine scale is a single uniform s= — clamp to a sane range
+    const sc = Math.min(5, Math.max(0.2, s));
+    if (Math.abs(sc - 1) > 2e-3) tr.setAttribute('s', sc.toFixed(3));
+    else tr.removeAttribute('s');
+  }
+  editState.dirty = true;
+  rebuildFromDoc();
+}
+
+function setTransformPos(tr, x, y, z) {
+  tr.removeAttribute('v');
+  tr.setAttribute('x', x.toFixed(3));
+  tr.setAttribute('y', y.toFixed(3));
+  if (Math.abs(z) > 5e-4) tr.setAttribute('z', z.toFixed(3)); else tr.removeAttribute('z');
+}
+
+// one undo step = a list of ops, reverted in reverse order:
+//   {type:'attrs', el, attrs}          restore an element's attribute set
+//   {type:'insert', node}              node was inserted -> remove it
+//   {type:'remove', node, parent, next} node was removed -> put it back
+//   {type:'text', el, text}            restore an element's text content
+function pushUndoOps(ops) {
+  editState.undo.push(ops);
+  if (editState.undo.length > 100) editState.undo.shift();
+}
+const attrsOp = el => ({ type: 'attrs', el, attrs: [...el.attributes].map(a => [a.name, a.value]) });
+function pushUndo(tr) { pushUndoOps([attrsOp(tr)]); }
+
+function undoEdit() {
+  const ops = editState?.undo.pop();
+  if (!ops) return;
+  for (const u of [...ops].reverse()) {
+    if (u.type === 'attrs') {
+      [...u.el.attributes].forEach(a => u.el.removeAttribute(a.name));
+      u.attrs.forEach(([n, v]) => u.el.setAttribute(n, v));
+    } else if (u.type === 'insert') {
+      u.node.parentNode?.removeChild(u.node);
+    } else if (u.type === 'remove') {
+      u.parent.insertBefore(u.node, u.next || null);
+    } else if (u.type === 'text') {
+      u.el.textContent = u.text;
+    }
+  }
+  editState.dirty = editState.undo.length > 0;
+  rebuildFromDoc();
+}
+
+async function rebuildFromDoc() {
+  const text = new XMLSerializer().serializeToString(editState.doc);
+  await loadFromText(text, editState.fileName,
+    { reuseDoc: true, keepCamera: true, keepSelection: editUi.selectedName });
+}
+
+// ---------------------------------------------------------------------------
+// OBJECT PALETTE — every placeable MRSIM library object + custom sensors.
+// cp: how the object joins the lap list — 'wrapper' = the checkpoint lives in
+// the include and MRSIM resolves the wrapper name; 'pass' = a named child
+// carries it (list "<name>_pass"); null = scenery, no lap entry.
+// ---------------------------------------------------------------------------
+const LIB = '/Data/Simulations/Multirotor/';
+const PALETTE = [
+  { id: 'gate5',   label: '5×5 gate (2.1 m)',  macro: 'Centered5x5Gate', cp: 'wrapper' },
+  { id: 'gate7',   label: '7×6 gate (3 m)',    macro: 'Centered7x6Gate', cp: 'wrapper' },
+  { id: 'sf5',     label: '5×5 start/finish',  macro: 'Centered5x5StartFinishGate', cp: 'wrapper' },
+  { id: 'sf7',     label: '7×6 start/finish',  macro: 'Centered7x6StartFinishGate', cp: 'wrapper' },
+  { id: 'champs',  label: 'Champs25 LED gate', include: 'Gates/Champs25Gate.xml', cp: 'wrapper' },
+  { id: 'dive',    label: '7×7 dive gate',     include: '7x7DiveGate.xml', cp: 'wrapper' },
+  { id: 'climb',   label: '7×7 climb gate',    include: '7x7ClimbGate.xml', cp: 'wrapper' },
+  { id: 'divebox', label: '7×7 dive box',      include: '7x7DiveBox.xml', cp: 'wrapper' },
+  { id: 'divebxc', label: '7×7 dive box crnr', include: '7x7DiveBoxCorner.xml', cp: 'wrapper' },
+  { id: 'hurdle5', label: 'hurdle 5×10',       include: '5x10Hurdle.xml', cp: 'wrapper' },
+  { id: 'hurdle7', label: 'hurdle 7×16',       include: '7x16Hurdle.xml', cp: 'wrapper' },
+  { id: 'passR',   label: 'pass plane (R)',    include: 'HalfPlanePassageRight.xml', cp: 'wrapper' },
+  { id: 'passL',   label: 'pass plane (L)',    include: 'HalfPlanePassageLeft.xml', cp: 'wrapper' },
+  { id: 'flagR',   label: 'flag + pass R',     flagCombo: 'HalfPlanePassageRight.xml', cp: 'pass' },
+  { id: 'flagL',   label: 'flag + pass L',     flagCombo: 'HalfPlanePassageLeft.xml', cp: 'pass' },
+  { id: 'check',   label: 'checkpoint (box)',  sensor: true, cp: 'pass' },
+  { id: 'tower5',  label: '5×5 tower',         include: '5x5Tower.xml', cp: null },
+  { id: 'tower7',  label: '7×6 tower',         include: '7x6Tower.xml', cp: null },
+  { id: 'hurdle4', label: 'hurdle 4×7',        include: '4x7Hurdle.xml', cp: null },
+  { id: 'carous',  label: 'carousel down',     include: 'CarouselDown.xml', cp: null },
+  { id: 'divecl',  label: 'dive frame (deco)', include: 'DiveGate.xml', cp: null },
+  { id: 'poleC25', label: 'Champs25 pole',     include: 'Gates/Champs25Pole.xml', cp: null },
+  { id: 'flag',    label: 'flag (deco)',       include: 'Flag.xml', cp: null },
+  { id: 'flag180', label: 'flag 180 (deco)',   include: 'Flag180.xml', cp: null },
+  { id: 'block',   label: 'start block',       include: 'StartBlock.xml', cp: null },
+  { id: 'mat',     label: '7×7 launch mat',    include: '7x7Mat.xml', cp: null },
+  { id: 'stand',   label: 'launch stand',      include: 'LaunchStands/MetalLaunchStand.xml', cp: null },
+  { id: 'standC',  label: 'champ stand',       include: 'LaunchStands/ChampionshipLaunchStand.xml', cp: null },
+  { id: 'canopy',  label: 'shade canopy',      include: 'Furniture/ShadeCanopy.xml', cp: null },
+];
+const MACRO_SHIFTS = {
+  Centered5x5Gate: ['-1.05', '5x5Gate.xml'],
+  Centered5x5StartFinishGate: ['-1.05', '5x5StartFinishGate.xml'],
+  Centered7x6Gate: ['-1.5', '7x6Gate.xml'],
+  Centered7x6StartFinishGate: ['-1.5', '7x6StartFinishGate.xml'],
+};
+
+// ---- DOM building blocks ---------------------------------------------------
+function uniqueName(prefix) {
+  const names = new Set([...editState.doc.getElementsByTagName('Entity')]
+    .map(e => e.getAttribute('name')).filter(Boolean));
+  let n = 1;
+  while (names.has(prefix + n)) n++;
+  return prefix + n;
+}
+
+function rootSim() { return editState.doc.documentElement; }
+
+function cpListEl(create = false) {
+  let el = editState.doc.getElementsByTagName('CheckpointList')[0] || null;
+  if (!el && create) {
+    el = editState.doc.createElement('CheckpointList');
+    el.textContent = '\n      {\n          isCircuit: true,\n          checkpoints:\n          [\n          ]\n      }\n    ';
+    insertParent().appendChild(el);
+    pushUndoOps([{ type: 'insert', node: el }]);
+  }
+  return el;
+}
+
+// where new objects go: the parent holding the CheckpointList (the track
+// entity in converter/community files), else the root <Simulation>
+function insertParent() {
+  const list = editState.doc.getElementsByTagName('CheckpointList')[0];
+  return list ? list.parentNode : rootSim();
+}
+
+function ensureMacro(name, ops) {
+  const has = [...editState.doc.getElementsByTagName('Macro')]
+    .some(m => m.getAttribute('name') === name);
+  if (has) return;
+  const [shift, file] = MACRO_SHIFTS[name];
+  const doc = editState.doc;
+  const macro = doc.createElement('Macro');
+  macro.setAttribute('name', name);
+  const tr = doc.createElement('Transform');
+  tr.setAttribute('x', shift);
+  const inc = doc.createElement('Include');
+  inc.setAttribute('file', LIB + file);
+  tr.appendChild(inc); macro.appendChild(tr);
+  // after the root-level includes, before everything else
+  const root = rootSim();
+  const includes = [...root.children].filter(c => c.tagName === 'Include');
+  root.insertBefore(macro, includes.length ? includes[includes.length - 1].nextSibling : root.firstChild);
+  ops.push({ type: 'insert', node: macro });
+}
+
+function ensureRootInclude(file, ops) {
+  const root = rootSim();
+  if ([...root.children].some(c => c.tagName === 'Include' &&
+      (c.getAttribute('file') || '').endsWith(file))) return;
+  const inc = editState.doc.createElement('Include');
+  inc.setAttribute('file', LIB + file);
+  root.insertBefore(inc, root.firstChild);
+  ops.push({ type: 'insert', node: inc });
+}
+
+// build the placement <Transform><Entity name=…>…</Entity></Transform>
+function buildPlacement(def, name, mx, my, mz, ops) {
+  const doc = editState.doc;
+  const tr = doc.createElement('Transform');
+  tr.setAttribute('x', mx.toFixed(3)); tr.setAttribute('y', my.toFixed(3));
+  if (Math.abs(mz) > 5e-4) tr.setAttribute('z', mz.toFixed(3));
+  const ent = doc.createElement('Entity');
+  ent.setAttribute('name', name);
+  tr.appendChild(ent);
+  if (def.macro) {
+    ensureMacro(def.macro, ops);
+    ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
+    const inst = doc.createElement('Instance');
+    inst.setAttribute('macro', def.macro);
+    ent.appendChild(inst);
+  } else if (def.include) {
+    ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
+    const inc = doc.createElement('Include');
+    inc.setAttribute('file', LIB + def.include);
+    ent.appendChild(inc);
+  } else if (def.flagCombo) {
+    ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
+    const flag = doc.createElement('Include');
+    flag.setAttribute('file', LIB + 'Flag.xml');
+    ent.appendChild(flag);
+    const pass = doc.createElement('Entity');
+    pass.setAttribute('name', name + '_pass');
+    const inc = doc.createElement('Include');
+    inc.setAttribute('file', LIB + def.flagCombo);
+    pass.appendChild(inc);
+    ent.appendChild(pass);
+  } else if (def.sensor) {
+    // bare trigger volume, the converter's pattern: 3 m wide, 2.5 m tall
+    const pass = doc.createElement('Entity');
+    pass.setAttribute('name', name + '_pass');
+    const wf = doc.createElement('WorldFromEntityComponent');
+    wf.setAttribute('z', '1.5');
+    const box = doc.createElement('Box');
+    box.setAttribute('x', '3'); box.setAttribute('y', '.05'); box.setAttribute('z', '2.5');
+    const sc = doc.createElement('StaticContact');
+    sc.setAttribute('contactMaterial', '-1');
+    const ref = doc.createElement('Entity');
+    ref.setAttribute('name', 'CheckpointReference');
+    ref.appendChild(doc.createElement('WorldFromEntityComponent'));
+    pass.append(wf, box, sc, ref, doc.createElement('Checkpoint'));
+    ent.appendChild(pass);
+  }
+  const list = editState.doc.getElementsByTagName('CheckpointList')[0];
+  const parent = insertParent();
+  parent.insertBefore(tr, list && list.parentNode === parent ? list : null);
+  ops.push({ type: 'insert', node: tr });
+  return tr;
+}
+
+// ---- checkpoint list (the lap) --------------------------------------------
+function lapNames() {
+  const el = cpListEl();
+  if (!el) return [];
+  return [...(el.textContent || '').matchAll(/"([^"]+)"/g)].map(m => m[1]);
+}
+function lapIsCircuit() {
+  const el = cpListEl();
+  return el ? !/isCircuit:\s*false/.test(el.textContent || '') : true;
+}
+function writeLap(names, isCircuit, ops) {
+  const el = cpListEl(true);
+  ops.push({ type: 'text', el, text: el.textContent });
+  el.textContent = '\n      {\n          isCircuit: ' + (isCircuit ? 'true' : 'false') +
+    ',\n          checkpoints:\n          [\n' +
+    names.map(n => `              "${n}"`).join(',\n') +
+    '\n          ]\n      }\n    ';
+}
+
+// the name MRSIM resolves for an element: the named child that DIRECTLY
+// carries <Checkpoint> (bare sensors, flag passes), else the wrapper (the
+// checkpoint lives inside a library include)
+function listNameFor(elementName) {
+  const rec = editState.index.get(elementName);
+  if (!rec?.trEl) return elementName;
+  const walk = el => {
+    for (const c of el.children || []) {
+      if (c.tagName === 'Entity' && c.getAttribute('name') &&
+          [...c.children].some(k => k.tagName === 'Checkpoint')) return c.getAttribute('name');
+      const hit = walk(c);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(rec.trEl) || elementName;
+}
+
+// every listable name inside an element's subtree (for delete cleanup)
+function subtreeNames(trEl) {
+  const out = new Set();
+  const walk = el => {
+    for (const c of el.children || []) {
+      if (c.tagName === 'Entity' && c.getAttribute('name')) out.add(c.getAttribute('name'));
+      walk(c);
+    }
+  };
+  walk(trEl);
+  return out;
+}
+
+// ---- place / delete / duplicate -------------------------------------------
+const placeUi = { def: null, marker: null };
+function armPlace(def) {
+  placeUi.def = def;
+  [...document.querySelectorAll('#palette button')].forEach(b =>
+    b.classList.toggle('arm', b.dataset.pid === (def && def.id)));
+  if (!def && placeUi.marker) placeUi.marker.visible = false;
+  document.getElementById('edHint').innerHTML = def
+    ? `placing <b>${def.label}</b> — click the ground · shift-click = keep placing · Esc cancels`
+    : 'click an object or checkpoint ring to select · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo';
+}
+
+function groundHit(e) {
+  pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects([terrainGroup, ground], true);
+  if (hits.length) return hits[0].point;
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -grid.position.y);
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(plane, p) ? p : null;
+}
+
+function placeAt(def, p3) {
+  // three ground point -> mrsim: (x, -z, y)
+  const mx = p3.x, my = -p3.z, mz = Math.abs(p3.y) > 5e-4 ? p3.y : 0;
+  const ops = [];
+  const name = uniqueName('ed' + def.id[0].toUpperCase() + def.id.slice(1));
+  buildPlacement(def, name, mx, my, mz, ops);
+  if (def.cp) {
+    const entry = def.cp === 'pass' ? name + '_pass' : name;
+    writeLap([...lapNames(), entry], lapIsCircuit(), ops);
+  }
+  pushUndoOps(ops);
+  editState.dirty = true;
+  return rebuildFromDoc().then(() => selectElementByName(name));
+}
+
+function deleteSelected() {
+  const rec = editState?.index.get(editUi.selectedName);
+  if (!rec?.trEl) return;
+  const ops = [];
+  const gone = subtreeNames(rec.trEl);
+  gone.add(editUi.selectedName);
+  const names = lapNames().filter(n => !gone.has(n) && !gone.has(n.split('.')[0]));
+  if (names.length !== lapNames().length) writeLap(names, lapIsCircuit(), ops);
+  ops.push({ type: 'remove', node: rec.trEl, parent: rec.trEl.parentNode, next: rec.trEl.nextSibling });
+  rec.trEl.parentNode.removeChild(rec.trEl);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  editUi.selectedName = null; tc.detach();
+  document.getElementById('edTitle').textContent = 'nothing selected';
+  rebuildFromDoc();
+}
+
+function duplicateSelected() {
+  const rec = editState?.index.get(editUi.selectedName);
+  if (!rec?.trEl) return;
+  const ops = [];
+  const clone = rec.trEl.cloneNode(true);
+  // rename every named entity in the clone to keep names unique
+  const renames = new Map();
+  const walk = el => {
+    for (const c of [...(el.children || [])]) {
+      if (c.tagName === 'Entity' && c.getAttribute('name') && c.getAttribute('name') !== 'CheckpointReference') {
+        const old = c.getAttribute('name');
+        const base = old.replace(/\d+$/, '').replace(/_pass$/, '');
+        const nn = old.endsWith('_pass') ? null : uniqueName(base);
+        if (nn) { renames.set(old, nn); c.setAttribute('name', nn); }
+      }
+      walk(c);
+    }
+  };
+  walk(clone);
+  // fix _pass children to follow their renamed parent
+  const walk2 = el => {
+    for (const c of [...(el.children || [])]) {
+      if (c.tagName === 'Entity') {
+        const n = c.getAttribute('name');
+        if (n && n.endsWith('_pass')) {
+          const parent = n.slice(0, -5);
+          if (renames.has(parent)) {
+            renames.set(n, renames.get(parent) + '_pass');
+            c.setAttribute('name', renames.get(parent) + '_pass');
+          }
+        }
+      }
+      walk2(c);
+    }
+  };
+  walk2(clone);
+  // offset 3 m along mrsim +x so the copy is visible
+  clone.setAttribute('x', (parseFloat(clone.getAttribute('x') || 0) + 3).toFixed(3));
+  rec.trEl.parentNode.insertBefore(clone, rec.trEl.nextSibling);
+  ops.push({ type: 'insert', node: clone });
+  // lap entries of the original -> append equivalents for the copy
+  const lap = lapNames();
+  const added = [];
+  for (const n of lap) if (renames.has(n)) added.push(renames.get(n));
+  if (added.length) writeLap([...lap, ...added], lapIsCircuit(), ops);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  const newName = renames.get(editUi.selectedName) || null;
+  rebuildFromDoc().then(() => newName && selectElementByName(newName));
+}
+
+// ---- lap panel -------------------------------------------------------------
+function renderLapPanel() {
+  const box = document.getElementById('lapList');
+  if (!editState) { box.innerHTML = ''; return; }
+  const names = lapNames();
+  const selListName = editUi.selectedName ? listNameFor(editUi.selectedName) : null;
+  box.innerHTML = names.map((n, i) =>
+    `<div class="lapRow${n === selListName ? ' sel' : ''}" data-i="${i}">` +
+    `<span class="num">${i + 1}</span><span class="nm" title="${escapeHtml(n)}">${escapeHtml(n)}</span>` +
+    `<button data-act="up" title="earlier">▲</button>` +
+    `<button data-act="dn" title="later">▼</button>` +
+    `<button data-act="rm" title="remove from lap">✕</button></div>`).join('') ||
+    '<div class="hint">no checkpoints in the lap yet — place a gate or select an object and “+ lap”</div>';
+  document.getElementById('lapCircuit').checked = lapIsCircuit();
+}
+document.getElementById('lapList').addEventListener('click', e => {
+  const row = e.target.closest('.lapRow');
+  if (!row) return;
+  const i = +row.dataset.i;
+  const act = e.target.dataset?.act;
+  const names = lapNames();
+  if (!act) {   // click the name -> select the element that carries it
+    const leaf = names[i].split('.').pop();
+    const el = currentData.elements.find(el2 => el2.name === leaf || listNameFor(el2.name) === names[i]);
+    if (el) selectElementByName(el.name);
+    return;
+  }
+  const ops = [];
+  if (act === 'rm') names.splice(i, 1);
+  else if (act === 'up' && i > 0) [names[i - 1], names[i]] = [names[i], names[i - 1]];
+  else if (act === 'dn' && i < names.length - 1) [names[i + 1], names[i]] = [names[i], names[i + 1]];
+  else return;
+  writeLap(names, lapIsCircuit(), ops);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  rebuildFromDoc();
+});
+document.getElementById('lapCircuit').addEventListener('change', e => {
+  const ops = [];
+  writeLap(lapNames(), e.target.checked, ops);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  rebuildFromDoc();
+});
+document.getElementById('edLapAdd').onclick = () => {
+  if (!editUi.selectedName) return;
+  const ops = [];
+  writeLap([...lapNames(), listNameFor(editUi.selectedName)], lapIsCircuit(), ops);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  rebuildFromDoc();
+};
+document.getElementById('edDel').onclick = deleteSelected;
+document.getElementById('edDup').onclick = duplicateSelected;
+
+// palette buttons
+{
+  const pal = document.getElementById('palette');
+  PALETTE.forEach(def => {
+    const b = document.createElement('button');
+    b.textContent = (def.cp ? '◉ ' : '▫ ') + def.label;
+    b.title = def.cp ? 'joins the lap when placed' : 'scenery only';
+    b.dataset.pid = def.id;
+    b.onclick = () => armPlace(placeUi.def === def ? null : def);
+    pal.appendChild(b);
+  });
+}
+
+// ---- numeric panel ----
+const edIn = {
+  x: document.getElementById('edX'), y: document.getElementById('edY'),
+  z: document.getElementById('edZ'), yaw: document.getElementById('edYaw'),
+  s: document.getElementById('edS'),
+};
+function refreshEditPanelNumbers(fromProxy = false) {
+  const rec = editState?.index.get(editUi.selectedName);
+  if (!rec || !rec.trEl) { Object.values(edIn).forEach(i => { i.value = ''; i.disabled = true; }); return; }
+  let L;
+  if (fromProxy) {
+    proxy.updateMatrix();
+    L = _tmpM.copy(rec.A).invert()
+      .multiply(_tmpM2.copy(Z_UP_TO_Y_UP).invert()).multiply(proxy.matrix);
+  } else L = localMatrixDom(rec.trEl);
+  const e = L.elements;
+  const s = Math.hypot(e[0], e[1], e[2]);
+  edIn.x.value = e[12].toFixed(2); edIn.y.value = e[13].toFixed(2); edIn.z.value = e[14].toFixed(2);
+  edIn.yaw.value = (-Math.atan2(e[1] / s, e[0] / s) / DEG).toFixed(1);
+  edIn.s.value = s.toFixed(2);
+  edIn.x.disabled = edIn.y.disabled = edIn.z.disabled = false;
+  edIn.yaw.disabled = edIn.s.disabled = !rec.yawOnly;
+}
+Object.entries(edIn).forEach(([key, input]) => {
+  input.addEventListener('change', () => {
+    const rec = editState?.index.get(editUi.selectedName);
+    if (!rec || !rec.trEl) return;
+    const tr = rec.trEl;
+    pushUndo(tr);
+    if (key === 'yaw') {
+      ['angle', 'rx', 'ry'].forEach(a => tr.removeAttribute(a));
+      const A = parseFloat(input.value) || 0;
+      if (Math.abs(A) > 1e-3) { tr.setAttribute('rz', '-1'); tr.setAttribute('angleDegrees', A.toFixed(2)); }
+      else { tr.removeAttribute('rz'); tr.removeAttribute('angleDegrees'); }
+    } else if (key === 's') {
+      const s = Math.min(5, Math.max(0.2, parseFloat(input.value) || 1));
+      if (Math.abs(s - 1) > 2e-3) tr.setAttribute('s', s.toFixed(3)); else tr.removeAttribute('s');
+    } else {
+      tr.removeAttribute('v');
+      tr.setAttribute(key, (parseFloat(input.value) || 0).toFixed(3));
+      if (key === 'z' && Math.abs(parseFloat(input.value) || 0) < 5e-4) tr.removeAttribute('z');
+    }
+    editState.dirty = true;
+    rebuildFromDoc();
+  });
+});
+
+// ---- picking ----
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!placeUi.def) return;
+  if (!placeUi.marker) {
+    const m = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.06, 8, 32),
+      new THREE.MeshBasicMaterial({ color: '#7ab648' }));
+    ring.rotation.x = Math.PI / 2;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4),
+      new THREE.MeshBasicMaterial({ color: '#7ab648', transparent: true, opacity: 0.5 }));
+    post.position.y = 1.2;
+    m.add(ring, post);
+    scene.add(m);
+    placeUi.marker = m;
+  }
+  const p = groundHit(e);
+  placeUi.marker.visible = !!p;
+  if (p) placeUi.marker.position.copy(p);
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!editUi.on || editUi.suppressClick || !downAt) return;
+  if (Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;  // it was a drag
+  if (placeUi.def) {
+    const p = groundHit(e);
+    if (p) {
+      const def = placeUi.def;
+      placeAt(def, p).then(() => { if (!e.shiftKey) armPlace(null); });
+    }
+    return;
+  }
+  pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const targets = [trackGroup, sensorGroup];
+  if (cpGroup.visible) targets.push(cpGroup);
+  // solid geometry / rings win over the (huge, translucent) sensor volumes —
+  // a sensor is only selected when nothing solid is under the cursor
+  let sensorPick = null;
+  for (const hit of raycaster.intersectObjects(targets, true)) {
+    let ei, isSensor = false;
+    if (hit.object.isInstancedMesh) ei = hit.object.userData.elems?.[hit.instanceId];
+    else {
+      let o = hit.object;
+      while (o && o.userData.elemIndex === undefined) { if (o === sensorGroup) break; o = o.parent; }
+      ei = o?.userData.elemIndex;
+      for (let o2 = hit.object; o2; o2 = o2.parent) if (o2 === sensorGroup) { isSensor = true; break; }
+    }
+    if (ei === undefined || ei === null || ei < 0) continue;
+    if (isSensor) { sensorPick ??= ei; continue; }
+    selectElementByName(currentData.elements[ei].name);
+    return;
+  }
+  if (sensorPick !== null) selectElementByName(currentData.elements[sensorPick].name);
+});
+
+function setEditMode(on) {
+  editUi.on = on;
+  document.getElementById('btnEdit').classList.toggle('edit-on', on);
+  document.getElementById('editPanel').classList.toggle('show', on);
+  sensorGroup.visible = on;
+  if (!on) tc.detach();
+  else if (editUi.selectedName) selectElementByName(editUi.selectedName);
+}
+function setGizmoMode(mode) {
+  tc.setMode(mode);
+  tc.showX = tc.showY = tc.showZ = true;   // rotate: all three rings (full 3D)
+  ['T', 'R', 'S'].forEach(k =>
+    document.getElementById('edMode' + k).classList.toggle('on', mode[0].toUpperCase() === k ||
+      (k === 'T' && mode === 'translate')));
+}
+document.getElementById('edModeT').onclick = () => setGizmoMode('translate');
+document.getElementById('edModeR').onclick = () => setGizmoMode('rotate');
+document.getElementById('edModeS').onclick = () => setGizmoMode('scale');
+
+addEventListener('keydown', e => {
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName)) return;
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undoEdit(); return; }
+  if (!editUi.on) return;
+  if (e.key === 'g' || e.key === 't') setGizmoMode('translate');
+  else if (e.key === 'r') setGizmoMode('rotate');
+  else if (e.key === 's') setGizmoMode('scale');
+  else if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'x') deleteSelected();
+  else if (e.key === 'd') duplicateSelected();
+  else if (e.key === 'Escape') {
+    if (placeUi.def) { armPlace(null); return; }
+    editUi.selectedName = null; tc.detach();
+    document.getElementById('edTitle').textContent = 'nothing selected';
+    refreshEditPanelNumbers(); renderLapPanel(); }
+});
+
+function exportXml() {
+  if (!editState) return;
+  const text = new XMLSerializer().serializeToString(editState.doc);
+  const stem = editState.fileName.replace(/\.xml$/i, '');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/xml' }));
+  a.download = editState.dirty ? `${stem}-edited.xml` : `${stem}.xml`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// headless hooks for automated testing of the editor itself
+window.__edit = {
+  enable: v => setEditMode(v !== false),
+  select: selectElementByName,
+  mode: setGizmoMode,
+  state: () => ({ on: editUi.on, selected: editUi.selectedName, dirty: !!editState?.dirty,
+    undoDepth: editState?.undo.length || 0 }),
+  setLocal: (name, vals) => {          // {x,y,z,yawDeg,s} — programmatic edit
+    const rec = editState?.index.get(name);
+    if (!rec || !rec.trEl) return 'not editable';
+    pushUndo(rec.trEl);
+    const tr = rec.trEl;
+    if (vals.x !== undefined || vals.y !== undefined || vals.z !== undefined) {
+      const L = localMatrixDom(tr).elements;
+      setTransformPos(tr, vals.x ?? L[12], vals.y ?? L[13], vals.z ?? L[14]);
+    }
+    if (vals.yawDeg !== undefined) {
+      ['angle', 'rx', 'ry'].forEach(a => tr.removeAttribute(a));
+      if (Math.abs(vals.yawDeg) > 1e-3) { tr.setAttribute('rz', '-1'); tr.setAttribute('angleDegrees', (+vals.yawDeg).toFixed(2)); }
+      else { tr.removeAttribute('rz'); tr.removeAttribute('angleDegrees'); }
+    }
+    if (vals.s !== undefined) {
+      if (Math.abs(vals.s - 1) > 2e-3) tr.setAttribute('s', (+vals.s).toFixed(3));
+      else tr.removeAttribute('s');
+    }
+    editState.dirty = true;
+    return rebuildFromDoc().then(() => 'ok');
+  },
+  xml: () => new XMLSerializer().serializeToString(editState.doc),
+  undo: undoEdit,
+  _proxy: proxy, _commit: commitEdit,   // test hooks for the gizmo-drag path
+  // editor feature hooks
+  palette: () => PALETTE.map(p => p.id),
+  place: (pid, mx, my, mz = 0) => {     // place at MRSIM coords, returns name
+    const def = PALETTE.find(p => p.id === pid);
+    if (!def) return 'unknown palette id';
+    // placeAt expects a three-space ground point: three = (mx, mz, -my)
+    return placeAt(def, new THREE.Vector3(mx, mz, -my)).then(() => editUi.selectedName);
+  },
+  del: deleteSelected,
+  dup: duplicateSelected,
+  lap: () => ({ names: lapNames(), isCircuit: lapIsCircuit() }),
+  lapAdd: name => { const ops = [];
+    writeLap([...lapNames(), name], lapIsCircuit(), ops);
+    pushUndoOps(ops); editState.dirty = true; return rebuildFromDoc(); },
+  lapWrite: (names, circuit) => { const ops = [];
+    writeLap(names, circuit ?? lapIsCircuit(), ops);
+    pushUndoOps(ops); editState.dirty = true; return rebuildFromDoc(); },
+  newTrack: () => document.getElementById('btnNew').onclick(),
+  importText: (text, name) => document.getElementById('file').onchange
+    ? (async () => { if (/\.(trk|json)$/i.test(name)) {
+        const { xml } = await convertVdText(text, name);
+        await loadFromText(xml, name + '-MRSIM.xml');
+      } else await loadFromText(text, name); })() : null,
+};
+
+// ---- UI wiring ----
+const trackSel = document.getElementById('track');
+BUNDLED.forEach(([path, label]) => {
+  const o = document.createElement('option'); o.value = path; o.textContent = label;
+  trackSel.appendChild(o);
+});
+trackSel.onchange = () => loadFromUrl(trackSel.value);
+
+// import: MRSIM .xml directly; VelociDrone .trk / viewer .json through the
+// same converter the main viewer uses (checkpoints face the lap direction,
+// full-aperture gate sensors — no ghost lines here, path-derived facing)
+let convertMods = null;
+async function convertVdText(text, fileName) {
+  if (!convertMods) {
+    const [conv, trk, cat, dims] = await Promise.all([
+      import('./convert.js'), import('./trk.js?v=11'),
+      fetch('tracks/prefabs.json').then(r => r.json()),
+      fetch('tracks/prefab-dims.json').then(r => r.json()),
+    ]);
+    const { classify, prefabName, gateWidthFor, heightFor } = conv.makeClassifier(cat, dims);
+    convertMods = { conv, trk, classify, prefabName, gateWidthFor, heightFor };
+  }
+  const { conv, trk, classify, prefabName, gateWidthFor, heightFor } = convertMods;
+  const data = /^\s*\{/.test(text) ? JSON.parse(text) : trk.parseTrk(text, fileName);
+  if (!Array.isArray(data.gates)) throw new Error('no gates in this track');
+  const { xml, warnings } = conv.vdToMrsim(data, classify, prefabName,
+    { gateWidthFor, heightFor });
+  return { xml, warnings, name: data.meta?.name || fileName.replace(/\.(trk|json)$/i, '') };
+}
+
+document.getElementById('file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  trackSel.selectedIndex = -1;
+  const text = await f.text();
+  if (/\.(trk|json)$/i.test(f.name)) {
+    statusEl.textContent = 'converting VelociDrone track…';
+    try {
+      const { xml, warnings, name } = await convertVdText(text, f.name);
+      await loadFromText(xml, name + '-MRSIM.xml');
+      if (warnings.length) {
+        errEl.textContent = 'converter notes:\n· ' + warnings.join('\n· ');
+        diagEl.classList.remove('hidden');
+      }
+    } catch (err) {
+      statusEl.textContent = 'convert error';
+      diagEl.classList.remove('hidden');
+      errEl.textContent = 'CONVERT ERROR: ' + err.message;
+    }
+  } else {
+    await loadFromText(text, f.name);
+  }
+  e.target.value = '';
+};
+
+// blank track: world + instance groups + launch mat/stand + empty lap
+const NEW_TRACK_XML = `<Simulation>
+  <Include file="/Data/Simulations/Multirotor/Locations/EmptyGrassWorld.xml"/>
+  <Include file="/Data/Simulations/Multirotor/DroneTrackInstanceGroups.xml"/>
+
+  <Entity name="Track">
+    <Transform>
+      <Transform>
+        <Include file="/Data/Simulations/Multirotor/7x7Mat.xml"/>
+      </Transform>
+      <Transform z=".025">
+        <Include file="/Data/Simulations/Multirotor/LaunchStands/MetalLaunchStand.xml"/>
+      </Transform>
+    </Transform>
+    <CheckpointList>
+      {
+          isCircuit: true,
+          checkpoints:
+          [
+          ]
+      }
+    </CheckpointList>
+  </Entity>
+</Simulation>
+`;
+document.getElementById('btnNew').onclick = async () => {
+  trackSel.selectedIndex = -1;
+  await loadFromText(NEW_TRACK_XML, 'new-track.xml');
+  setEditMode(true);
+};
+
+document.getElementById('btnTop').onclick = e => {
+  e.target.classList.toggle('on');
+  const c = controls.target;
+  const r = Math.max(camera.position.distanceTo(c), 20);
+  camera.position.set(c.x, c.y + r, c.z + 0.001);
+  camera.up.set(0, 0, -1); camera.lookAt(c);
+};
+document.getElementById('btnCp').onclick = e => {
+  e.target.classList.toggle('on'); cpGroup.visible = e.target.classList.contains('on');
+};
+document.getElementById('btnDiag').onclick = e => {
+  e.target.classList.toggle('on'); diagEl.classList.toggle('hidden', !e.target.classList.contains('on'));
+};
+document.getElementById('btnEdit').onclick = () => setEditMode(!editUi.on);
+document.getElementById('btnExport').onclick = exportXml;
+
+// initial load: ?track= param, else first bundled
+diagEl.classList.remove('hidden');
+document.getElementById('btnDiag').classList.add('on');
+const qs = new URLSearchParams(location.search).get('track');
+if (qs) { trackSel.selectedIndex = -1; loadFromUrl(qs); }
+else { trackSel.selectedIndex = 0; loadFromUrl(BUNDLED[0][0]); }
+</script>
