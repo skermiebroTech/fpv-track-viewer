@@ -2837,8 +2837,18 @@ window.addEventListener('resize', () => {
   catch (e) { console.warn('models.json unavailable, using procedural meshes'); }
   try { PREFAB_DIMS = await (await fetch('tracks/prefab-dims.json')).json(); }
   catch (e) { console.warn('prefab-dims.json unavailable, scenery boxes use raw scale'); }
+  // MRSIM object meshes are the game dev's copyrighted assets and are NOT
+  // redistributed: the committed models/mrsim/models.json is an empty subset,
+  // so the deployed site renders every MRSIM object procedurally from its
+  // collision primitives (buildTrackMrsim). Locally, models.local.json (the
+  // gitignored full extraction) is preferred so real meshes show — same split
+  // as models.json/.local.json above.
   try { MRSIM_MODELS = await (await fetch('models/mrsim/models.json')).json(); }
   catch (e) { /* no MRSIM meshes — element models fall back to procedural */ }
+  try {
+    const localMrsim = await fetch('models/mrsim/models.local.json');
+    if (localMrsim.ok) MRSIM_MODELS = await localMrsim.json();
+  } catch (e) { /* no local overlay — render MRSIM objects procedurally */ }
   const tracks = await loadManifest();
   if (tracks.length) {
     // deep link: ?track=<manifest file> opens that track directly
@@ -2861,8 +2871,9 @@ window.__viewer = {
     renderer.render(scene, camera);
     return renderer.domElement.toDataURL('image/jpeg', quality);
   },
-  topView, frameTrack, camera, controls, selectSeq, pick, convertCurrent,
+  topView, frameTrack, camera, controls, selectSeq, pick, convertCurrent, loadTrack,
   get bounds() { return bounds; },
   get groups() { return groups; },
   get currentTrack() { return currentTrack; },
+  get mrsimModelCount() { return Object.keys(MRSIM_MODELS).length; },
 };

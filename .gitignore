@@ -15,9 +15,16 @@ venv/
 # and add its entry to models/models.json.
 models/*.glb
 models/models.local.json
-# MRSIM object meshes decoded from MRSIM.dkb (export_mrsim_models.py) — local
-# model cache like the VelociDrone GLBs; MRSIM tracks are local-only too
+# MRSIM object meshes/textures decoded from MRSIM.dkb (export_mrsim_models.py).
+# These are the game developer's copyrighted assets — NOT redistributed. The
+# whole dir is a local-only cache: on the deployed site MRSIM objects render
+# procedurally from their collision primitives (see app.js buildTrackMrsim).
+# The full model index lives in the gitignored models.local.json overlay the
+# viewer prefers when present; the committed models.json is an empty subset
+# (no MRSIM tracks are published). To ship an MRSIM track's gates one day,
+# `git add -f models/mrsim/<x>.glb` and add its entry to models/mrsim/models.json.
 models/mrsim/
+!models/mrsim/models.json
 # node deps for the converter CLI + tests (`npm install && npm test`); the
 # viewer itself still runs from a CDN import map with no build step
 node_modules/
