@@ -185,7 +185,7 @@ export function emitMrsim(normal, opts = {}) {
           <Box x="${fmt(b.bw)}" y=".01" z="${fmt(b.bh)}"/>
           <StaticContact contactMaterial="-1"/>
           <Entity name="CheckpointReference">
-            <WorldFromEntityComponent x="${fmt(b.refX)}" z="${fmt(b.refZ)}"/>
+            <WorldFromEntityComponent x="${fmt(b.cx + b.refX)}" z="${fmt(b.cz - clampD + b.refZ)}"/>
           </Entity>
           <Checkpoint/>
         </Entity>
@@ -231,7 +231,7 @@ export function emitMrsim(normal, opts = {}) {
           <Box x="${fmt(colW)}" y="${fmt(colW)}" z="${fmt(colH)}"/>
           <StaticContact contactMaterial="-1"/>
           <Entity name="CheckpointReference">
-            <WorldFromEntityComponent z="${fmt(refY - colC)}"/>
+            <WorldFromEntityComponent z="${fmt(refY)}"/>
           </Entity>
           <Checkpoint/>
         </Entity>
@@ -324,7 +324,7 @@ export function emitMrsim(normal, opts = {}) {
           <Box x="${fmt(b.bw)}" y=".01" z="${fmt(b.bh)}"/>
           <StaticContact contactMaterial="-1"/>
           <Entity name="CheckpointReference">
-            <WorldFromEntityComponent x="${fmt(b.refX)}" z="${fmt(b.refZ)}"/>
+            <WorldFromEntityComponent x="${fmt(b.cx + b.refX)}" z="${fmt(b.cz + b.refZ)}"/>
           </Entity>
           <Checkpoint/>
         </Entity>
@@ -475,7 +475,7 @@ export function emitMrsim(normal, opts = {}) {
           <Box x="${fmt(bw)}" y=".3" z="${fmt(bh)}"/>
           <StaticContact contactMaterial="-1"/>
           <Entity name="CheckpointReference">
-            <WorldFromEntityComponent/>
+            <WorldFromEntityComponent z="${fmt(apH / 2)}"/>
           </Entity>
           <Checkpoint/>
         </Entity>
@@ -501,6 +501,8 @@ export function emitMrsim(normal, opts = {}) {
           pos: refWorld,
           side: new THREE.Vector3(Math.cos(A), 0, Math.sin(A)),
           through: new THREE.Vector3(dir.x, 0, dir.z).normalize(),
+          half,       // gate half-width: thin dressing evicts across the whole frame
+          sf: isSF,   // only the start gate sheds its full decorative frame
         });
       }
       // an elevated gate (raised / tower gate) stands on legs in VD — add a
@@ -553,7 +555,7 @@ export function emitMrsim(normal, opts = {}) {
   // INSIDE the flyable opening (this made the 2026 Australian Nationals start
   // gate nearly impassable). Evict any solid box overlapping a gate aperture.
   const UP = new THREE.Vector3(0, 1, 0);
-  function blocksAperture(basePos, q, [bsx, bsy, bsz]) {
+  function blocksAperture(basePos, q, [bsx, bsy, bsz], thin) {
     const bx = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
     const by = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
     const bz = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
@@ -562,12 +564,28 @@ export function emitMrsim(normal, opts = {}) {
       Math.abs(a.dot(by)) * bsy / 2 + Math.abs(a.dot(bz)) * bsz / 2;
     return apertures.some(ap => {
       const off = centre.clone().sub(ap.pos);
+      // must sit in the gate's own plane either way — never touch scenery
+      // that merely passes in front of or behind the gate
+      if (Math.abs(off.dot(ap.through)) >= 0.6 + half(ap.through)) return false;
+      if (thin && ap.sf) {
+        // VD dresses its start gate with a thin decorative frame (coloured PVC
+        // poles + top bars) sized for its taller/wider gate. We already draw
+        // the gate, so those poles are redundant AND land as phantom colliders
+        // hugging the posts and arching over the opening (the dev's "invisible
+        // pole in the middle of the start gate"). A thin pole/bar standing in
+        // the start gate's plane, anywhere across its own width and up to just
+        // above its top, is that frame — evict it. Scoped to the S/F gate: the
+        // spawn sits here so its dressing is the most intrusive, and a blanket
+        // sweep of every gate strips legitimate track-side poles.
+        return Math.abs(off.dot(ap.side)) < ap.half + 0.35 + half(ap.side) &&
+          centre.y - half(UP) < ap.pos.y + 2 &&   // reaches down into the gate zone
+          centre.y + half(UP) > -0.55;            // and up out of the floor band
+      }
       return Math.abs(off.dot(ap.side)) < 1.35 + half(ap.side) &&
         Math.abs(off.y) < 1.05 + half(UP) &&
         // a low ground strip (boundary band) under the gate is flown OVER,
         // not through — only evict what reaches up into the opening
-        off.y + half(UP) > -0.55 &&
-        Math.abs(off.dot(ap.through)) < 0.6 + half(ap.through);
+        off.y + half(UP) > -0.55;
     });
   }
   scenery.forEach(b => {
@@ -576,7 +594,13 @@ export function emitMrsim(normal, opts = {}) {
     const at = `x="${fmt(pm.x)}" y="${fmt(pm.y)}" z="${fmt(pm.z)}"`;
     const [sx, sy, sz] = b.scale;
     if (b.map.type === 'block' || b.map.type === 'net') {
-      if (blocksAperture(b.pos, q, [sx, sy, sz])) { nEvicted++; return; }
+      // a short thin pole/bar (two smaller dims <=0.3 m, long axis <=4.5 m ≈ a
+      // gate's own height) is gate-frame dressing, not a wall — it evicts
+      // across the gate's whole width, not just the opening. The length cap
+      // spares tall boundary/light masts that merely align with a gate plane.
+      const dd = [sx, sy, sz].slice().sort((a, z) => a - z);
+      const thin = dd[1] <= 0.3 && dd[2] <= 4.5;
+      if (blocksAperture(b.pos, q, [sx, sy, sz], thin)) { nEvicted++; return; }
     }
     if (b.map.type === 'block') {
       // unit blocks: base origin, scale % per local axis (three x/y/z ->

@@ -220,7 +220,7 @@ function walkEntity(node, ctx, st) {
     elem = { name, tags: new Set(ctx.tags), prims: [], models: [], cps: [], sensors: [] };
     st.elements.push(elem);
   }
-  const c2 = { ...ctx, m, elem, path: name ? [...ctx.path, name] : ctx.path };
+  const c2 = { ...ctx, m, parentM: ctx.m, elem, path: name ? [...ctx.path, name] : ctx.path };
   processComponents(node, c2, st);
   walkChildren(node, c2, st);
 }
@@ -281,11 +281,20 @@ function processComponents(node, ctx, st) {
     processComponents(tpl.el, ctx, st);
   }
   if (hasCheckpoint) {
+    // MRSIM resolves the CheckpointReference (the ring position + crossing
+    // normal) against the checkpoint entity's PARENT — it does NOT apply the
+    // checkpoint entity's own WorldFromEntityComponent. Verified in-game: our
+    // lifted `_pass` sensors drew the ring down at the gate base, and the
+    // game's own gates always keep the checkpoint entity unshifted and carry
+    // the offset on the reference (a full compose would put the hurdle ring
+    // ~10 m up). Fall back to this entity's matrix if it has no reference child
+    // or was reached outside the entity walker (macro/instance bodies).
+    const refBase = ctx.parentM ?? ctx.m;
     let refM = ctx.m;
     for (const c of node.children) {
       if (c.tagName === 'Entity' && c.getAttribute('name') === 'CheckpointReference') {
         const wf = directChild(c, 'WorldFromEntityComponent');
-        if (wf) refM = ctx.m.clone().multiply(localMatrix(wf));
+        if (wf) refM = refBase.clone().multiply(localMatrix(wf));
       }
     }
     st.checkpoints.push({ path: ctx.path, m: ctx.m.clone(), refM, elem });

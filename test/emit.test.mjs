@@ -43,6 +43,50 @@ test('gate size mapping: big gates are TRUE-SIZE frames, 1.92 m -> 5x5', () => {
   assert.match(xml, /<Box x="2\.96" y="\.3" z="2\.46"\/>/);
 });
 
+test('checkpoint rings sit at the gate/opening centre, not the base', () => {
+  // MRSIM places the ring at the CheckpointReference resolved against the
+  // checkpoint entity's PARENT — it ignores the entity's own lift. So the
+  // vertical offset MUST live on the reference, matching the game's own gates;
+  // if we only lift the `_pass` entity and leave the reference at zero (as we
+  // once did) the ring drops to the gate base in-game.
+  const { xml } = convert(fixture());
+  // the start gate's reference carries the half-height offset, not a bare tag
+  const pass = xml.match(/<Entity name="trkGate1_pass">[\s\S]*?<Checkpoint\/>/)[0];
+  const ref = pass.match(/CheckpointReference">\s*<WorldFromEntityComponent z="([^"]+)"/);
+  assert.ok(ref && parseFloat(ref[1]) > 0.5,
+    `start gate reference must carry the centre offset (got ${ref?.[1]})`);
+  const t = parseMrsim(xml, 'synthetic.xml');
+  assert.ok(t.seq[0].pos.y > 0.5,
+    `start gate ring should be centred, not at the floor (y=${t.seq[0].pos.y})`);
+});
+
+test('parseMrsim resolves the ring against the checkpoint entity parent, not its own lift', () => {
+  // a checkpoint whose sensor entity is lifted 2 m with a zero-offset reference
+  // renders at the PARENT level (0), not at 2 — the game skips the entity's own
+  // WorldFromEntityComponent when placing the ring
+  const xml = `<Simulation>
+    <Entity name="Track">
+      <Transform>
+        <Entity name="gate">
+          <Entity name="gate_pass">
+            <WorldFromEntityComponent z="2"/>
+            <Box x="2" y=".3" z="2"/>
+            <StaticContact contactMaterial="-1"/>
+            <Entity name="CheckpointReference"><WorldFromEntityComponent z="1.4"/></Entity>
+            <Checkpoint/>
+          </Entity>
+        </Entity>
+      </Transform>
+      <CheckpointList>{ isCircuit: false, checkpoints: [ "gate_pass" ] }</CheckpointList>
+    </Entity>
+  </Simulation>`;
+  const t = parseMrsim(xml, 'lift.xml');
+  assert.equal(t.seq.length, 1);
+  // ring = parent(0) + reference(1.4) = 1.4, NOT 2 + 1.4 = 3.4
+  assert.ok(Math.abs(t.seq[0].pos.y - 1.4) < 1e-6,
+    `ring must skip the entity's own 2 m lift (got ${t.seq[0].pos.y})`);
+});
+
 test('steep windows become dive/climb gates by crossing sign, shallow stays a gate', () => {
   const { xml, summary } = convert(fixture());
   assert.match(xml, /7x7DiveGate\.xml/);

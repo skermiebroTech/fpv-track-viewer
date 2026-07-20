@@ -165,25 +165,27 @@ export function normalizeVdTrack(data, { classify, prefabName = () => '', gateWi
   // lines' velocity at closest approach when lines are supplied, the
   // neighbour-to-neighbour lap delta otherwise. The flip also fixes the
   // dive/climb sense of flat squares (dir.y decides cage type downstream).
-  // Walk each line and the checkpoint sequence TOGETHER (a plain
-  // closest-approach search grabs the wrong pass wherever the lap crosses
-  // near itself): the next in-order local minimum of distance to crossing k
-  // is that lap's actual pass of k, and the line's travel there is the
-  // crossing sense.
+  // Travel through crossing k = the ghost's velocity where it passes closest,
+  // accumulated as a proximity-weighted sum of every nearby segment's heading.
+  // A weighted sum (not a single closest-approach pick, nor an in-order walk)
+  // is robust to the two things that break naive matching: MULTI-LAP ghosts
+  // (each lap crosses k the same way, so every pass reinforces one direction)
+  // and the lap passing NEAR itself (the true pass is nearest, so it dominates
+  // the 1/d² weight). Earlier single-pass matchers desynced and left the back
+  // half of long tracks with no ghost travel at all — those fell back to noisy
+  // neighbour deltas and flipped gates the wrong way.
   const travel = crossings.map(() => null);
   for (const line of humanLines) {
-    let k = 0;
-    for (let i = 1; i < line.length - 1 && k < crossings.length; i++) {
-      const c = crossings[k];
-      const d = line[i].distanceTo(c.rawPos);
-      if (d < 10 && d <= line[i - 1].distanceTo(c.rawPos) &&
-          d < line[i + 1].distanceTo(c.rawPos)) {
-        const tv = line[i + 1].clone().sub(line[i - 1]);
-        if (tv.lengthSq() > 1e-6) {
-          (travel[k] ??= new THREE.Vector3()).add(tv.normalize());
-        }
-        k++;
+    for (let k = 0; k < crossings.length; k++) {
+      const cp = crossings[k].rawPos;
+      const acc = new THREE.Vector3();
+      for (let i = 1; i < line.length; i++) {
+        const d = 0.5 * (line[i - 1].distanceTo(cp) + line[i].distanceTo(cp));
+        if (d > 6) continue;               // only segments passing near the crossing
+        const v = line[i].clone().sub(line[i - 1]);
+        if (v.lengthSq() > 1e-8) acc.addScaledVector(v.normalize(), 1 / (d * d + 0.25));
       }
+      if (acc.lengthSq() > 1e-8) (travel[k] ??= new THREE.Vector3()).add(acc);
     }
   }
   // Compare only the component that decides anything downstream — the

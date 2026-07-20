@@ -49,6 +49,28 @@ test('ghost overflights far above a flag do not stretch the sensor', () => {
   assert.ok(f.expectPos.y < 4, `ref height ${f.expectPos.y}`);
 });
 
+test('a multi-lap ghost orients checkpoints to the lap, without cancelling', () => {
+  // The facing pass turns any crossing that opposes the lap. Its travel signal
+  // comes from the ghost: a MULTI-LAP ghost crosses each checkpoint several
+  // times the same way, and the (proximity-weighted) matcher must reinforce
+  // that one direction — an earlier single-pass matcher desynced and left the
+  // back half of the lap with no ghost travel at all, flipping gates wrongly.
+  const data = loadFixture('synthetic-track.json');
+  const back = data.gates.find(g => g.gate === 1);
+  back.trans.rot = [707, 0, 707, 0];                 // face it backward: +x -> -x
+  const pts = convert(loadFixture('synthetic-track.json'))
+    .normal.crossings.map(c => c.rawPos.clone());
+  const lap = [];
+  for (let i = 0; i < pts.length - 1; i++)
+    for (let t = 0; t < 1; t += 0.2) lap.push(pts[i].clone().lerp(pts[i + 1], t));
+  // three identical laps supplied together — the weighting must not cancel them
+  const { xml, summary, normal } = convert(data, { humanLines: [lap, lap, lap] });
+  const c = normal.crossings.find(x => Math.abs(x.rawPos.x - 5) < 1.5);
+  assert.ok(c && c.dir.x > 0.5,
+    `the ghost should turn the backward gate to +x (dir=${c && c.dir.toArray()})`);
+  assert.deepEqual(validateMrsim(xml, { summary, normal }).errors, []);
+});
+
 test('upright checkpoint sensors scale width and height independently', () => {
   const data = loadFixture('synthetic-track.json');
   // a square's aperture spans its local Y/Z: at identity +Y is up (height)
@@ -169,6 +191,30 @@ test('gate dressing blocks are evicted from the opening', () => {
   const r = convert(data);
   assert.equal(r.summary.counts.evicted, 1);
   assert.ok(r.warnings.some(w => /removed from gate openings/.test(w)));
+});
+
+test('start-gate frame poles are evicted at the posts, not just dead centre', () => {
+  // VD dresses its start gate with a thin PVC frame (coloured poles at the
+  // uprights + bars over the top) sized for its bigger gate; on MRSIM's gate
+  // those poles become phantom colliders hugging the posts — the dev's
+  // "invisible pole in the middle of the start gate". A pole at the post sits
+  // ~1.8 m off centre, outside the old opening-only box, yet must still go.
+  const post = d => { d.barriers.push({ prefab: 2220,
+    trans: { pos: [180, 150, 0], rot: [1000, 0, 0, 0], scale: [10, 318, 10] } }); return d; };
+  assert.equal(convert(post(loadFixture('synthetic-track.json'))).summary.counts.evicted, 1);
+
+  // but a thin pole 1.5 m in FRONT of the gate plane is scenery, not frame
+  const front = loadFixture('synthetic-track.json');
+  front.barriers.push({ prefab: 2220,
+    trans: { pos: [0, 150, 150], rot: [1000, 0, 0, 0], scale: [10, 318, 10] } });
+  assert.equal(convert(front).summary.counts.evicted, 0);
+
+  // and a THICK block at the same post offset is a wall, kept unless it
+  // actually reaches into the opening
+  const wall = loadFixture('synthetic-track.json');
+  wall.barriers.push({ prefab: 2220,
+    trans: { pos: [180, 0, 0], rot: [1000, 0, 0, 0], scale: [40, 318, 40] } });
+  assert.equal(convert(wall).summary.counts.evicted, 0);
 });
 
 test('a sunken invisible marker does not float the track', () => {
