@@ -2,7 +2,7 @@
 
 A static, browser-based 3D viewer compatible with
 [VelociDrone](https://www.velocidrone.com/) and
-[MRSIM]() tracks, built with
+[MRSIM](https://store.steampowered.com/app/2338080/MRSIM/) tracks, built with
 [Three.js](https://threejs.org/) and hosted on **GitHub Pages**.
 Styled after the official AUFPV / Mission Foods Australian Drone Nationals track
 posters: green grid mat (1 m / 5 m lines), khaki racing line, white Mission gates,
@@ -176,13 +176,24 @@ per-type code. The `<CheckpointList>` names (`trkCube1.lower.backEntry`)
 resolve to `<Checkpoint>` reference points and crossing directions, so the
 racing line is exact — including multi-pass elements and cube entries/exits.
 
-The library objects are embedded in `mrsim-lib.js`, extracted from the
-game's `MRSIM.dkb` archive (a simple file-table format). After a game
-update, regenerate with:
+The library objects are embedded in `mrsim-lib.js` — the object geometry
+(collision-primitive coordinates + sizes) needed to place and draw any MRSIM
+track, read from your own licensed `MRSIM.dkb`. After a game update,
+regenerate with:
 
 ```bash
 python3 export_mrsim_lib.py   # reads ~/.local/share/Steam/steamapps/common/MRSIM/MRSIM.dkb
 ```
+
+MRSIM's rendered **meshes and textures** (gates, flags, mat, terrain, drone
+frames, logo…) are **not redistributed with this project** — they are the
+developer's copyrighted art. The hosted viewer draws every MRSIM object from
+those collision primitives instead, which is faithful (the thin boxes *are*
+the fabric panels, the cylinders *are* the PVC/poles). If you own MRSIM you
+can decode the real meshes locally into `models/mrsim/` with
+`export_mrsim_models.py`; a gitignored `models/mrsim/models.local.json`
+overlay then makes the viewer prefer them on your own machine only. See
+[Assets & attribution](#assets--attribution).
 
 ## Converting between sims
 
@@ -271,6 +282,32 @@ sensor so the MRSIM lap counts exactly like the VD lap.
   Particle-only prefabs (fog, smoke) are skipped entirely.
 - Click any object in the viewer to open the **inspector** with its raw
   database values (position, quaternion, scale, prefab id/name) and derived info.
+
+## Assets & attribution
+
+This is a **non-commercial, fan-made interoperability tool** — a track viewer
+and format converter. It is **not affiliated with, endorsed by, or associated
+with** VelociDrone or its developers, or MRSIM / Multi Rotor SIM or its
+developers. "VelociDrone", "MRSIM", their names and logos, and all in-game 3D
+models, textures and other art are the property of their respective owners.
+
+The viewer works by reading each game's file formats from **your own licensed
+copy** of the game (and public, already-shareable data such as the community
+track catalogue and public leaderboard times). What that means for game art:
+
+- **MRSIM meshes and textures are not redistributed here.** MRSIM objects
+  render procedurally from their collision-primitive geometry. The real meshes
+  can be decoded locally by owners of the game and stay on that machine (a
+  gitignored `models/mrsim/models.local.json` overlay); they are never
+  committed or served.
+- **VelociDrone:** the bundled example tracks include a small subset of
+  VelociDrone scenery meshes needed to display *those* tracks; the full ~3300
+  prefab extraction stays local (gitignored), and objects with no shipped mesh
+  are drawn procedurally. Run your own copy of VelociDrone to extract the rest.
+
+If you are a rights holder and would like something changed, please open an
+issue. Contributions that add value back to the sims (the VD⇄MRSIM converter,
+for example) are the point — not re-hosting anyone's assets.
 
 ## Files
 
