@@ -125,8 +125,21 @@
   <div class="row"><label>roll °</label><input id="edRoll" type="number" step="1"></div>
   <div class="row"><label>scale</label><input id="edS" type="number" step="0.05" min="0.2" max="5"></div>
   <div class="row" id="edWHRow" style="display:none">
-    <label>w × h</label><input id="edW" type="number" step="0.1" min="0.5">
-    <input id="edH" type="number" step="0.1" min="0.5"></div>
+    <label>w × h × d</label><input id="edW" type="number" step="0.1" min="0.5">
+    <input id="edH" type="number" step="0.1" min="0.5">
+    <input id="edD" type="number" step="0.1" min="0.05"></div>
+  <div id="edRefRow" style="display:none;border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
+    <div class="row"><label style="color:#4a83ff">checkpoint ref</label>
+      <span style="color:#8a93a6;font-size:11px">ring + crossing arrow only</span></div>
+    <div class="row"><label>ref pos</label>
+      <input id="edRefX" type="number" step="0.1" title="ref x">
+      <input id="edRefY" type="number" step="0.1" title="ref y">
+      <input id="edRefZ" type="number" step="0.1" title="ref z (up)"></div>
+    <div class="row"><label>ref y/p/r °</label>
+      <input id="edRefYaw" type="number" step="1" title="ref yaw">
+      <input id="edRefPitch" type="number" step="1" title="ref pitch">
+      <input id="edRefRoll" type="number" step="1" title="ref roll"></div>
+  </div>
   <div class="btnRow">
     <button id="edLapAdd">+ lap</button>
     <button id="edDup">duplicate</button>
@@ -760,12 +773,18 @@ tc.addEventListener('dragging-changed', e => {
 });
 tc.addEventListener('objectChange', () => {
   if (tc.mode === 'scale') {
-    // MRSIM scale is UNIFORM (s=) — mirror the most-changed axis to all three
     const sc = proxy.scale, s0 = editUi.startScale;
-    let best = 'x';
-    for (const c of ['y', 'z'])
-      if (Math.abs(sc[c] - s0) > Math.abs(sc[best] - s0)) best = c;
-    sc.setScalar(Math.min(5, Math.max(0.2, sc[best])));
+    if (isFreeSensor(editUi.selectedName)) {
+      // bare sensor: per-axis scale is allowed (it folds into the <Box> dims)
+      const cl = v => Math.min(s0 * 20, Math.max(s0 * 0.05, v));
+      sc.set(cl(sc.x), cl(sc.y), cl(sc.z));
+    } else {
+      // library object: engine scale is UNIFORM (s=) — mirror the most-changed axis
+      let best = 'x';
+      for (const c of ['y', 'z'])
+        if (Math.abs(sc[c] - s0) > Math.abs(sc[best] - s0)) best = c;
+      sc.setScalar(Math.min(5, Math.max(0.2, sc[best])));
+    }
   }
   applyLiveDelta();
   refreshEditPanelNumbers(true);
@@ -791,7 +810,7 @@ function selectElementByName(name, silent = false) {
     document.getElementById('edHint').innerHTML =
       `<span class="locked">not editable: ${rec ? rec.reason : 'unknown element'}</span>`;
     refreshEditPanelNumbers();
-    renderLapPanel(); refreshWHRow();
+    renderLapPanel(); refreshWHRow(); refreshRefRow();
     return;
   }
   const W = currentWorldThree(rec);
@@ -799,11 +818,11 @@ function selectElementByName(name, silent = false) {
   editUi.startWorld = W.clone();
   editUi.startScale = proxy.scale.x;
   if (editUi.on) tc.attach(proxy);
-  document.getElementById('edHint').innerHTML = rec.yawOnly
-    ? 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo'
-    : 'tilted object: <span class="locked">move only</span> (rotation is not pure yaw)';
+  document.getElementById('edHint').innerHTML = isFreeSensor(name)
+    ? 'sensor box: <b>g</b> move · <b>r</b> rotate (any axis) · <b>s</b> scale (per-axis) · <b>w×h×d</b> fields'
+    : 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo';
   refreshEditPanelNumbers();
-  renderLapPanel(); refreshWHRow();
+  renderLapPanel(); refreshWHRow(); refreshRefRow();
 }
 
 // bare custom checkpoints expose their sensor Box width x height directly
@@ -825,20 +844,117 @@ function sensorBoxEl(name) {
   };
   return walk(rec.trEl);
 }
+// a BARE sensor checkpoint = a trigger <Box> + <Checkpoint> with NO solid
+// geometry (turn markers, dive plates, custom checkpoints). Its yellow box and
+// blue arrow ride one wrapper, so we let it scale per-axis (into the <Box>
+// dims) and rotate on any axis. Library objects (gates/flags) keep the engine's
+// uniform-scale / yaw placement because that is all it can instance them with.
+function isFreeSensor(name) {
+  if (!sensorBoxEl(name)) return false;
+  const ei = elemIndexByName(name);
+  const el = ei >= 0 ? currentData.elements[ei] : null;
+  return !!el && !(el.prims || []).some(p => p.solid);
+}
+// write a rotation onto a <Transform> as MRSIM axis-angle. Pure yaw keeps the
+// clean rz="-1"/angleDegrees form (what the rest of the pipeline emits); any
+// other tilt writes the full rx/ry/rz axis + angle that localMatrixDom reads.
+function writeRotation(tr, q) {
+  ['angle', 'rx', 'ry', 'rz', 'angleDegrees'].forEach(a => tr.removeAttribute(a));
+  let { x, y, z, w } = q;
+  if (w < 0) { x = -x; y = -y; z = -z; w = -w; }        // canonical: angle in [0, PI]
+  const angle = 2 * Math.acos(Math.min(1, w));
+  if (angle < 3e-4) return;                             // ~identity: no rotation attrs
+  const sh = Math.sqrt(Math.max(1e-12, 1 - w * w));
+  const ax = x / sh, ay = y / sh, az = z / sh;          // unit axis, mrsim space
+  if (Math.hypot(ax, ay) < 1.5e-3) {                    // rotation about ±z -> yaw form
+    tr.setAttribute('rz', '-1');
+    tr.setAttribute('angleDegrees', ((az > 0 ? -angle : angle) / DEG).toFixed(3));
+  } else {
+    tr.setAttribute('rx', ax.toFixed(5));
+    tr.setAttribute('ry', ay.toFixed(5));
+    tr.setAttribute('rz', az.toFixed(5));
+    tr.setAttribute('angleDegrees', (angle / DEG).toFixed(3));
+  }
+}
 function refreshWHRow() {
   const box = editUi.selectedName ? sensorBoxEl(editUi.selectedName) : null;
   document.getElementById('edWHRow').style.display = box ? 'flex' : 'none';
   if (box) {
     document.getElementById('edW').value = parseFloat(box.getAttribute('x') || 3).toFixed(1);
     document.getElementById('edH').value = parseFloat(box.getAttribute('z') || 2.5).toFixed(1);
+    document.getElementById('edD').value = parseFloat(box.getAttribute('y') || 0.3).toFixed(2);
   }
 }
-for (const [inputId, attr] of [['edW', 'x'], ['edH', 'z']]) {
+// w = Box x, h = Box z (vertical), d = Box y (through-thickness). All three axes
+// of the trigger volume are editable directly on the <Box>.
+for (const [inputId, attr, mn] of [['edW', 'x', 0.5], ['edH', 'z', 0.5], ['edD', 'y', 0.02]]) {
   document.getElementById(inputId).addEventListener('change', e => {
     const box = sensorBoxEl(editUi.selectedName);
     if (!box) return;
     pushUndoOps([attrsOp(box)]);
-    box.setAttribute(attr, Math.max(0.5, parseFloat(e.target.value) || 1).toFixed(2));
+    box.setAttribute(attr, Math.max(mn, parseFloat(e.target.value) || 1).toFixed(2));
+    editState.dirty = true;
+    rebuildFromDoc();
+  });
+}
+
+// the <Entity name="CheckpointReference"> inside the selected checkpoint: its
+// WorldFromEntityComponent alone sets the ring position + crossing-arrow
+// direction (MRSIM resolves it against the checkpoint entity's parent), so it
+// can be aimed independently of the gate/box geometry.
+function checkpointRef(name) {
+  const rec = editState?.index.get(name);
+  if (!rec?.trEl) return null;
+  const walk = el => {
+    for (const c of el.children || []) {
+      if (c.tagName === 'Entity' && [...c.children].some(k => k.tagName === 'Checkpoint')) {
+        const ref = [...c.children].find(k => k.tagName === 'Entity'
+          && k.getAttribute('name') === 'CheckpointReference');
+        if (ref) return ref;
+      }
+      const hit = walk(c);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(rec.trEl);
+}
+function refWf(refEl, create) {
+  let wf = [...refEl.children].find(k => k.tagName === 'WorldFromEntityComponent');
+  if (!wf && create) { wf = editState.doc.createElement('WorldFromEntityComponent'); refEl.appendChild(wf); }
+  return wf || null;
+}
+function refreshRefRow() {
+  const ref = editUi.selectedName ? checkpointRef(editUi.selectedName) : null;
+  document.getElementById('edRefRow').style.display = ref ? 'block' : 'none';
+  if (!ref) return;
+  const wf = refWf(ref, false);
+  const e = (wf ? localMatrixDom(wf) : new THREE.Matrix4()).elements;
+  document.getElementById('edRefX').value = e[12].toFixed(2);
+  document.getElementById('edRefY').value = e[13].toFixed(2);
+  document.getElementById('edRefZ').value = e[14].toFixed(2);
+  const r = eulerFromRot(e, 1, 1, 1);
+  document.getElementById('edRefYaw').value = r.yaw.toFixed(1);
+  document.getElementById('edRefPitch').value = r.pitch.toFixed(1);
+  document.getElementById('edRefRoll').value = r.roll.toFixed(1);
+}
+for (const id of ['edRefX', 'edRefY', 'edRefZ', 'edRefYaw', 'edRefPitch', 'edRefRoll']) {
+  document.getElementById(id).addEventListener('change', () => {
+    const ref = checkpointRef(editUi.selectedName);
+    if (!ref) return;
+    const existed = !!refWf(ref, false);
+    const wf = refWf(ref, true);
+    pushUndoOps([existed ? attrsOp(wf) : { type: 'insert', node: wf }]);
+    const g = i => parseFloat(document.getElementById(i).value) || 0;
+    // rotation from the three angle fields (writeRotation only touches rot attrs)
+    writeRotation(wf, new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(g('edRefPitch') * DEG, g('edRefRoll') * DEG, -g('edRefYaw') * DEG, 'ZXY')));
+    // position (mrsim x/y/z, z up)
+    wf.removeAttribute('v');
+    for (const [i, a] of [['edRefX', 'x'], ['edRefY', 'y'], ['edRefZ', 'z']]) {
+      const v = g(i);
+      if (Math.abs(v) > 5e-4) wf.setAttribute(a, v.toFixed(3)); else wf.removeAttribute(a);
+    }
     editState.dirty = true;
     rebuildFromDoc();
   });
@@ -874,36 +990,36 @@ function commitEdit() {
     .multiply(_tmpM2.copy(Z_UP_TO_Y_UP).invert())
     .multiply(proxy.matrix);
   const e = L.elements;
-  const s = Math.hypot(e[0], e[1], e[2]);               // uniform scale
-  const c0 = { x: e[0] / s, y: e[1] / s };              // rotated X axis
-  const zAxisOk = Math.abs(e[10] / s - 1) < 2e-3 && Math.abs(e[8]) < 2e-3 * s && Math.abs(e[9]) < 2e-3 * s;
   const tr = rec.trEl;
-  if (!rec.yawOnly || !zAxisOk) {
-    // tilted object (or a drag that left pure-yaw): translation only
-    const q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
-    editUi.startWorld.decompose(v, q0, sc); proxy.matrix.decompose(v, q1, sc);
-    if (q0.angleTo(q1) > 0.01 || Math.abs(proxy.scale.x - editUi.startScale) > 0.01) {
-      selectElementByName(editUi.selectedName);         // revert the gizmo
-      document.getElementById('edHint').innerHTML =
-        '<span class="locked">only moving is allowed on tilted objects — rotation/scale reverted</span>';
-      rebuildFromDoc();
-      return;
+  // basis-column lengths = rotation * per-axis scale; normalise them to recover
+  // the pure rotation (T*R*S with S diagonal keeps the columns orthogonal)
+  const sx = Math.hypot(e[0], e[1], e[2]);
+  const sy = Math.hypot(e[4], e[5], e[6]);
+  const sz = Math.hypot(e[8], e[9], e[10]);
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().set(
+    e[0] / sx, e[4] / sy, e[8] / sz, 0,
+    e[1] / sx, e[5] / sy, e[9] / sz, 0,
+    e[2] / sx, e[6] / sy, e[10] / sz, 0,
+    0, 0, 0, 1));
+  const box = isFreeSensor(editUi.selectedName) ? sensorBoxEl(editUi.selectedName) : null;
+  pushUndoOps(box ? [attrsOp(tr), attrsOp(box)] : [attrsOp(tr)]);
+  setTransformPos(tr, e[12], e[13], e[14]);
+  writeRotation(tr, q);                                 // full axis-angle (any tilt)
+  if (box) {
+    // bare sensor: per-axis size lives in the <Box>, so fold this drag's
+    // per-axis scale into it and leave the wrapper's uniform scale untouched
+    const s0 = editUi.startScale || 1;
+    const cd = v => Math.min(40, Math.max(0.02, v));
+    if (Math.abs(sx - s0) > 2e-3 * s0 || Math.abs(sy - s0) > 2e-3 * s0 || Math.abs(sz - s0) > 2e-3 * s0) {
+      box.setAttribute('x', cd(parseFloat(box.getAttribute('x') || 1) * sx / s0).toFixed(2));
+      box.setAttribute('y', cd(parseFloat(box.getAttribute('y') || 0.3) * sy / s0).toFixed(2));
+      box.setAttribute('z', cd(parseFloat(box.getAttribute('z') || 1) * sz / s0).toFixed(2));
     }
-    pushUndo(tr);
-    setTransformPos(tr, e[12], e[13], e[14]);
+    if (Math.abs(s0 - 1) > 2e-3) tr.setAttribute('s', s0.toFixed(3)); else tr.removeAttribute('s');
   } else {
-    pushUndo(tr);
-    setTransformPos(tr, e[12], e[13], e[14]);
-    const yaw = Math.atan2(c0.y, c0.x);                 // rotation about mrsim +z
-    ['angle', 'rx', 'ry'].forEach(a => tr.removeAttribute(a));
-    if (Math.abs(yaw) > 1e-4) {
-      tr.setAttribute('rz', '-1');
-      tr.setAttribute('angleDegrees', (-yaw / DEG).toFixed(2));
-    } else { tr.removeAttribute('rz'); tr.removeAttribute('angleDegrees'); }
-    // MRSIM's engine scale is a single uniform s= — clamp to a sane range
-    const sc = Math.min(5, Math.max(0.2, s));
-    if (Math.abs(sc - 1) > 2e-3) tr.setAttribute('s', sc.toFixed(3));
-    else tr.removeAttribute('s');
+    // library object: engine scale is a single uniform s= (drag was clamped uniform)
+    const sc = Math.min(5, Math.max(0.2, sx));
+    if (Math.abs(sc - 1) > 2e-3) tr.setAttribute('s', sc.toFixed(3)); else tr.removeAttribute('s');
   }
   editState.dirty = true;
   rebuildFromDoc();
@@ -1338,8 +1454,19 @@ document.getElementById('edDup').onclick = duplicateSelected;
 const edIn = {
   x: document.getElementById('edX'), y: document.getElementById('edY'),
   z: document.getElementById('edZ'), yaw: document.getElementById('edYaw'),
+  pitch: document.getElementById('edPitch'), roll: document.getElementById('edRoll'),
   s: document.getElementById('edS'),
 };
+// yaw/pitch/roll <-> rotation matrix as an Euler triple in mrsim space (z up).
+// yaw keeps the old sign (rotation about +z read as angleDegrees); pitch/roll
+// are the remaining two axes. Order 'ZXY' round-trips cleanly.
+function eulerFromRot(e, sx, sy, sz) {
+  const rot = new THREE.Matrix4().set(
+    e[0] / sx, e[4] / sy, e[8] / sz, 0, e[1] / sx, e[5] / sy, e[9] / sz, 0,
+    e[2] / sx, e[6] / sy, e[10] / sz, 0, 0, 0, 0, 1);
+  const u = new THREE.Euler().setFromRotationMatrix(rot, 'ZXY');
+  return { yaw: -u.z / DEG, pitch: u.x / DEG, roll: u.y / DEG };
+}
 function refreshEditPanelNumbers(fromProxy = false) {
   const rec = editState?.index.get(editUi.selectedName);
   if (!rec || !rec.trEl) { Object.values(edIn).forEach(i => { i.value = ''; i.disabled = true; }); return; }
@@ -1350,12 +1477,15 @@ function refreshEditPanelNumbers(fromProxy = false) {
       .multiply(_tmpM2.copy(Z_UP_TO_Y_UP).invert()).multiply(proxy.matrix);
   } else L = localMatrixDom(rec.trEl);
   const e = L.elements;
-  const s = Math.hypot(e[0], e[1], e[2]);
+  const sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
   edIn.x.value = e[12].toFixed(2); edIn.y.value = e[13].toFixed(2); edIn.z.value = e[14].toFixed(2);
-  edIn.yaw.value = (-Math.atan2(e[1] / s, e[0] / s) / DEG).toFixed(1);
-  edIn.s.value = s.toFixed(2);
-  edIn.x.disabled = edIn.y.disabled = edIn.z.disabled = false;
-  edIn.yaw.disabled = edIn.s.disabled = !rec.yawOnly;
+  const rot = eulerFromRot(e, sx, sy, sz);
+  edIn.yaw.value = rot.yaw.toFixed(1);
+  edIn.pitch.value = rot.pitch.toFixed(1);
+  edIn.roll.value = rot.roll.toFixed(1);
+  edIn.s.value = ((sx + sy + sz) / 3).toFixed(2);
+  // rotation is now fully editable on every object; scale field is uniform
+  Object.values(edIn).forEach(i => { i.disabled = false; });
 }
 Object.entries(edIn).forEach(([key, input]) => {
   input.addEventListener('change', () => {
@@ -1363,11 +1493,14 @@ Object.entries(edIn).forEach(([key, input]) => {
     if (!rec || !rec.trEl) return;
     const tr = rec.trEl;
     pushUndo(tr);
-    if (key === 'yaw') {
-      ['angle', 'rx', 'ry'].forEach(a => tr.removeAttribute(a));
-      const A = parseFloat(input.value) || 0;
-      if (Math.abs(A) > 1e-3) { tr.setAttribute('rz', '-1'); tr.setAttribute('angleDegrees', A.toFixed(2)); }
-      else { tr.removeAttribute('rz'); tr.removeAttribute('angleDegrees'); }
+    if (key === 'yaw' || key === 'pitch' || key === 'roll') {
+      // compose the three fields into one rotation (pure yaw still lands on the
+      // clean rz="-1" form via writeRotation)
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        (parseFloat(edIn.pitch.value) || 0) * DEG,
+        (parseFloat(edIn.roll.value) || 0) * DEG,
+        -(parseFloat(edIn.yaw.value) || 0) * DEG, 'ZXY'));
+      writeRotation(tr, q);
     } else if (key === 's') {
       const s = Math.min(5, Math.max(0.2, parseFloat(input.value) || 1));
       if (Math.abs(s - 1) > 2e-3) tr.setAttribute('s', s.toFixed(3)); else tr.removeAttribute('s');
@@ -1627,11 +1760,18 @@ document.getElementById('btnNew').onclick = async () => {
 };
 
 document.getElementById('btnTop').onclick = e => {
-  e.target.classList.toggle('on');
+  const on = e.target.classList.toggle('on');
   const c = controls.target;
   const r = Math.max(camera.position.distanceTo(c), 20);
-  camera.position.set(c.x, c.y + r, c.z + 0.001);
-  camera.up.set(0, 0, -1); camera.lookAt(c);
+  // keep the WORLD up (+y) as the orbit axis — flipping camera.up to (0,0,-1)
+  // for a top-down snap left OrbitControls orbiting the wrong axis, so every
+  // drag afterwards tumbled and rolled. OrbitControls clamps the polar angle
+  // just off the pole, so a camera placed straight overhead reads as top-down
+  // while normal orbit/pan/zoom keeps working.
+  camera.up.set(0, 1, 0);
+  if (on) camera.position.set(c.x, c.y + r, c.z + r * 0.0015);   // directly overhead
+  else camera.position.set(c.x + r * 0.5, c.y + r * 0.7, c.z + r * 0.9);  // back to an angled view
+  controls.update();
 };
 document.getElementById('btnCp').onclick = e => {
   e.target.classList.toggle('on'); cpGroup.visible = e.target.classList.contains('on');
