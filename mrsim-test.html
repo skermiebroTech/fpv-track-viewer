@@ -1081,6 +1081,8 @@ const PALETTE = [
   { id: 'gate7',   label: '7×6 gate (3 m)',    macro: 'Centered7x6Gate', cp: 'wrapper' },
   { id: 'sf5',     label: '5×5 start/finish',  macro: 'Centered5x5StartFinishGate', cp: 'wrapper' },
   { id: 'sf7',     label: '7×6 start/finish',  macro: 'Centered7x6StartFinishGate', cp: 'wrapper' },
+  { id: 'gatefab', label: 'gate 2 m (fabric)', gateKind: 'fabric', cp: 'pass' },
+  { id: 'gatesq',  label: 'gate 2.5 m square', gateKind: 'square', cp: 'pass' },
   { id: 'champs',  label: 'Champs25 LED gate', include: 'Gates/Champs25Gate.xml', cp: 'wrapper' },
   { id: 'dive',    label: '7×7 dive gate',     include: '7x7DiveGate.xml', cp: 'wrapper' },
   { id: 'climb',   label: '7×7 climb gate',    include: '7x7ClimbGate.xml', cp: 'wrapper' },
@@ -1173,6 +1175,72 @@ function ensureRootInclude(file, ops) {
   ops.push({ type: 'insert', node: inc });
 }
 
+// ---- custom gates (the converter's true-size frames) ----------------------
+// PBR fabric/frame materials, matching the converter's output; added to the
+// doc on demand so a converted-or-blank track renders them in-game.
+const GATE_MATERIALS = {
+  GatePostMaterial:        [0.93, 0.93, 0.9, '.4'],
+  GateBannerMaterial:      [0.09, 0.13, 0.38, '.5'],
+  GateStartBannerMaterial: [0.55, 0.05, 0.05, '.4'],
+  GateFabricMaterial:      [0.9, 0.35, 0.05, '.85'],
+};
+function ensureMaterial(matName, ops) {
+  const doc = editState.doc;
+  if ([...doc.getElementsByTagName('Material')].some(m => m.getAttribute('name') === matName)) return;
+  const [r, g, b, rough] = GATE_MATERIALS[matName];
+  const mat = doc.createElement('Material'); mat.setAttribute('name', matName);
+  const pbr = doc.createElement('PBR');
+  const bc = doc.createElement('baseColor');
+  bc.setAttribute('x', String(r)); bc.setAttribute('y', String(g)); bc.setAttribute('z', String(b));
+  const ro = doc.createElement('roughness'); ro.setAttribute('value', rough);
+  const me = doc.createElement('metallic'); me.setAttribute('value', '0');
+  pbr.append(bc, ro, me); mat.appendChild(pbr);
+  const root = rootSim();
+  const includes = [...root.children].filter(c => c.tagName === 'Include');
+  root.insertBefore(mat, includes.length ? includes[includes.length - 1].nextSibling : root.firstChild);
+  ops.push({ type: 'insert', node: mat });
+}
+function ensureGateMaterials(kind, ops) {
+  ensureMaterial('GatePostMaterial', ops);
+  ensureMaterial('GateBannerMaterial', ops);
+  if (kind !== 'square') ensureMaterial('GateFabricMaterial', ops);
+}
+// A frame of two posts + a top banner + a checkpoint sensor. 'fabric' keeps the
+// converter's 2.96 m frame and adds a 2 m × 2 m ground-standing fabric window
+// (sides + top, open at the ground); 'square' is a 2.5 m × 2.5 m open frame.
+function buildCustomGate(doc, ent, name, kind) {
+  const sq = kind === 'square';
+  const mk = (tag, attrs) => { const e = doc.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const part = (suffix, wf, tag, prim, material) => {
+    const e = mk('Entity', { name: name + suffix });
+    e.appendChild(mk('WorldFromEntityComponent', wf));
+    e.appendChild(mk(tag, prim));
+    e.appendChild(mk('StaticContact', { contactMaterial: 'TrackPart' }));
+    e.appendChild(mk('MeshRendererComponent', { material, subdivisions: tag === 'Cylinder' ? '10' : '1' }));
+    ent.appendChild(e);
+  };
+  const pX = sq ? '1.31' : '1.54', pZ = sq ? '1.325' : '1.356', pH = sq ? '2.65' : '2.712';
+  part('_postL', { x: '-' + pX, z: pZ }, 'Cylinder', { radius: '.06', height: pH }, 'GatePostMaterial');
+  part('_postR', { x: pX, z: pZ }, 'Cylinder', { radius: '.06', height: pH }, 'GatePostMaterial');
+  part('_banner', { z: sq ? '2.575' : '2.637' }, 'Box',
+    { x: sq ? '2.74' : '3.2', y: '.04', z: '.15' }, 'GateBannerMaterial');
+  // checkpoint sensor (the trigger, contactMaterial="-1") + ring reference
+  const passZ = sq ? '1.25' : '1.281';
+  const pass = mk('Entity', { name: name + '_pass' });
+  pass.appendChild(mk('WorldFromEntityComponent', { z: passZ }));
+  pass.appendChild(mk('Box', { x: sq ? '2.5' : '2.96', y: '.3', z: sq ? '2.5' : '2.562' }));
+  pass.appendChild(mk('StaticContact', { contactMaterial: '-1' }));
+  const ref = mk('Entity', { name: 'CheckpointReference' });
+  ref.appendChild(mk('WorldFromEntityComponent', { z: passZ }));
+  pass.append(ref, mk('Checkpoint', {}));
+  ent.appendChild(pass);
+  if (!sq) {   // 2 m × 2 m fabric window: sides narrow to 2 m, top caps at z=2 m
+    part('_fabricL', { x: '-1.24', z: '1.281' }, 'Box', { x: '0.48', y: '.05', z: '2.562' }, 'GateFabricMaterial');
+    part('_fabricR', { x: '1.24', z: '1.281' }, 'Box', { x: '0.48', y: '.05', z: '2.562' }, 'GateFabricMaterial');
+    part('_fabricT', { z: '2.281' }, 'Box', { x: '2.0', y: '.05', z: '0.562' }, 'GateFabricMaterial');
+  }
+}
+
 // build the placement <Transform><Entity name=…>…</Entity></Transform>
 function buildPlacement(def, name, mx, my, mz, ops) {
   const doc = editState.doc;
@@ -1219,6 +1287,9 @@ function buildPlacement(def, name, mx, my, mz, ops) {
     ref.appendChild(doc.createElement('WorldFromEntityComponent'));
     pass.append(wf, box, sc, ref, doc.createElement('Checkpoint'));
     ent.appendChild(pass);
+  } else if (def.gateKind) {
+    ensureGateMaterials(def.gateKind, ops);
+    buildCustomGate(doc, ent, name, def.gateKind);
   }
   const list = editState.doc.getElementsByTagName('CheckpointList')[0];
   const parent = insertParent();
