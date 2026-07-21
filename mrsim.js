@@ -266,7 +266,7 @@ function processComponents(node, ctx, st) {
       if (!elem) { note(st, 'shape outside any entity'); continue; }
       elem.prims.push({
         ...s, m: ctx.m.clone(), hint: matHint(s.shape, s.dims, material, ctx.tags),
-        src: ctx.src,
+        material, src: ctx.src,   // the render material NAME, for exact-colour lookup
         solid: contact != null,   // render-only shapes carry no StaticContact
       });
     }
@@ -351,7 +351,7 @@ function assemble(st, fileName) {
     isStart: [...e.tags].some(t => /StartFinish/.test(t)),
     tags: [...e.tags],
     prims: e.prims.map(p => ({
-      shape: p.shape, dims: p.dims, hint: p.hint, matrix: three(p.m), src: p.src,
+      shape: p.shape, dims: p.dims, hint: p.hint, material: p.material, matrix: three(p.m), src: p.src,
       solid: p.solid !== false,
     })),
     models: e.models.map(md => ({ model: md.model, matrix: three(md.m), src: md.src })),
