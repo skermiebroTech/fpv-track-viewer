@@ -145,6 +145,16 @@
     <button id="edDup">duplicate</button>
     <button id="edDel" class="danger">✕ delete</button>
   </div>
+  <div id="edColorRow" style="border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
+    <div class="row"><label>colour</label>
+      <input id="edColor" type="color" value="#e67300" style="width:44px;height:24px;padding:0;flex:0 0 auto">
+      <span class="hint" id="edColorTip" style="margin:0">recolour by material</span></div>
+    <div class="btnRow">
+      <button id="edColThis">this item</button>
+      <button id="edColType">all <span id="edColTypeName">type</span></button>
+      <button id="edColAll">all items</button>
+    </div>
+  </div>
   <div class="hint" id="edHint">click an object or checkpoint ring to select ·
     keys: <b>g</b> move / <b>r</b> rotate / <b>s</b> scale / <b>Esc</b> deselect /
     <b>Ctrl-Z</b> undo · MRSIM coords (z up), yaw = angleDegrees</div>
@@ -409,6 +419,30 @@ async function build(data, keepCamera = false) {
   const gateWidths = [];
   let groundY = Infinity;
 
+  // Exact colour for a prim that names an inline <Material> in this doc (the
+  // converter's gate posts/banner + fabric panels): read its PBR baseColor so
+  // the editor shows the real in-game colour, not a generic hint fallback.
+  // Library materials (DroneTrackMaterials, poles…) aren't in the doc -> null,
+  // and those prims keep their hint colour. baseColor is LINEAR, like MRMAT.
+  const docMatCache = new Map();
+  const docMat = name => {
+    if (!name) return null;
+    if (docMatCache.has(name)) return docMatCache.get(name);
+    const def = [...(editState?.doc?.getElementsByTagName('Material') || [])]
+      .find(m => m.getAttribute('name') === name);
+    const bc = def && def.getElementsByTagName('baseColor')[0];
+    let mat = null;
+    if (bc) {
+      const pbrEl = def.getElementsByTagName('PBR')[0];
+      const n = (el, a, d) => { const v = el?.getAttribute(a); return v == null || v === '' ? d : parseFloat(v); };
+      mat = pbr(n(bc, 'x', .5), n(bc, 'y', .5), n(bc, 'z', .5),
+        n(pbrEl?.getElementsByTagName('roughness')[0], 'value', .5),
+        n(pbrEl?.getElementsByTagName('metallic')[0], 'value', 0));
+    }
+    docMatCache.set(name, mat);
+    return mat;
+  };
+
   data.elements.forEach((el, ei) => {
     const bbox = new THREE.Box3();
     el.prims.forEach(p => {
@@ -438,9 +472,10 @@ async function build(data, keepCamera = false) {
         const r = hint === 'pvc' ? Math.max(p.dims[0], 0.04) : p.dims[0];
         scale = [r, r, p.dims[1]];
       } else scale = p.dims.map(d => Math.max(d, 0.02));
-      const key = `${hint}|${p.shape}`;
+      const dm = docMat(p.material);
+      const key = `${dm ? 'mat:' + p.material : hint}|${p.shape}`;
       if (!buckets.has(key))
-        buckets.set(key, { geo: p.shape === 'cyl' ? unitCyl : unitBox, mat: matFor(hint), list: [], elems: [] });
+        buckets.set(key, { geo: p.shape === 'cyl' ? unitCyl : unitBox, mat: dm || matFor(hint), list: [], elems: [] });
       const b = buckets.get(key);
       b.list.push(p.matrix.clone().scale(V.set(scale[0], scale[1], scale[2])));
       b.elems.push(ei);
@@ -810,7 +845,7 @@ function selectElementByName(name, silent = false) {
     document.getElementById('edHint').innerHTML =
       `<span class="locked">not editable: ${rec ? rec.reason : 'unknown element'}</span>`;
     refreshEditPanelNumbers();
-    renderLapPanel(); refreshWHRow(); refreshRefRow();
+    renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow();
     return;
   }
   const W = currentWorldThree(rec);
@@ -822,7 +857,7 @@ function selectElementByName(name, silent = false) {
     ? 'sensor box: <b>g</b> move · <b>r</b> rotate (any axis) · <b>s</b> scale (per-axis) · <b>w×h×d</b> fields'
     : 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo';
   refreshEditPanelNumbers();
-  renderLapPanel(); refreshWHRow(); refreshRefRow();
+  renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow();
 }
 
 // bare custom checkpoints expose their sensor Box width x height directly
@@ -1067,6 +1102,87 @@ async function rebuildFromDoc() {
   const text = new XMLSerializer().serializeToString(editState.doc);
   await loadFromText(text, editState.fileName,
     { reuseDoc: true, keepCamera: true, keepSelection: editUi.selectedName });
+}
+
+// ---- colour changer -------------------------------------------------------
+// Recolour objects by (re)pointing their MeshRendererComponents at a shared
+// EdColor_<HEX> material (created on demand). Scope: this item / all of the
+// same type / all items. The chosen sRGB colour is stored as a LINEAR baseColor
+// so it shows the same in the editor (see docMat) and in-game.
+const srgbToLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const hexToLinear = hex => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255].map(srgbToLinear);
+};
+function ensureColorMaterial(hex, ops) {
+  const name = 'EdColor_' + hex.slice(1).toUpperCase();
+  const doc = editState.doc;
+  if ([...doc.getElementsByTagName('Material')].some(m => m.getAttribute('name') === name)) return name;
+  const [r, g, b] = hexToLinear(hex);
+  const mat = doc.createElement('Material'); mat.setAttribute('name', name);
+  const pbrEl = doc.createElement('PBR');
+  const bc = doc.createElement('baseColor');
+  bc.setAttribute('x', r.toFixed(4)); bc.setAttribute('y', g.toFixed(4)); bc.setAttribute('z', b.toFixed(4));
+  const ro = doc.createElement('roughness'); ro.setAttribute('value', '.6');
+  const me = doc.createElement('metallic'); me.setAttribute('value', '0');
+  pbrEl.append(bc, ro, me); mat.appendChild(pbrEl);
+  const root = rootSim();
+  const includes = [...root.children].filter(c => c.tagName === 'Include');
+  root.insertBefore(mat, includes.length ? includes[includes.length - 1].nextSibling : root.firstChild);
+  ops.push({ type: 'insert', node: mat });
+  return name;
+}
+// unique wrapper Transforms of every editable object
+function itemTransforms() {
+  const set = new Set();
+  for (const rec of (editState?.index.values() || [])) if (rec.trEl) set.add(rec.trEl);
+  return [...set];
+}
+// an object's "type" for group recolouring: its entity-name prefix (trkGate,
+// blk, decoFlag, trkCheck, hurdle…). kind is 'deco' for every converter object,
+// so the name prefix is the meaningful grouping.
+function typeOfTransform(tr) {
+  const ent = [...tr.children].find(c => c.tagName === 'Entity');
+  const n = ent?.getAttribute('name') || '';
+  return n.replace(/\d.*$/, '') || 'item';
+}
+function colorTargets(scope) {
+  const trs = itemTransforms();
+  if (scope === 'all') return trs;
+  const rec = editState?.index.get(editUi.selectedName);
+  if (!rec?.trEl) return [];
+  if (scope === 'this') return [rec.trEl];
+  const t = typeOfTransform(rec.trEl);
+  return trs.filter(tr => typeOfTransform(tr) === t);
+}
+function applyColor(scope) {
+  if (!editState) return;
+  const mrcs = colorTargets(scope)
+    .flatMap(tr => [...tr.getElementsByTagName('MeshRendererComponent')]);
+  if (!mrcs.length) return;   // nothing renderable (e.g. only bare sensors)
+  const ops = [];
+  const matName = ensureColorMaterial(document.getElementById('edColor').value, ops);
+  let changed = 0;
+  for (const mrc of mrcs) {
+    if (mrc.getAttribute('material') === matName) continue;
+    ops.push(attrsOp(mrc));
+    mrc.setAttribute('material', matName);
+    changed++;
+  }
+  if (!changed) return;       // already that colour (no new material was inserted)
+  pushUndoOps(ops);
+  editState.dirty = true;
+  rebuildFromDoc();
+}
+function refreshColorRow() {
+  const thisBtn = document.getElementById('edColThis');
+  if (!thisBtn) return;
+  const rec = editState?.index.get(editUi.selectedName);
+  const has = !!rec?.trEl;
+  thisBtn.disabled = !has;
+  document.getElementById('edColType').disabled = !has;
+  document.getElementById('edColTypeName').textContent =
+    has ? `${typeOfTransform(rec.trEl)} (${colorTargets('type').length})` : 'type';
 }
 
 // ---------------------------------------------------------------------------
@@ -1399,6 +1515,7 @@ function deleteSelected() {
   editState.dirty = true;
   editUi.selectedName = null; tc.detach();
   document.getElementById('edTitle').textContent = 'nothing selected';
+  refreshColorRow();
   rebuildFromDoc();
 }
 
@@ -1507,6 +1624,9 @@ document.getElementById('edLapAdd').onclick = () => {
 };
 document.getElementById('edDel').onclick = deleteSelected;
 document.getElementById('edDup').onclick = duplicateSelected;
+document.getElementById('edColThis').onclick = () => applyColor('this');
+document.getElementById('edColType').onclick = () => applyColor('type');
+document.getElementById('edColAll').onclick = () => applyColor('all');
 
 // palette buttons
 {
@@ -1650,6 +1770,7 @@ function setEditMode(on) {
   sensorGroup.visible = on;
   if (!on) tc.detach();
   else if (editUi.selectedName) selectElementByName(editUi.selectedName);
+  if (on) refreshColorRow();
 }
 function setGizmoMode(mode) {
   tc.setMode(mode);
@@ -1675,7 +1796,7 @@ addEventListener('keydown', e => {
     if (placeUi.def) { armPlace(null); return; }
     editUi.selectedName = null; tc.detach();
     document.getElementById('edTitle').textContent = 'nothing selected';
-    refreshEditPanelNumbers(); renderLapPanel(); }
+    refreshEditPanelNumbers(); renderLapPanel(); refreshColorRow(); }
 });
 
 function exportXml() {
@@ -1730,6 +1851,11 @@ window.__edit = {
   },
   del: deleteSelected,
   dup: duplicateSelected,
+  color: (scope, hex) => {   // recolour: scope 'this'|'type'|'all'
+    if (hex) document.getElementById('edColor').value = hex;
+    applyColor(scope);
+    return rebuildFromDoc().then(() => 'ok');
+  },
   lap: () => ({ names: lapNames(), isCircuit: lapIsCircuit() }),
   lapAdd: name => { const ops = [];
     writeLap([...lapNames(), name], lapIsCircuit(), ops);
