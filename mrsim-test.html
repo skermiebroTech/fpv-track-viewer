@@ -48,6 +48,8 @@
   #diag details summary { cursor: pointer; color: #8a93a6; }
   #err { color: #ff8a7a; padding: 4px 0; white-space: pre-wrap; }
   #legend { position: fixed; bottom: 8px; left: 10px; z-index: 5; color: #6a7488; }
+  #ctrlLegend { position: fixed; bottom: 24px; left: 10px; z-index: 5; color: #6a7488; }
+  #ctrlLegend b { color: #9aa4b8; font-weight: 600; }
 
   /* ---- edit panel ---- */
   #editPanel { position: fixed; top: 46px; left: 10px; width: 268px; z-index: 5;
@@ -57,6 +59,11 @@
   #editPanel.show { display: block; }
   #editPanel h3 { font-size: 12px; margin: 10px 0 4px; color: #b7e07a;
     border-top: 1px solid #222836; padding-top: 8px; }
+  #editPanel details.edSect { margin: 0; }
+  #editPanel details.edSect > summary { font-size: 12px; margin: 10px 0 4px; color: #b7e07a;
+    border-top: 1px solid #222836; padding-top: 8px; cursor: pointer; }
+  #editPanel details.edSect > summary:hover { color: #cdea9a; }
+  #editPanel details.edSect > summary span { color: #8a93a6; font-weight: 400; }
   #editPanel .pal { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
   #editPanel .pal button { background: #1a1e28; color: #dfe3ea; text-align: left;
     border: 1px solid #2b3242; border-radius: 4px; padding: 3px 6px;
@@ -78,6 +85,8 @@
     font-size: 11.5px; cursor: pointer; }
   #editPanel .btnRow button:hover { border-color: #4a83ff; }
   #editPanel .btnRow button.danger:hover { border-color: #ff6b6b; color: #ff8a7a; }
+  #editPanel .btnRow button.on { background: #4a1e1e; border-color: #ff6b6b; color: #ff9a8a; }
+  #editPanel .btnRow button:disabled { opacity: .5; cursor: default; border-color: #2b3242; }
   #editPanel .lapCk { display: flex; align-items: center; gap: 6px; margin-top: 5px;
     color: #8a93a6; font-size: 11.5px; }
   #editPanel h2 { font-size: 13px; margin: 0 0 6px; color: #b7e07a; }
@@ -93,6 +102,101 @@
     border: 1px solid #2b3242; border-radius: 4px; padding: 3px 0; font: inherit; cursor: pointer; }
   #editPanel .modes button.on { background: #2a4a1e; border-color: #7ab648; }
   #bar button.edit-on { background: #2a4a1e; border-color: #7ab648; }
+
+  /* ---- palette hover preview ---- */
+  #palPreview { position: fixed; z-index: 8; width: 312px; display: none;
+    background: #12151df2; border: 1px solid #3a4a2a; border-radius: 8px;
+    padding: 6px; box-shadow: 0 8px 28px #000a; backdrop-filter: blur(4px);
+    pointer-events: none; }
+  #palPreview.show { display: block; }
+  #palPreview canvas { display: block; width: 300px; height: 230px;
+    border-radius: 5px; background: #0d0f14; }
+  #palPreview .cap { margin-top: 5px; color: #b7e07a; font-size: 11px;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #palPreview.empty canvas { opacity: .3; }
+  #palPreview.empty .cap::after { content: ' · no mesh'; color: #8a93a6; }
+
+  /* ---- palette custom section ---- */
+  #editPanel .pal button.custom { border-color: #3a4a2a; }
+  #editPanel .pal button.custom:hover { border-color: #b7e07a; }
+  #editPanel .palDivide { grid-column: 1 / -1; display: flex; align-items: center;
+    gap: 6px; color: #8a93a6; font-size: 10.5px; margin: 4px 0 1px; }
+  #editPanel .palDivide::before, #editPanel .palDivide::after {
+    content: ''; flex: 1; height: 1px; background: #262c3a; }
+  #editPanel .palBuild { grid-column: 1 / -1; background: #24406e !important;
+    border-color: #4a83ff !important; text-align: center !important; font-weight: 600; }
+  #editPanel .palBuild:hover { background: #2c4d85 !important; }
+
+  /* ---- object builder modal ---- */
+  #builder { position: fixed; inset: 0; z-index: 20; display: none;
+    background: #05070bcc; backdrop-filter: blur(2px); }
+  #builder.show { display: flex; align-items: center; justify-content: center; }
+  #builder .sheet { width: min(1080px, 96vw); height: min(760px, 94vh);
+    display: grid; grid-template-columns: 190px 1fr 1fr; grid-template-rows: auto 1fr auto;
+    gap: 0; background: #12151d; border: 1px solid #2b3242; border-radius: 10px;
+    overflow: hidden; box-shadow: 0 24px 80px #000a; }
+  #builder .bHead { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid #222836; }
+  #builder .bHead h2 { font-size: 15px; margin: 0; color: #fff; }
+  #builder .bHead .sub { color: #8a93a6; }
+  #builder .bHead .x { margin-left: auto; background: #1a1e28; border: 1px solid #2b3242;
+    color: #dfe3ea; border-radius: 5px; padding: 4px 10px; cursor: pointer; font: inherit; }
+  #builder .bHead .x:hover { border-color: #ff6b6b; color: #ff8a7a; }
+  #builder .bList { grid-row: 2 / 3; border-right: 1px solid #222836; overflow: auto; padding: 8px; }
+  #builder .bList h3 { font-size: 11px; color: #8a93a6; margin: 4px 0 6px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: .05em; }
+  #builder .bList button { display: block; width: 100%; text-align: left; margin-bottom: 4px;
+    background: #1a1e28; color: #dfe3ea; border: 1px solid #2b3242; border-radius: 5px;
+    padding: 5px 8px; font: inherit; font-size: 11.5px; cursor: pointer; }
+  #builder .bList button:hover { border-color: #7ab648; }
+  #builder .bList button.on { background: #2a4a1e; border-color: #7ab648; }
+  #builder .bList button.new { border-style: dashed; color: #b7e07a; }
+  #builder .bList .shared { color: #6a7488; font-size: 10px; float: right; }
+  #builder .bForm { grid-row: 2 / 3; overflow: auto; padding: 12px 14px; }
+  #builder .bPrev { grid-row: 2 / 3; position: relative; background: #0d0f14;
+    border-left: 1px solid #222836; }
+  #builder .bPrev canvas { display: block; width: 100%; height: 100%; }
+  #builder .bPrev .pvHint { position: absolute; left: 10px; bottom: 8px; color: #6a7488;
+    font-size: 10.5px; pointer-events: none; }
+  #builder .bFoot { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center;
+    padding: 10px 14px; border-top: 1px solid #222836; }
+  #builder .bFoot button { background: #1a1e28; color: #dfe3ea; border: 1px solid #2b3242;
+    border-radius: 5px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  #builder .bFoot button:hover { border-color: #4a83ff; }
+  #builder .bFoot button.primary { background: #2a4a1e; border-color: #7ab648; color: #dff3c8; }
+  #builder .bFoot button.primary:hover { border-color: #b7e07a; }
+  #builder .bFoot button.danger:hover { border-color: #ff6b6b; color: #ff8a7a; }
+  #builder .bFoot .spacer { flex: 1; }
+  #builder .bFoot .saveMsg { color: #7ab648; font-size: 11.5px; }
+  #builder .fRow { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  #builder .fRow > label { width: 76px; color: #8a93a6; flex: 0 0 auto; }
+  #builder input[type=text], #builder input[type=number] { background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 4px; padding: 4px 6px; font: inherit; width: 100%; }
+  #builder input:focus { border-color: #4a83ff; outline: none; }
+  #builder .parts { border-top: 1px solid #222836; margin-top: 10px; padding-top: 8px; }
+  #builder .parts h3 { font-size: 12px; color: #b7e07a; margin: 0 0 6px; }
+  #builder .part { border: 1px solid #262c3a; border-radius: 6px; padding: 7px 8px; margin-bottom: 7px;
+    background: #141821; }
+  #builder .part.sel { border-color: #7ab648; }
+  #builder .part .ph { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  #builder .part .ph .tag { background: #1c2230; border: 1px solid #2b3242; border-radius: 4px;
+    padding: 1px 6px; font-size: 10.5px; color: #9aa4b8; }
+  #builder .part .ph input[type=color] { width: 24px; height: 20px; padding: 0; border: 1px solid #2b3242;
+    border-radius: 4px; background: none; cursor: pointer; flex: 0 0 auto; }
+  #builder .part .ph .nm { flex: 1; }
+  #builder .part .ph .rm { background: none; border: none; color: #8a93a6; cursor: pointer;
+    font: inherit; padding: 0 3px; }
+  #builder .part .ph .rm:hover { color: #ff8a7a; }
+  #builder .part .grid3 { display: grid; grid-template-columns: 14px 1fr 1fr 1fr; gap: 3px 5px;
+    align-items: center; }
+  #builder .part .grid3 .gl { color: #8a93a6; font-size: 10.5px; }
+  #builder .part .grid3 input { padding: 2px 4px; font-size: 11px; }
+  #builder .addRow { display: flex; gap: 6px; margin-top: 4px; }
+  #builder .addRow button { flex: 1; background: #1a1e28; color: #dfe3ea; border: 1px dashed #3a4358;
+    border-radius: 5px; padding: 5px 0; font: inherit; cursor: pointer; }
+  #builder .addRow button:hover { border-color: #7ab648; color: #b7e07a; }
+  #builder .cpRow { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; color: #8a93a6; }
+  #builder .bImport { display: none; }
 </style>
 
 <div id="app"></div>
@@ -102,6 +206,8 @@
   <label class="file">import<input id="file" type="file" accept=".xml,.trk,.json"></label>
   <button id="btnNew">new track</button>
   <button id="btnTop">top view</button>
+  <button id="btnProj" title="perspective — click for orthographic / isometric">perspective</button>
+  <select id="ctrlScheme" title="camera control scheme — matches popular 3D/CAD tools"></select>
   <button id="btnCp" class="on">checkpoints</button>
   <button id="btnDiag" class="on">diagnostics</button>
   <button id="btnEdit">✎ edit</button>
@@ -145,6 +251,12 @@
     <button id="edDup">duplicate</button>
     <button id="edDel" class="danger">✕ delete</button>
   </div>
+  <div class="btnRow"><button id="edToBuilder"
+    title="copy this object's shapes (and checkpoint) into the object builder as a new, reusable custom object">＋ copy to object builder</button></div>
+  <div id="edStartRow" style="display:none;border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
+    <div class="btnRow"><button id="edSetStart">★ set as start / finish</button></div>
+    <div class="hint" id="edStartTip" style="margin-top:4px">the red-banner gate the lap starts &amp; finishes at</div>
+  </div>
   <div id="edColorRow" style="border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
     <div class="row"><label>colour</label>
       <input id="edColor" type="color" value="#e67300" style="width:44px;height:24px;padding:0;flex:0 0 auto">
@@ -156,25 +268,90 @@
     </div>
   </div>
   <div class="hint" id="edHint">click an object or checkpoint ring to select ·
+    <b>Ctrl</b>-click adds/removes from the selection (move many at once) ·
     keys: <b>g</b> move / <b>r</b> rotate / <b>s</b> scale / <b>Esc</b> deselect /
     <b>Ctrl-Z</b> undo · MRSIM coords (z up), yaw = angleDegrees</div>
 
-  <h3>place object <span style="color:#8a93a6;font-weight:400">(click canvas · shift = multi)</span></h3>
-  <div class="pal" id="palette"></div>
+  <details class="edSect" id="edPlaceSect" open>
+    <summary>place object <span>(click canvas · shift = multi)</span></summary>
+    <div class="pal" id="palette"></div>
+  </details>
 
-  <h3>lap — checkpoint order</h3>
-  <div id="lapList"></div>
-  <div class="lapCk"><input type="checkbox" id="lapCircuit"> <label for="lapCircuit"
-    style="width:auto">circuit (lap closes back to #1)</label></div>
+  <details class="edSect" id="edLapSect" open>
+    <summary>lap — checkpoint order</summary>
+    <div id="lapList"></div>
+    <div class="lapCk"><input type="checkbox" id="lapCircuit"> <label for="lapCircuit"
+      style="width:auto">circuit (lap closes back to #1)</label></div>
+  </details>
 </div>
+
+<!-- object builder: compose a custom track object from box/cylinder parts,
+     save it to the palette, and export it as a shareable components.json -->
+<div id="builder">
+  <div class="sheet">
+    <div class="bHead">
+      <h2>track object builder</h2>
+      <span class="sub">compose parts → save to palette → export for the repo</span>
+      <button class="x" id="bClose">✕ close</button>
+    </div>
+    <div class="bList" id="bList"></div>
+    <div class="bForm" id="bForm">
+      <div class="fRow"><label>name</label><input type="text" id="bName" placeholder="my object" maxlength="40"></div>
+      <div class="cpRow"><input type="checkbox" id="bCp">
+        <label for="bCp" style="width:auto;color:#b7e07a">race checkpoint (joins the lap when placed)</label></div>
+      <div id="bPassRow" class="fRow" style="display:none">
+        <label title="fly-through trigger box: width × depth × height, centre height">gate w×d×h·z</label>
+        <input type="number" id="bPassW" step="0.1" min="0.2" title="trigger width" style="width:52px">
+        <input type="number" id="bPassD" step="0.05" min="0.05" title="trigger depth" style="width:52px">
+        <input type="number" id="bPassH" step="0.1" min="0.2" title="trigger height" style="width:52px">
+        <input type="number" id="bPassZ" step="0.1" title="centre height (z)" style="width:52px">
+      </div>
+      <div id="bRefRow" style="display:none;border-top:1px solid #222836;margin-top:6px;padding-top:6px">
+        <div class="fRow"><label style="color:#4a83ff" title="the blue ring shown in the preview">checkpoint ref</label>
+          <span style="color:#8a93a6;font-size:11px">ring position + crossing (fly-through) direction</span></div>
+        <div class="fRow"><label title="ring position — x, y, z (up)">ring pos</label>
+          <input type="number" id="bRefX" step="0.1" title="ref x" style="width:52px">
+          <input type="number" id="bRefY" step="0.1" title="ref y" style="width:52px">
+          <input type="number" id="bRefZ" step="0.1" title="ref z (up)" style="width:52px"></div>
+        <div class="fRow"><label title="crossing direction — yaw / pitch / roll°">ring y/p/r°</label>
+          <input type="number" id="bRefYaw" step="5" title="yaw" style="width:52px">
+          <input type="number" id="bRefPitch" step="5" title="pitch" style="width:52px">
+          <input type="number" id="bRefRoll" step="5" title="roll" style="width:52px"></div>
+      </div>
+      <div class="parts">
+        <h3>parts</h3>
+        <div id="bParts"></div>
+        <div class="addRow">
+          <button id="bAddBox">＋ box</button>
+          <button id="bAddCyl">＋ cylinder</button>
+        </div>
+      </div>
+    </div>
+    <div class="bPrev" id="bPrev">
+      <div class="pvHint">drag to orbit · scroll to zoom · z is up (MRSIM)</div>
+    </div>
+    <div class="bFoot">
+      <button class="primary" id="bSave">✓ save to palette</button>
+      <button id="bExportOne">⤓ export this</button>
+      <button id="bExportAll">⤓ export all (components.json)</button>
+      <button id="bImport">⤒ import</button>
+      <input type="file" id="bImportFile" class="bImport" accept=".json">
+      <span class="spacer"></span>
+      <span class="saveMsg" id="bMsg"></span>
+      <button class="danger" id="bDelete">✕ delete</button>
+    </div>
+  </div>
+</div>
+
 <div id="legend"></div>
+<div id="ctrlLegend"></div>
 
 <script type="importmap">
 {
   "imports": {
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
-    "./mrsim.js": "./mrsim.js?v=9",
+    "./mrsim.js": "./mrsim.js?v=10",
     "./mrsim-lib.js": "./mrsim-lib.js?v=6"
   }
 }
@@ -212,9 +389,96 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0d0f14');
 scene.fog = new THREE.Fog('#0d0f14', 90, 320);
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+// two cameras share one orbit rig; projection toggles between them (see setProjection)
+const perspCamera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 4000);
+let camera = perspCamera;      // the active camera (live binding read by loop/resize/frame)
+let projection = 'perspective';
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+
+// ---------------------------------------------------------------------------
+// camera control presets — match the navigation of popular DCC / CAD tools.
+// OrbitControls decides an action on each pointerdown by reading
+// controls.mouseButtons, so a capture-phase pointerdown handler rewrites that
+// map from the live modifier keys *before* OrbitControls' own listener runs.
+// That is how the Blender/Fusion/Maya modifier+button combos work — OrbitControls
+// has no native modifier support. Selection (LMB click) and the transform gizmo
+// (LMB drag on a handle) are handled by our own code, so LMB is left free
+// (null) for orbit/pan in every scheme except the default "orbit" one.
+const MB = THREE.MOUSE;   // ROTATE = 0, DOLLY = 1, PAN = 2
+const CTRL_SCHEMES = {
+  orbit: {
+    label: 'Orbit (default)',
+    hint: 'orbit <b>LMB</b> · zoom <b>MMB</b>/scroll · pan <b>RMB</b> · select LMB',
+    map: e => ({ LEFT: MB.ROTATE, MIDDLE: MB.DOLLY, RIGHT: MB.PAN }),
+  },
+  blender: {
+    label: 'Blender',
+    hint: 'orbit <b>MMB</b> · pan <b>Shift+MMB</b> · zoom <b>scroll</b>/Ctrl+MMB · select <b>LMB</b>',
+    map: e => ({
+      LEFT: null,
+      MIDDLE: e.shiftKey ? MB.PAN : ((e.ctrlKey || e.metaKey) ? MB.DOLLY : MB.ROTATE),
+      RIGHT: null,
+    }),
+  },
+  fusion: {
+    label: 'Fusion / CAD',
+    hint: 'pan <b>MMB</b> · orbit <b>Shift+MMB</b> · zoom <b>scroll</b> · select <b>LMB</b>',
+    map: e => ({
+      LEFT: null,
+      MIDDLE: e.shiftKey ? MB.ROTATE : MB.PAN,
+      RIGHT: null,
+    }),
+  },
+  maya: {
+    label: 'Maya / industry',
+    hint: 'orbit <b>Alt+LMB</b> · pan <b>Alt+MMB</b> · zoom <b>Alt+RMB</b>/scroll · select <b>LMB</b>',
+    map: e => e.altKey
+      ? { LEFT: MB.ROTATE, MIDDLE: MB.PAN, RIGHT: MB.DOLLY }
+      : { LEFT: null, MIDDLE: null, RIGHT: null },
+  },
+};
+let ctrlScheme = localStorage.getItem('mrsim.ctrlScheme') || 'orbit';
+if (!CTRL_SCHEMES[ctrlScheme]) ctrlScheme = 'orbit';
+
+function setCtrlScheme(name) {
+  if (!CTRL_SCHEMES[name]) return;
+  ctrlScheme = name;
+  try { localStorage.setItem('mrsim.ctrlScheme', name); } catch {}
+  controls.mouseButtons = CTRL_SCHEMES[name].map({});   // no-modifier resting map
+  const sel = document.getElementById('ctrlScheme');
+  if (sel) sel.value = name;
+  const cl = document.getElementById('ctrlLegend');
+  if (cl) cl.innerHTML = CTRL_SCHEMES[name].hint;
+}
+// rewrite the button map from modifiers held at press time, before OrbitControls reads it
+renderer.domElement.addEventListener('pointerdown', e => {
+  controls.mouseButtons = CTRL_SCHEMES[ctrlScheme].map(e);
+  if (e.button === 1) e.preventDefault();
+}, true);
+// Suppress the browser's native middle-click autoscroll. It arms on mousedown
+// and, once armed, swallows the middle-button pointerup — OrbitControls (which
+// never preventDefaults the press) then never ends the gesture, so the camera
+// stays "stuck" orbiting/panning. MMB is the primary orbit/pan drag in the
+// Blender/Fusion presets, so kill autoscroll at the source. Passive:false so
+// preventDefault is honoured; the page body is overflow:hidden anyway.
+const noAutoscroll = e => { if (e.button === 1) e.preventDefault(); };
+renderer.domElement.addEventListener('mousedown', noAutoscroll, { passive: false });
+renderer.domElement.addEventListener('auxclick', noAutoscroll, { passive: false });
+
+// populate the selector from the scheme table (single source of truth)
+{
+  const sel = document.getElementById('ctrlScheme');
+  for (const [k, v] of Object.entries(CTRL_SCHEMES)) {
+    const o = document.createElement('option'); o.value = k; o.textContent = 'controls: ' + v.label;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('change', () => setCtrlScheme(sel.value));
+  setCtrlScheme(ctrlScheme);
+}
+window.__ctrl = { get: () => ctrlScheme, set: setCtrlScheme,
+  schemes: Object.keys(CTRL_SCHEMES), buttons: () => controls.mouseButtons };
 
 scene.add(new THREE.HemisphereLight('#c9d6ff', '#20242c', 1.0));
 const sun = new THREE.DirectionalLight('#fff', 1.4);
@@ -247,14 +511,71 @@ const Y_UP_TO_Z_UP = Z_UP_TO_Y_UP.clone().invert();
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
+  perspCamera.aspect = w / h; perspCamera.updateProjectionMatrix();
+  if (projection === 'ortho') fitOrthoFrustum();
 }
 addEventListener('resize', resize); resize();
 window.__renderer = renderer;
+
+// Size the orthographic frustum so it frames the same thing the perspective
+// camera would at the current orbit distance (matched to the 55° vertical FOV).
+// Zoom is carried on orthoCamera.zoom by OrbitControls, so we only set the base.
+function fitOrthoFrustum() {
+  const dist = orthoCamera.position.distanceTo(controls.target) || 40;
+  const halfH = Math.tan(THREE.MathUtils.degToRad(perspCamera.fov / 2)) * dist;
+  const aspect = (innerWidth && innerHeight) ? innerWidth / innerHeight : 1;
+  orthoCamera.left = -halfH * aspect; orthoCamera.right = halfH * aspect;
+  orthoCamera.top = halfH; orthoCamera.bottom = -halfH;
+  orthoCamera.updateProjectionMatrix();
+}
+
+// Toggle perspective <-> orthographic ("isometric") while preserving the view.
+// The new camera inherits the old one's position/orientation, and the framing
+// is matched across the switch so the scene doesn't jump.
+function setProjection(mode) {
+  mode = mode === 'ortho' ? 'ortho' : 'perspective';
+  if (mode === projection) return;
+  const from = camera;
+  const to = mode === 'ortho' ? orthoCamera : perspCamera;
+  const dir = new THREE.Vector3().subVectors(from.position, controls.target);
+  const dist = dir.length() || 40; dir.normalize();
+  to.up.copy(from.up);
+  to.quaternion.copy(from.quaternion);
+  if (mode === 'ortho') {
+    to.position.copy(from.position);
+    to.zoom = 1;
+    camera = to; controls.object = to;
+    fitOrthoFrustum();                          // uses the just-copied position
+  } else {
+    // reproduce the (possibly zoomed) ortho framing at a perspective distance:
+    // visible half-height = orthoTop / zoom  ->  dist = that / tan(fov/2)
+    const halfH = orthoCamera.top / (orthoCamera.zoom || 1);
+    const newDist = halfH / Math.tan(THREE.MathUtils.degToRad(perspCamera.fov / 2));
+    to.position.copy(controls.target).addScaledVector(dir, Math.max(newDist, 0.5));
+    to.far = from.far; to.updateProjectionMatrix();
+    camera = to; controls.object = to;
+  }
+  projection = mode;
+  window.__camera = camera;
+  try { localStorage.setItem('mrsim.projection', mode); } catch {}
+  controls.update();
+  const btn = document.getElementById('btnProj');
+  if (btn) {
+    btn.classList.toggle('on', mode === 'ortho');
+    btn.textContent = mode === 'ortho' ? 'isometric' : 'perspective';
+    btn.title = mode === 'ortho'
+      ? 'orthographic / isometric — click for perspective'
+      : 'perspective — click for orthographic / isometric';
+  }
+}
+window.__view = { projection: () => projection, set: setProjection };
+let previewTick = null;   // set by the palette hover-preview system (spins + renders its thumbnail)
+let previewHover = null;  // debounce timer for palette-button hover
 (function loop() {
   requestAnimationFrame(loop);
   controls.update();
   if (!window.__paused) renderer.render(scene, camera);
+  if (previewTick) previewTick();
 })();
 
 // ---------------------------------------------------------------------------
@@ -502,7 +823,7 @@ async function build(data, keepCamera = false) {
       mesh.matrix.copy(sn.matrix).scale(V.set(dims[0], dims[1], dims[2]));
       mesh.userData.elemIndex = ei;
       sensorGroup.add(mesh);
-      renderRefs[ei].push({ obj: mesh, base: mesh.matrix.clone() });
+      renderRefs[ei].push({ obj: mesh, base: mesh.matrix.clone(), sensor: true });
     });
   });
 
@@ -590,14 +911,17 @@ function makeLabel(text, pos, color) {
 }
 
 function frameCamera(box) {
-  if (!box) { camera.position.set(20, 20, 20); controls.target.set(0, 0, 0); return; }
-  const c = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  const r = Math.max(size.x, size.z, 8);
-  controls.target.copy(c);
-  camera.position.set(c.x + r * 0.6, c.y + r * 0.9, c.z + r * 1.1);
-  camera.far = r * 8 + 500; camera.updateProjectionMatrix();
-  scene.fog.far = r * 4 + 120;
+  if (!box) { camera.position.set(20, 20, 20); controls.target.set(0, 0, 0); }
+  else {
+    const c = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const r = Math.max(size.x, size.z, 8);
+    controls.target.copy(c);
+    camera.position.set(c.x + r * 0.6, c.y + r * 0.9, c.z + r * 1.1);
+    camera.far = r * 8 + 500; camera.updateProjectionMatrix();
+    scene.fog.far = r * 4 + 120;
+  }
+  if (projection === 'ortho') { orthoCamera.zoom = 1; fitOrthoFrustum(); }
 }
 
 // ---------------------------------------------------------------------------
@@ -641,7 +965,7 @@ function renderDiag(data, extra) {
           ).join('')}</table></details></section>`
       : '') +
 
-    `<section><details open><summary>checkpoint sequence (${data.seq.length})</summary>` +
+    `<section><details><summary>checkpoint sequence (${data.seq.length})</summary>` +
       `<table><tr><th>#</th><th>name</th><th>pos x,y,z</th><th>dir</th></tr>` +
       data.seq.map(s =>
         `<tr><td class="${s.seqNum === 1 ? 'start' : 'num'}">${s.seqNum}</td>` +
@@ -798,8 +1122,15 @@ const proxy = new THREE.Object3D(); scene.add(proxy);
 const tc = new TransformControls(camera, renderer.domElement);
 tc.setSize(0.8);
 scene.add(tc);
+// yellow wireframe cages drawn around every selected element (the gizmo can only
+// anchor on one, so the cages are how the rest of a multi-selection are shown)
+const selGroup = new THREE.Group(); scene.add(selGroup);
+const selEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+const selMat = new THREE.LineBasicMaterial({ color: '#ffcc33', transparent: true, opacity: 0.9, depthTest: false });
 const editUi = {
-  on: false, selectedName: null, startWorld: null, startScale: 1,
+  // selection is the full set; selectedName is the primary (gizmo anchor +
+  // owner of the edit panel). selectedName is always the last entry of selection.
+  on: false, selection: [], selectedName: null, startWorld: null, startScale: 1,
   suppressClick: false,
 };
 tc.addEventListener('dragging-changed', e => {
@@ -835,18 +1166,61 @@ function currentWorldThree(rec) {
   return Z_UP_TO_Y_UP.clone().multiply(rec.A).multiply(localMatrixDom(rec.trEl));
 }
 
+// replace the whole selection with a single object — the path every plain
+// (non-Ctrl) click and every programmatic select uses.
 function selectElementByName(name, silent = false) {
+  editUi.selection = name == null ? [] : [name];
+  setPrimary(name, silent);
+  refreshSelectionHighlight();
+}
+
+// Ctrl/⌘-click: add `name` to the selection (or drop it if already in). The
+// newly-added object becomes the primary (gizmo anchor); dropping the primary
+// hands the anchor to whatever is left.
+function toggleSelection(name) {
+  if (!name) return;
+  const i = editUi.selection.indexOf(name);
+  if (i >= 0) {
+    editUi.selection.splice(i, 1);
+    if (editUi.selectedName === name)
+      editUi.selectedName = editUi.selection[editUi.selection.length - 1] || null;
+    if (editUi.selectedName) setPrimary(editUi.selectedName, true);
+    else { clearSelection(); return; }
+  } else {
+    editUi.selection.push(name);
+    setPrimary(name);
+  }
+  refreshSelectionHighlight();
+}
+
+// tear the whole selection down (Esc / delete-all / edit-mode off)
+function clearSelection() {
+  editUi.selection = [];
+  editUi.selectedName = null;
+  tc.detach();
+  document.getElementById('edTitle').textContent = 'nothing selected';
+  refreshSelectionHighlight();
+  refreshEditPanelNumbers();
+  renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow(); refreshStartRow();
+}
+
+// point the gizmo + edit panel at `name` WITHOUT touching which objects are in
+// editUi.selection (used both for single-select and to re-anchor a group).
+function setPrimary(name, silent = false) {
   const rec = editState?.index.get(name);
   editUi.selectedName = name;
   const ei = elemIndexByName(name);
-  document.getElementById('edTitle').textContent =
-    name + (ei >= 0 ? ` · ${KIND_LABEL[currentData.elements[ei].kind] || ''}` : '');
+  const more = editUi.selection.length - 1;
+  const tail = more > 0 ? ` · +${more} more` : '';
+  document.getElementById('edTitle').textContent = name == null ? 'nothing selected'
+    : name + (ei >= 0 ? ` · ${KIND_LABEL[currentData.elements[ei].kind] || ''}` : '') + tail;
   if (!rec || !rec.trEl) {
     tc.detach();
-    document.getElementById('edHint').innerHTML =
-      `<span class="locked">not editable: ${rec ? rec.reason : 'unknown element'}</span>`;
+    document.getElementById('edHint').innerHTML = name == null
+      ? 'click an object or checkpoint ring to select · <b>Ctrl</b>-click adds to the selection'
+      : `<span class="locked">not editable: ${rec ? rec.reason : 'unknown element'}</span>`;
     refreshEditPanelNumbers();
-    renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow();
+    renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow(); refreshStartRow();
     return;
   }
   const W = currentWorldThree(rec);
@@ -854,11 +1228,55 @@ function selectElementByName(name, silent = false) {
   editUi.startWorld = W.clone();
   editUi.startScale = proxy.scale.x;
   if (editUi.on) tc.attach(proxy);
-  document.getElementById('edHint').innerHTML = isFreeSensor(name)
-    ? 'sensor box: <b>g</b> move · <b>r</b> rotate (any axis) · <b>s</b> scale (per-axis) · <b>w×h×d</b> fields'
-    : 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo';
+  document.getElementById('edHint').innerHTML = more > 0
+    ? `moving <b>${editUi.selection.length}</b> objects together · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl</b>-click adds/removes`
+    : isFreeSensor(name)
+      ? 'sensor box: <b>g</b> move · <b>r</b> rotate (any axis) · <b>s</b> scale (per-axis) · <b>w×h×d</b> fields'
+      : 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl</b>-click multi · <b>Ctrl-Z</b> undo';
   refreshEditPanelNumbers();
-  renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow();
+  renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow(); refreshStartRow();
+}
+
+// world-space AABB of an element, unioned from its rendered scene objects.
+// Sensor volumes are skipped unless they are all the element has (bare markers).
+const _selBox = new THREE.Box3();
+function elementWorldBox(ei) {
+  const refs = renderRefs[ei] || [];
+  const solid = refs.filter(r => !r.sensor);
+  const use = solid.length ? solid : refs;
+  const box = new THREE.Box3();
+  for (const r of use) {
+    const geo = r.im ? r.im.geometry : r.obj.geometry;
+    if (geo) {
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      box.union(_selBox.copy(geo.boundingBox).applyMatrix4(r.base));
+    } else {
+      box.union(_selBox.setFromObject(r.obj));
+    }
+  }
+  return box;
+}
+
+// rebuild the yellow cages around the current selection (no-op out of edit mode)
+function refreshSelectionHighlight() {
+  while (selGroup.children.length) selGroup.remove(selGroup.children[0]);
+  if (!editUi.on) return;
+  const c = new THREE.Vector3(), s = new THREE.Vector3(), q = new THREE.Quaternion();
+  for (const name of editUi.selection) {
+    const ei = elemIndexByName(name);
+    if (ei < 0) continue;
+    const box = elementWorldBox(ei);
+    if (box.isEmpty()) continue;
+    box.getCenter(c); box.getSize(s).addScalar(0.15);
+    const M = new THREE.Matrix4().compose(c, q,
+      new THREE.Vector3(Math.max(s.x, 0.05), Math.max(s.y, 0.05), Math.max(s.z, 0.05)));
+    const cage = new THREE.LineSegments(selEdges, selMat);
+    cage.matrixAutoUpdate = false;
+    cage.matrix.copy(M);
+    cage.userData.base = M.clone();
+    cage.renderOrder = 999;
+    selGroup.add(cage);
+  }
 }
 
 // bare custom checkpoints expose their sensor Box width x height directly
@@ -996,35 +1414,66 @@ for (const id of ['edRefX', 'edRefY', 'edRefZ', 'edRefYaw', 'edRefPitch', 'edRef
   });
 }
 
-// live preview while dragging: delta(world) applied to every scene object of
-// the selected element; the XML is only written on release
-const _tmpM = new THREE.Matrix4(), _tmpM2 = new THREE.Matrix4();
+// live preview while dragging: the primary's world delta is applied to every
+// scene object of every selected element (rigid group move); the XML is only
+// written on release. Rotate/scale therefore pivot about the primary's origin.
+const _tmpM = new THREE.Matrix4(), _tmpM2 = new THREE.Matrix4(), _tmpM3 = new THREE.Matrix4();
 function applyLiveDelta() {
-  const ei = elemIndexByName(editUi.selectedName);
-  if (ei < 0 || !editUi.startWorld) return;
+  if (!editUi.selectedName || !editUi.startWorld) return;
   proxy.updateMatrix();
   const delta = _tmpM.copy(proxy.matrix).multiply(_tmpM2.copy(editUi.startWorld).invert());
-  (renderRefs[ei] || []).forEach(r => {
-    if (r.im) {
-      r.im.setMatrixAt(r.idx, _tmpM2.copy(delta).multiply(r.base));
-      r.im.instanceMatrix.needsUpdate = true;
-    } else {
-      r.obj.matrixAutoUpdate = false;
-      r.obj.matrix.copy(delta).multiply(r.base);
-    }
-  });
+  for (const name of editUi.selection) {
+    const ei = elemIndexByName(name);
+    if (ei < 0) continue;
+    (renderRefs[ei] || []).forEach(r => {
+      if (r.im) {
+        r.im.setMatrixAt(r.idx, _tmpM3.copy(delta).multiply(r.base));
+        r.im.instanceMatrix.needsUpdate = true;
+      } else {
+        r.obj.matrixAutoUpdate = false;
+        r.obj.matrix.copy(delta).multiply(r.base);
+      }
+    });
+  }
+  selGroup.children.forEach(cage => cage.matrix.copy(delta).multiply(cage.userData.base));
 }
 
-// proxy world matrix -> new local T*R*S written into the wrapper <Transform>
+// proxy world matrix -> new local T*R*S written into the wrapper <Transform>.
+// A group drag applies the primary's world delta to every selected element,
+// committed as a single undo step.
 function commitEdit() {
   const rec = editState?.index.get(editUi.selectedName);
   if (!rec || !rec.trEl || !editUi.startWorld) return;
   proxy.updateMatrix();
   if (proxy.matrix.equals(editUi.startWorld)) return;   // no-op drag
-  // L' = A⁻¹ · ZUP⁻¹ · proxyWorld   (mrsim space)
+  const delta = _tmpM3.copy(proxy.matrix).multiply(new THREE.Matrix4().copy(editUi.startWorld).invert());
+  // snapshot each element's target world BEFORE writing any DOM (commitOne
+  // mutates transforms as it goes)
+  const jobs = [];
+  for (const name of editUi.selection) {
+    const r = editState?.index.get(name);
+    if (!r || !r.trEl) continue;
+    const rest = currentWorldThree(r);
+    jobs.push({ name, rest, world: new THREE.Matrix4().multiplyMatrices(delta, rest) });
+  }
+  const ops = [];
+  for (const j of jobs) commitOne(j.name, j.rest, j.world, ops);
+  if (!ops.length) return;
+  pushUndoOps(ops);
+  editState.dirty = true;
+  rebuildFromDoc();
+}
+
+// write one element's new world matrix back into its wrapper <Transform> as a
+// local T*R*S. restWorld is the element's world before the drag (for the bare-
+// sensor per-axis fold); ops collects the undo attrs.
+function commitOne(name, restWorld, world, ops) {
+  const rec = editState?.index.get(name);
+  if (!rec || !rec.trEl) return;
+  // L' = A⁻¹ · ZUP⁻¹ · world   (mrsim space)
   const L = _tmpM.copy(rec.A).invert()
     .multiply(_tmpM2.copy(Z_UP_TO_Y_UP).invert())
-    .multiply(proxy.matrix);
+    .multiply(world);
   const e = L.elements;
   const tr = rec.trEl;
   // basis-column lengths = rotation * per-axis scale; normalise them to recover
@@ -1037,14 +1486,14 @@ function commitEdit() {
     e[1] / sx, e[5] / sy, e[9] / sz, 0,
     e[2] / sx, e[6] / sy, e[10] / sz, 0,
     0, 0, 0, 1));
-  const box = isFreeSensor(editUi.selectedName) ? sensorBoxEl(editUi.selectedName) : null;
-  pushUndoOps(box ? [attrsOp(tr), attrsOp(box)] : [attrsOp(tr)]);
+  const box = isFreeSensor(name) ? sensorBoxEl(name) : null;
+  ops.push(...(box ? [attrsOp(tr), attrsOp(box)] : [attrsOp(tr)]));
   setTransformPos(tr, e[12], e[13], e[14]);
   writeRotation(tr, q);                                 // full axis-angle (any tilt)
   if (box) {
     // bare sensor: per-axis size lives in the <Box>, so fold this drag's
     // per-axis scale into it and leave the wrapper's uniform scale untouched
-    const s0 = editUi.startScale || 1;
+    const s0 = new THREE.Vector3().setFromMatrixColumn(restWorld, 0).length() || 1;
     const cd = v => Math.min(40, Math.max(0.02, v));
     if (Math.abs(sx - s0) > 2e-3 * s0 || Math.abs(sy - s0) > 2e-3 * s0 || Math.abs(sz - s0) > 2e-3 * s0) {
       box.setAttribute('x', cd(parseFloat(box.getAttribute('x') || 1) * sx / s0).toFixed(2));
@@ -1057,8 +1506,6 @@ function commitEdit() {
     const sc = Math.min(5, Math.max(0.2, sx));
     if (Math.abs(sc - 1) > 2e-3) tr.setAttribute('s', sc.toFixed(3)); else tr.removeAttribute('s');
   }
-  editState.dirty = true;
-  rebuildFromDoc();
 }
 
 function setTransformPos(tr, x, y, z) {
@@ -1100,9 +1547,19 @@ function undoEdit() {
 }
 
 async function rebuildFromDoc() {
+  const savedSelection = [...editUi.selection];
   const text = new XMLSerializer().serializeToString(editState.doc);
   await loadFromText(text, editState.fileName,
     { reuseDoc: true, keepCamera: true, keepSelection: editUi.selectedName });
+  // loadFromText re-selects the primary as a single selection — restore the
+  // rest of a multi-selection (names survive rebuilds; drop any that vanished)
+  if (savedSelection.length > 1) {
+    editUi.selection = savedSelection.filter(n => elemIndexByName(n) >= 0);
+    if (editUi.selectedName && !editUi.selection.includes(editUi.selectedName))
+      editUi.selection.push(editUi.selectedName);
+    setPrimary(editUi.selectedName, true);
+    refreshSelectionHighlight();
+  }
 }
 
 // ---- colour changer -------------------------------------------------------
@@ -1186,6 +1643,80 @@ function refreshColorRow() {
     has ? `${typeOfTransform(rec.trEl)} (${colorTargets('type').length})` : 'type';
 }
 
+// ---- start / finish designation -------------------------------------------
+// The "start element" is the gate wearing the red banner. There is no separate
+// flag in the format: a gate is the start because its banner uses
+// GateStartBannerMaterial (parser keys isStart off that + the StartFinish
+// macro name). So "set as start" just repoints the selected gate's banner
+// material — the red recolour, the panel readout and export all follow.
+function gateBannerMRCs(trEl) {
+  const out = new Set();
+  if (!trEl) return [];
+  // by material name (a normal banner, or one already marked start)
+  for (const m of trEl.getElementsByTagName('MeshRendererComponent'))
+    if (/^Gate(Start)?BannerMaterial$/.test(m.getAttribute('material') || '')) out.add(m);
+  // by entity name — catches a banner whose colour was changed by the recolourer
+  for (const ent of trEl.getElementsByTagName('Entity'))
+    if (/(^|_)banner$/i.test(ent.getAttribute('name') || ''))
+      for (const m of ent.getElementsByTagName('MeshRendererComponent')) out.add(m);
+  return [...out];
+}
+function setBannerMaterial(mrcs, matName, ops) {
+  ensureMaterial(matName, ops);
+  for (const m of mrcs) {
+    if (m.getAttribute('material') === matName) continue;
+    ops.push(attrsOp(m));
+    m.setAttribute('material', matName);
+  }
+}
+// toggle: make the selected gate the start/finish (reverting any previous one),
+// or, if it already is, revert it to a plain gate banner.
+function setAsStart(name = editUi.selectedName) {
+  if (!editState) return;
+  const rec = editState.index.get(name);
+  const banner = gateBannerMRCs(rec?.trEl);
+  if (!banner.length) return;                 // not a bannered gate — nothing to mark
+  const ei = elemIndexByName(name);
+  const el = ei >= 0 ? currentData.elements[ei] : null;
+  const makeStart = !(el && el.isStart);      // toggle off if already the start
+  const ops = [];
+  if (makeStart) {
+    // demote whichever gate currently holds the red banner
+    for (const other of currentData.elements) {
+      if (other.name === name || !other.isStart) continue;
+      const orec = editState.index.get(other.name);
+      const obanner = gateBannerMRCs(orec?.trEl)
+        .filter(m => m.getAttribute('material') === 'GateStartBannerMaterial');
+      if (obanner.length) setBannerMaterial(obanner, 'GateBannerMaterial', ops);
+    }
+  }
+  setBannerMaterial(banner, makeStart ? 'GateStartBannerMaterial' : 'GateBannerMaterial', ops);
+  if (!ops.length) return;
+  pushUndoOps(ops);
+  editState.dirty = true;
+  return rebuildFromDoc();
+}
+function refreshStartRow() {
+  const row = document.getElementById('edStartRow');
+  const btn = document.getElementById('edSetStart');
+  if (!row || !btn) return;
+  const rec = editState?.index.get(editUi.selectedName);
+  const ei = elemIndexByName(editUi.selectedName);
+  const el = ei >= 0 ? currentData?.elements[ei] : null;
+  const hasBanner = gateBannerMRCs(rec?.trEl).length > 0;
+  const macroStart = !!el?.isStart && !hasBanner;   // structural StartFinish gate type
+  if (!el || (!hasBanner && !macroStart)) { row.style.display = 'none'; return; }
+  row.style.display = 'block';
+  const isStart = !!el.isStart;
+  btn.classList.toggle('on', isStart);
+  btn.disabled = macroStart;
+  btn.textContent = isStart ? '★ start / finish gate' : '★ set as start / finish';
+  document.getElementById('edStartTip').textContent = macroStart
+    ? 'a start/finish gate type — already the start'
+    : isStart ? 'click to revert this to a normal gate banner'
+              : 'the red-banner gate the lap starts & finishes at';
+}
+
 // ---------------------------------------------------------------------------
 // OBJECT PALETTE — every placeable MRSIM library object + custom sensors.
 // cp: how the object joins the lap list — 'wrapper' = the checkpoint lives in
@@ -1232,6 +1763,50 @@ const MACRO_SHIFTS = {
   Centered7x6Gate: ['-1.5', '7x6Gate.xml'],
   Centered7x6StartFinishGate: ['-1.5', '7x6StartFinishGate.xml'],
 };
+
+// ---------------------------------------------------------------------------
+// CUSTOM COMPONENTS — user-built track objects. A component is a small entity
+// subtree (the same shape buildCustomGate emits): a list of primitive `parts`
+// (box/cylinder with an offset, rotation, size and colour) plus an optional
+// `pass` checkpoint trigger. They live in two places and both feed the palette:
+//   · localStorage  — this browser's own objects, editable in the builder
+//   · components.json — repo-shared objects (read-only here), so a contributor
+//     can "export all" and drop the file in the repo for everyone.
+// ---------------------------------------------------------------------------
+const CUSTOM_STORE_KEY = 'mrsim.customComponents';
+let CUSTOM_LOCAL = [];    // this browser's components (editable)
+let CUSTOM_SHARED = [];   // components.json bundled in the repo (read-only)
+
+function loadLocalComponents() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CUSTOM_STORE_KEY) || '[]');
+    CUSTOM_LOCAL = Array.isArray(v) ? v.filter(isComponent) : [];
+  } catch { CUSTOM_LOCAL = []; }
+}
+function saveLocalComponents() {
+  try { localStorage.setItem(CUSTOM_STORE_KEY, JSON.stringify(CUSTOM_LOCAL)); } catch {}
+}
+async function loadSharedComponents() {
+  try {
+    const r = await fetch('components.json');
+    if (!r.ok) return;
+    const v = await r.json();
+    if (Array.isArray(v)) CUSTOM_SHARED = v.filter(isComponent).map(c => ({ ...c, shared: true }));
+  } catch { /* no repo bundle — fine */ }
+}
+const isComponent = c => c && typeof c === 'object' && Array.isArray(c.parts);
+
+// palette id -> component (local wins over a same-id shared one)
+function customById(id) {
+  return CUSTOM_LOCAL.find(c => c.id === id) || CUSTOM_SHARED.find(c => c.id === id) || null;
+}
+// every custom component as a palette def, deduped by id (local shadows shared)
+function customDefs() {
+  const seen = new Set(CUSTOM_LOCAL.map(c => c.id));
+  return [...CUSTOM_LOCAL, ...CUSTOM_SHARED.filter(c => !seen.has(c.id))];
+}
+// built-ins + custom — the full placeable set (palette, place() hook, arm)
+function allPalette() { return [...PALETTE, ...customDefs()]; }
 
 // ---- DOM building blocks ---------------------------------------------------
 function uniqueName(prefix) {
@@ -1358,6 +1933,62 @@ function buildCustomGate(doc, ent, name, kind) {
   }
 }
 
+// ---- user-built components (the object builder) ----------------------------
+// a [yaw,pitch,roll]° triple -> mrsim-space quaternion (same convention as the
+// editor's numeric panel), shared by the preview and the emitted rotation attrs.
+function quatFromRot(rot) {
+  const [yaw = 0, pitch = 0, roll = 0] = rot || [];
+  return new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(pitch * DEG, roll * DEG, -yaw * DEG, 'ZXY'));
+}
+const partQuat = part => quatFromRot(part.rot);
+function writeVec(el, pos) {
+  el.removeAttribute('v');
+  ['x', 'y', 'z'].forEach((a, i) => {
+    const val = +(pos?.[i]) || 0;
+    if (Math.abs(val) > 5e-4) el.setAttribute(a, val.toFixed(3)); else el.removeAttribute(a);
+  });
+}
+// emit a saved component `def` (from the builder) as parts + optional checkpoint,
+// mirroring buildCustomGate but data-driven. Part colours reuse the recolour
+// machinery's EdColor_<HEX> materials, so a placed object is self-contained XML.
+function buildCustomComponent(doc, ent, name, def, ops) {
+  const mk = (tag, attrs) => { const e = doc.createElement(tag);
+    for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== '') e.setAttribute(k, attrs[k]); return e; };
+  (def.parts || []).forEach((part, i) => {
+    const material = ensureColorMaterial(part.color || '#c8c8c8', ops);
+    const e = mk('Entity', { name: `${name}_p${i}` });
+    const wf = mk('WorldFromEntityComponent', {});
+    writeVec(wf, part.pos); writeRotation(wf, partQuat(part));
+    e.appendChild(wf);
+    const d = (part.dims || []).map(v => (+v || 0).toFixed(3));
+    if (part.shape === 'cyl') e.appendChild(mk('Cylinder', { radius: d[0] || '0.1', height: d[1] || '1' }));
+    else e.appendChild(mk('Box', { x: d[0] || '0.5', y: d[1] || '0.5', z: d[2] || '0.5' }));
+    e.appendChild(mk('StaticContact', { contactMaterial: 'TrackPart' }));
+    e.appendChild(mk('MeshRendererComponent', { material, subdivisions: part.shape === 'cyl' ? '12' : '1' }));
+    ent.appendChild(e);
+  });
+  if (def.cp) {   // fly-through trigger box + ring reference (resolved vs parent)
+    const pass = def.pass || {};
+    const pos = pass.pos || [0, 0, 1.25];
+    const dims = (pass.dims || [2.5, 0.3, 2.5]).map(v => (+v || 0).toFixed(3));
+    // the ring reference: its position is where the ring shows and its local +Y
+    // is the crossing (fly-through) direction. Defaults to the trigger centre,
+    // no rotation — or the builder's explicit checkpoint-ref pos + yaw/pitch/roll.
+    const refDef = pass.ref || { pos, rot: [0, 0, 0] };
+    const p = mk('Entity', { name: name + '_pass' });
+    const wf = mk('WorldFromEntityComponent', {}); writeVec(wf, pos); p.appendChild(wf);
+    p.appendChild(mk('Box', { x: dims[0], y: dims[1], z: dims[2] }));
+    p.appendChild(mk('StaticContact', { contactMaterial: '-1' }));
+    const ref = mk('Entity', { name: 'CheckpointReference' });
+    const rwf = mk('WorldFromEntityComponent', {});
+    writeVec(rwf, refDef.pos || pos); writeRotation(rwf, quatFromRot(refDef.rot));
+    ref.appendChild(rwf);
+    p.append(ref, mk('Checkpoint', {}));
+    ent.appendChild(p);
+  }
+}
+
 // build the placement <Transform><Entity name=…>…</Entity></Transform>
 function buildPlacement(def, name, mx, my, mz, ops) {
   const doc = editState.doc;
@@ -1407,6 +2038,8 @@ function buildPlacement(def, name, mx, my, mz, ops) {
   } else if (def.gateKind) {
     ensureGateMaterials(def.gateKind, ops);
     buildCustomGate(doc, ent, name, def.gateKind);
+  } else if (def.parts) {
+    buildCustomComponent(doc, ent, name, def, ops);
   }
   const list = editState.doc.getElementsByTagName('CheckpointList')[0];
   const parent = insertParent();
@@ -1466,15 +2099,55 @@ function subtreeNames(trEl) {
 }
 
 // ---- place / delete / duplicate -------------------------------------------
-const placeUi = { def: null, marker: null };
+const placeUi = { def: null, marker: null, token: 0 };
+// drop the current placement ghost. Only the CLONED ghost materials are
+// disposed — geometries are shared (unitBox/unitCyl or cached GLB templates),
+// so disposing them would corrupt the main scene.
+function disposePlaceMarker() {
+  if (!placeUi.marker) return;
+  scene.remove(placeUi.marker);
+  placeUi.marker.userData._ghostMats?.forEach(m => m.dispose?.());
+  placeUi.marker = null;
+}
+// a translucent 3-D ghost of the object about to be placed, via the real
+// placement+render path so it matches the click exactly
+async function buildPlaceGhost(def) {
+  const xml = previewXml(def);
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  const data = parseMrsim(xml, 'ghost.xml');
+  const names = new Set();
+  data.elements.forEach(el => (el.models || []).forEach(m => names.add(m.model)));
+  await preloadModels(names);
+  const g = buildPreviewGroup(data, doc);
+  const ghostMats = [];
+  g.traverse(o => {
+    if (!o.isMesh) return;
+    o.castShadow = o.receiveShadow = false;
+    const clone = m => { const c = m.clone(); c.transparent = true; c.opacity = 0.55; c.depthWrite = false; ghostMats.push(c); return c; };
+    o.material = Array.isArray(o.material) ? o.material.map(clone) : clone(o.material);
+  });
+  g.userData._ghostMats = ghostMats;
+  return g;
+}
 function armPlace(def) {
   placeUi.def = def;
+  const token = ++placeUi.token;        // guards against rapid re-arm / async races
   [...document.querySelectorAll('#palette button')].forEach(b =>
     b.classList.toggle('arm', b.dataset.pid === (def && def.id)));
-  if (!def && placeUi.marker) placeUi.marker.visible = false;
+  disposePlaceMarker();
   document.getElementById('edHint').innerHTML = def
     ? `placing <b>${def.label}</b> — click the ground · shift-click = keep placing · Esc cancels`
     : 'click an object or checkpoint ring to select · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo';
+  if (!def) return;
+  buildPlaceGhost(def).then(g => {
+    if (placeUi.token !== token || placeUi.def !== def) {   // armed something else meanwhile
+      g.userData._ghostMats?.forEach(m => m.dispose?.());
+      return;
+    }
+    g.visible = false;                  // revealed on the first pointermove
+    scene.add(g);
+    placeUi.marker = g;
+  }).catch(e => console.warn('place ghost failed', e));
 }
 
 function groundHit(e) {
@@ -1503,27 +2176,58 @@ function placeAt(def, p3) {
 }
 
 function deleteSelected() {
-  const rec = editState?.index.get(editUi.selectedName);
-  if (!rec?.trEl) return;
+  const names = editUi.selection.filter(n => editState?.index.get(n)?.trEl);
+  if (!names.length) return;
   const ops = [];
-  const gone = subtreeNames(rec.trEl);
-  gone.add(editUi.selectedName);
-  const names = lapNames().filter(n => !gone.has(n) && !gone.has(n.split('.')[0]));
-  if (names.length !== lapNames().length) writeLap(names, lapIsCircuit(), ops);
-  ops.push({ type: 'remove', node: rec.trEl, parent: rec.trEl.parentNode, next: rec.trEl.nextSibling });
-  rec.trEl.parentNode.removeChild(rec.trEl);
+  // every listable name that disappears with the deleted subtrees
+  const gone = new Set();
+  for (const n of names) {
+    subtreeNames(editState.index.get(n).trEl).forEach(x => gone.add(x));
+    gone.add(n);
+  }
+  const lap = lapNames();
+  const kept = lap.filter(n => !gone.has(n) && !gone.has(n.split('.')[0]));
+  if (kept.length !== lap.length) writeLap(kept, lapIsCircuit(), ops);
+  for (const n of names) {
+    const tr = editState.index.get(n).trEl;
+    ops.push({ type: 'remove', node: tr, parent: tr.parentNode, next: tr.nextSibling });
+    tr.parentNode.removeChild(tr);
+  }
   pushUndoOps(ops);
   editState.dirty = true;
-  editUi.selectedName = null; tc.detach();
-  document.getElementById('edTitle').textContent = 'nothing selected';
-  refreshColorRow();
+  clearSelection();
   rebuildFromDoc();
 }
 
+// select a set of objects programmatically (post-duplicate re-select, headless)
+function setSelectionSet(names, primary) {
+  editUi.selection = names.filter(n => elemIndexByName(n) >= 0);
+  if (!editUi.selection.length) { clearSelection(); return; }
+  setPrimary(editUi.selection.includes(primary) ? primary : editUi.selection[editUi.selection.length - 1], true);
+  refreshSelectionHighlight();
+}
+
 function duplicateSelected() {
-  const rec = editState?.index.get(editUi.selectedName);
-  if (!rec?.trEl) return;
+  const names = editUi.selection.filter(n => editState?.index.get(n)?.trEl);
+  if (!names.length) return;
   const ops = [];
+  const newNames = [];
+  let newPrimary = null;
+  for (const n of names) {
+    const nn = duplicateOne(n, ops);
+    if (nn) { newNames.push(nn); if (n === editUi.selectedName) newPrimary = nn; }
+  }
+  if (!ops.length) return;
+  pushUndoOps(ops);
+  editState.dirty = true;
+  rebuildFromDoc().then(() => { if (newNames.length) setSelectionSet(newNames, newPrimary); });
+}
+
+// clone one element (inserted into the DOM so later clones stay name-unique) and
+// return the copy's leaf name; appends its undo ops to `ops`.
+function duplicateOne(name, ops) {
+  const rec = editState?.index.get(name);
+  if (!rec?.trEl) return null;
   const clone = rec.trEl.cloneNode(true);
   // rename every named entity in the clone to keep names unique
   const renames = new Map();
@@ -1565,10 +2269,7 @@ function duplicateSelected() {
   const added = [];
   for (const n of lap) if (renames.has(n)) added.push(renames.get(n));
   if (added.length) writeLap([...lap, ...added], lapIsCircuit(), ops);
-  pushUndoOps(ops);
-  editState.dirty = true;
-  const newName = renames.get(editUi.selectedName) || null;
-  rebuildFromDoc().then(() => newName && selectElementByName(newName));
+  return renames.get(name) || null;
 }
 
 // ---- lap panel -------------------------------------------------------------
@@ -1625,22 +2326,759 @@ document.getElementById('edLapAdd').onclick = () => {
 };
 document.getElementById('edDel').onclick = deleteSelected;
 document.getElementById('edDup').onclick = duplicateSelected;
+document.getElementById('edToBuilder').onclick = copySelectionToBuilder;
+document.getElementById('edSetStart').onclick = () => setAsStart();
 document.getElementById('edColThis').onclick = () => applyColor('this');
 document.getElementById('edColType').onclick = () => applyColor('type');
 document.getElementById('edColAll').onclick = () => applyColor('all');
 
-// palette buttons
-{
+// TEMP: hide built-ins whose .model isn't in the published models.json, so they
+// don't show up as an empty "no mesh" preview. Champs25 gate/pole, the DiveGate
+// deco frame, and the championship launch stand live only in the local overlay.
+// Restore them by emptying this set once the models ship in models.json.
+const HIDDEN_NO_MODEL = new Set(['champs', 'divecl', 'poleC25', 'standC']);
+
+// palette buttons — built-ins, then a "custom" section of user/repo components,
+// then the "build object" entry point. Re-rendered whenever components change.
+function renderPalette() {
   const pal = document.getElementById('palette');
-  PALETTE.forEach(def => {
+  if (!pal) return;
+  pal.innerHTML = '';
+  const mkBtn = def => {
     const b = document.createElement('button');
     b.textContent = (def.cp ? '◉ ' : '▫ ') + def.label;
     b.title = def.cp ? 'joins the lap when placed' : 'scenery only';
     b.dataset.pid = def.id;
     b.onclick = () => armPlace(placeUi.def === def ? null : def);
-    pal.appendChild(b);
+    b.addEventListener('mouseenter', () => {
+      clearTimeout(previewHover);
+      previewHover = setTimeout(() => showPreview(def, b), 80);
+    });
+    b.addEventListener('mouseleave', () => { clearTimeout(previewHover); hidePreview(); });
+    return b;
+  };
+  PALETTE.filter(def => !HIDDEN_NO_MODEL.has(def.id)).forEach(def => pal.appendChild(mkBtn(def)));
+  const custom = customDefs();
+  if (custom.length) {
+    const div = document.createElement('div');
+    div.className = 'palDivide'; div.textContent = 'custom';
+    pal.appendChild(div);
+    custom.forEach(def => {
+      const b = mkBtn(def);
+      b.classList.add('custom');
+      b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
+        (def.shared ? ' · repo-shared' : ' · yours') + ' · right-click to edit in builder';
+      b.oncontextmenu = e => { e.preventDefault(); openBuilder(def.id); };
+      pal.appendChild(b);
+    });
+  }
+  const build = document.createElement('button');
+  build.className = 'palBuild'; build.textContent = '＋ build / manage objects…';
+  build.dataset.pid = '__build';
+  build.title = 'design your own track object from boxes & cylinders';
+  build.onclick = () => openBuilder(null);
+  pal.appendChild(build);
+}
+loadLocalComponents();
+renderPalette();
+loadSharedComponents().then(renderPalette);
+
+// ---------------------------------------------------------------------------
+// PALETTE HOVER PREVIEW — a live 3-D thumbnail of the object under the cursor.
+// Built by the SAME parse+render path a real placement uses: buildPlacement
+// drops just this object into a throwaway <Simulation>, parseMrsim reads it,
+// its models are preloaded, and its meshes go into a small spinning offscreen
+// scene — so the thumbnail is exactly what a click would place. Lazily created
+// on first hover (no extra GL context in headless runs) and cached per def.id.
+// ---------------------------------------------------------------------------
+const PV = { el: null, cap: null, renderer: null, scene: null, camera: null,
+  group: null, cache: new Map(), pending: null, active: false };
+
+function initPreview() {
+  if (PV.renderer) return;
+  const div = document.createElement('div'); div.id = 'palPreview';
+  const cap = document.createElement('div'); cap.className = 'cap';
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  r.setPixelRatio(1); r.setSize(300, 230);
+  div.append(r.domElement, cap); document.body.appendChild(div);
+  const s = new THREE.Scene();
+  s.add(new THREE.HemisphereLight('#c9d6ff', '#20242c', 1.15));
+  const sun = new THREE.DirectionalLight('#fff', 1.6); sun.position.set(4, 8, 6); s.add(sun);
+  Object.assign(PV, { el: div, cap, renderer: r, scene: s,
+    camera: new THREE.PerspectiveCamera(40, 300 / 230, 0.05, 500) });
+  previewTick = () => {                     // spun + drawn from the main rAF loop
+    if (!PV.active || !PV.group) return;
+    PV.group.rotation.y += 0.012;
+    PV.renderer.render(PV.scene, PV.camera);
+  };
+}
+
+// a throwaway <Simulation> holding just this object, via the real placement
+// code (buildPlacement mutates editState.doc, so swap in a scratch doc)
+function previewXml(def) {
+  const saved = editState;
+  editState = { doc: new DOMParser().parseFromString('<Simulation></Simulation>', 'text/xml'),
+    fileName: 'preview.xml', index: new Map(), dirty: false, undo: [] };
+  try { buildPlacement(def, 'pv_' + def.id, 0, 0, 0, []);
+    return new XMLSerializer().serializeToString(editState.doc); }
+  finally { editState = saved; }               // sync only — restored before any await
+}
+
+// exact PBR colour for a doc-local <Material> (mirrors build()'s docMat); the
+// custom gates/components define colours inline, GLB models carry their own
+function previewDocMat(doc, name, cache) {
+  if (!name) return null;
+  if (cache.has(name)) return cache.get(name);
+  const def = [...doc.getElementsByTagName('Material')].find(m => m.getAttribute('name') === name);
+  const bc = def && def.getElementsByTagName('baseColor')[0];
+  let mat = null;
+  if (bc) {
+    const p = def.getElementsByTagName('PBR')[0];
+    const n = (el, a, d) => { const v = el?.getAttribute(a); return v == null || v === '' ? d : parseFloat(v); };
+    mat = pbr(n(bc, 'x', .5), n(bc, 'y', .5), n(bc, 'z', .5),
+      n(p?.getElementsByTagName('roughness')[0], 'value', .5),
+      n(p?.getElementsByTagName('metallic')[0], 'value', 0));
+  }
+  cache.set(name, mat); return mat;
+}
+
+// meshes for a parsed preview doc — a trimmed build(): models + prims + sensor
+// boxes, no checkpoints/instancing (only a handful of meshes per object)
+function buildPreviewGroup(data, doc) {
+  const g = new THREE.Group();
+  const V = new THREE.Vector3(), matCache = new Map();
+  data.elements.forEach((el, ei) => {
+    const meshSrcs = new Set((el.models || []).filter(m => templates.has(m.model)).map(m => m.src));
+    el.prims.forEach(p => {
+      if (meshSrcs.has(p.src)) return;         // collision shadow of a rendered mesh
+      let scale;
+      if (p.shape === 'cyl') { const r = p.hint === 'pvc' ? Math.max(p.dims[0], 0.04) : p.dims[0]; scale = [r, r, p.dims[1]]; }
+      else scale = p.dims.map(d => Math.max(d, 0.02));
+      const mesh = new THREE.Mesh(p.shape === 'cyl' ? unitCyl : unitBox,
+        previewDocMat(doc, p.material, matCache) || matFor(p.hint));
+      mesh.matrixAutoUpdate = false;
+      mesh.matrix.copy(p.matrix).scale(V.set(scale[0], scale[1], scale[2]));
+      g.add(mesh);
+    });
+    el.models.forEach(md => {
+      const inst = modelInstance(md.model, ei, el.isStart);
+      if (inst) { inst.applyMatrix4(md.matrix); g.add(inst); }
+    });
+    (el.sensors || []).forEach(sn => {
+      const dims = sn.shape === 'cyl' ? [sn.dims[0], sn.dims[0], sn.dims[1]] : sn.dims.map(d => Math.max(d, 0.05));
+      const mesh = new THREE.Mesh(sn.shape === 'cyl' ? unitCyl : unitBox, sensorMat);
+      mesh.matrixAutoUpdate = false;
+      mesh.matrix.copy(sn.matrix).scale(V.set(dims[0], dims[1], dims[2]));
+      g.add(mesh);
+    });
+  });
+  return g;
+}
+
+// build a centred, spin-ready pivot (content re-centred inside it) for a def
+async function buildPreviewEntry(def) {
+  const xml = previewXml(def);
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  const data = parseMrsim(xml, 'preview.xml');
+  const names = new Set();
+  data.elements.forEach(el => (el.models || []).forEach(m => names.add(m.model)));
+  await preloadModels(names);
+  const content = buildPreviewGroup(data, doc);
+  const box = new THREE.Box3().setFromObject(content);
+  if (box.isEmpty()) return { empty: true };
+  content.position.sub(box.getCenter(new THREE.Vector3()));   // centre in the pivot
+  const size = box.getSize(new THREE.Vector3());
+  const pivot = new THREE.Group(); pivot.add(content);
+  // bounding-SPHERE radius (half the diagonal) so the object never clips the
+  // frame at any spin angle — a max-dimension radius under-frames the corners
+  return { group: pivot, radius: Math.max(size.length() * 0.5, 0.5) };
+}
+
+async function showPreview(def, btn) {
+  initPreview();
+  PV.pending = def.id;
+  let entry = PV.cache.get(def.id);
+  if (!entry) {
+    try { entry = await buildPreviewEntry(def); }
+    catch (e) { console.warn('preview build failed:', def.id, e); entry = { empty: true }; }
+    PV.cache.set(def.id, entry);
+  }
+  if (PV.pending !== def.id) return;             // cursor moved on while we built
+  if (PV.group) PV.scene.remove(PV.group);
+  PV.group = entry.group || null;
+  if (PV.group) {
+    PV.group.rotation.y = 0.7; PV.scene.add(PV.group);
+    const dist = (entry.radius / Math.sin(20 * DEG)) * 1.08;
+    PV.camera.position.copy(new THREE.Vector3(0.55, 0.5, 1).normalize().multiplyScalar(dist));
+    PV.camera.lookAt(0, 0, 0);
+  }
+  PV.cap.textContent = def.label;
+  PV.el.classList.toggle('empty', !PV.group);
+  positionPreview(btn);
+  PV.el.classList.add('show');
+  PV.active = true;
+}
+
+// anchor to the right of the edit panel, aligned to the hovered button; flip to
+// the button's left if there's no room, and clamp inside the viewport
+function positionPreview(btn) {
+  const ep = document.getElementById('editPanel').getBoundingClientRect();
+  const br = btn.getBoundingClientRect();
+  const w = 312, h = 270;
+  let left = ep.right + 8;
+  if (left + w > innerWidth - 8) left = br.left - w - 8;
+  left = Math.max(8, left);
+  const top = Math.max(52, Math.min(br.top - 6, innerHeight - h - 8));
+  PV.el.style.left = left + 'px';
+  PV.el.style.top = top + 'px';
+}
+
+function hidePreview() { PV.pending = null; PV.active = false; PV.el?.classList.remove('show'); }
+
+// headless hook: __preview.show('gate7') renders a def's thumbnail, .cached() lists built ids
+window.__preview = {
+  show: id => { const def = [...PALETTE, ...customDefs()].find(p => p.id === id);
+    return def ? showPreview(def, document.querySelector(`#palette button[data-pid="${id}"]`) || document.body) : 'unknown id'; },
+  hide: hidePreview, cached: () => [...PV.cache.keys()],
+  stat: () => { let meshes = 0; PV.group?.traverse(o => { if (o.isMesh) meshes++; });
+    return { id: PV.pending, active: PV.active, empty: !!PV.el?.classList.contains('empty'), meshes,
+      left: PV.el?.style.left, top: PV.el?.style.top }; },
+  // worst-case framing check: max |NDC| of the shown object's bbox corners over a
+  // full spin. ≤1 on both axes = nothing clips the frame at any rotation angle.
+  fit: (steps = 24) => {
+    if (!PV.group) return null;
+    PV.camera.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(PV.group.children[0]);   // content, unrotated
+    const corners = [];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y])
+      for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z));
+    let mx = 0, my = 0;
+    for (let i = 0; i < steps; i++) {
+      const rot = new THREE.Matrix4().makeRotationY((i / steps) * Math.PI * 2);
+      for (const c of corners) {
+        const p = c.clone().applyMatrix4(rot).project(PV.camera);
+        mx = Math.max(mx, Math.abs(p.x)); my = Math.max(my, Math.abs(p.y));
+      }
+    }
+    return { maxNdcX: +mx.toFixed(3), maxNdcY: +my.toFixed(3), fits: mx <= 1 && my <= 1 };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// OBJECT BUILDER — compose a custom object from box/cylinder parts (+ optional
+// checkpoint), save it into the palette, and export it as a shareable
+// components.json for the repo. The live preview reuses the exact placement
+// path (previewXml → buildPreviewGroup), so what you see is what a click places.
+// ---------------------------------------------------------------------------
+let builderState = null;   // { editingId, def:{ label, cp, parts, pass } }
+let builderOpen = false;
+
+// a pass's ring reference, defaulting to the trigger centre with no rotation
+const defaultRef = pass => ({ pos: (pass?.pos || [0, 0, 1.25]).slice(0, 3), rot: [0, 0, 0] });
+const withRef = pass => ({ ...pass, ref: pass.ref
+  ? { pos: (pass.ref.pos || pass.pos || [0, 0, 1.25]).slice(0, 3), rot: (pass.ref.rot || [0, 0, 0]).slice(0, 3) }
+  : defaultRef(pass) });
+const blankComponent = () => ({ label: '', cp: null, parts: [],
+  pass: { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5], ref: { pos: [0, 0, 1.25], rot: [0, 0, 0] } } });
+const cloneForEdit = c => {
+  const d = JSON.parse(JSON.stringify(c)); delete d.shared; delete d.id;
+  d.cp = d.cp === 'pass' ? 'pass' : null;
+  d.parts = (d.parts || []).map(p => ({ shape: p.shape === 'cyl' ? 'cyl' : 'box',
+    pos: (p.pos || [0, 0, 0]).slice(0, 3), rot: (p.rot || [0, 0, 0]).slice(0, 3),
+    dims: (p.dims || []).slice(0, 3), color: p.color || '#cccccc' }));
+  d.pass = withRef(d.pass || { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5] });
+  return d;
+};
+const r3 = v => Math.round((+v || 0) * 1000) / 1000;
+// strip runtime fields, round numbers — the canonical stored/exported shape
+function cleanComponent(def, id) {
+  const parts = (def.parts || []).map(p => ({
+    shape: p.shape === 'cyl' ? 'cyl' : 'box',
+    pos: (p.pos || [0, 0, 0]).slice(0, 3).map(r3),
+    rot: (p.rot || [0, 0, 0]).slice(0, 3).map(r3),
+    dims: (p.shape === 'cyl' ? (p.dims || []).slice(0, 2) : (p.dims || []).slice(0, 3)).map(r3),
+    color: /^#[0-9a-fA-F]{6}$/.test(p.color || '') ? p.color.toLowerCase() : '#cccccc',
+  }));
+  const out = { id, label: (def.label || 'object').slice(0, 40), cp: def.cp === 'pass' ? 'pass' : null, parts };
+  if (out.cp) {
+    const pass = withRef(def.pass || {});
+    out.pass = { pos: (pass.pos || [0, 0, 1.25]).slice(0, 3).map(r3),
+      dims: (pass.dims || [2.5, 0.3, 2.5]).slice(0, 3).map(r3),
+      ref: { pos: pass.ref.pos.slice(0, 3).map(r3), rot: pass.ref.rot.slice(0, 3).map(r3) } };
+  }
+  return out;
+}
+function uniqueComponentId(label) {
+  const slug = (label || 'object').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'object';
+  const taken = new Set([...PALETTE, ...CUSTOM_LOCAL, ...CUSTOM_SHARED].map(c => c.id));
+  let id = 'custom_' + slug, n = 2;
+  while (taken.has(id)) id = `custom_${slug}-${n++}`;
+  return id;
+}
+function upsertComponent(stored) {
+  const i = CUSTOM_LOCAL.findIndex(c => c.id === stored.id);
+  if (i >= 0) CUSTOM_LOCAL[i] = stored; else CUSTOM_LOCAL.push(stored);
+  saveLocalComponents();
+  PV.cache?.delete(stored.id);   // hover-preview thumbnail rebuilds next hover
+}
+
+// ---- builder preview (own renderer/scene/orbit, separate from the hover one) ----
+const BP = { renderer: null, scene: null, camera: null, controls: null, group: null, raf: null };
+function initBuilderPreview() {
+  if (BP.renderer) return;
+  const host = document.getElementById('bPrev');
+  const r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(1);
+  host.appendChild(r.domElement);
+  const s = new THREE.Scene(); s.background = new THREE.Color('#0d0f14');
+  s.add(new THREE.HemisphereLight('#c9d6ff', '#20242c', 1.15));
+  const sun = new THREE.DirectionalLight('#fff', 1.5); sun.position.set(4, 8, 6); s.add(sun);
+  s.add(new THREE.GridHelper(20, 20, 0x36415a, 0x1a1e28));
+  const cam = new THREE.PerspectiveCamera(45, 1, 0.05, 500); cam.position.set(4, 3, 5);
+  const ctrl = new OrbitControls(cam, r.domElement); ctrl.enableDamping = true; ctrl.target.set(0, 1, 0);
+  Object.assign(BP, { renderer: r, scene: s, camera: cam, controls: ctrl });
+}
+function sizeBuilderPreview() {
+  if (!BP.renderer) return;
+  const host = document.getElementById('bPrev');
+  const w = host.clientWidth, h = host.clientHeight;
+  if (!w || !h) return;
+  BP.renderer.setSize(w, h, false);
+  BP.camera.aspect = w / h; BP.camera.updateProjectionMatrix();
+}
+function builderLoop() {
+  if (!builderOpen) { BP.raf = null; return; }
+  BP.raf = requestAnimationFrame(builderLoop);
+  BP.controls?.update();
+  BP.renderer?.render(BP.scene, BP.camera);
+}
+// the parts as meshes, via the real placement+render path (matches a click),
+// plus a blue checkpoint ring + crossing arrow at the ref (so it can be aimed)
+function builderPreviewGroup() {
+  const def = { ...builderState.def, id: builderState.editingId || '_build' };
+  let group;
+  if (!def.parts.length) group = new THREE.Group();
+  else {
+    const xml = previewXml(def);
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    const data = parseMrsim(xml, 'builder.xml');
+    group = buildPreviewGroup(data, doc);
+  }
+  if (def.cp === 'pass') addCheckpointVis(group, def);
+  return group;
+}
+// mrsim (z up) point -> three (y up), matching Z_UP_TO_Y_UP: (x,y,z) -> (x,z,-y)
+const mrsimToThree = v => new THREE.Vector3(v?.[0] || 0, v?.[2] || 0, -(v?.[1] || 0));
+function addCheckpointVis(group, def) {
+  const pass = withRef(def.pass || {});
+  const dm = new THREE.Vector3(0, 1, 0).applyQuaternion(quatFromRot(pass.ref.rot));  // local +Y = crossing dir
+  const pos3 = mrsimToThree(pass.ref.pos);
+  const dir3 = mrsimToThree([dm.x, dm.y, dm.z]).normalize();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.05, 8, 32),
+    new THREE.MeshBasicMaterial({ color: '#4a83ff' }));
+  ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir3);
+  ring.position.copy(pos3);
+  group.add(ring, new THREE.ArrowHelper(dir3, pos3, 1.8, '#4a83ff', 0.5, 0.3));
+}
+function disposeBuilderGroup(g) {
+  const shared = new Set([sensorMat, ...Object.values(MATS), ...Object.values(MRMAT)]);
+  g.traverse(o => {
+    if (o.type === 'ArrowHelper') { o.dispose?.(); return; }
+    if (!o.isMesh) return;
+    if (o.geometry && o.geometry !== unitBox && o.geometry !== unitCyl) o.geometry.dispose?.();
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m && !shared.has(m)) m.dispose?.(); });
   });
 }
+function updateBuilderPreview() {
+  if (!BP.renderer || !builderState) return;
+  if (BP.group) { BP.scene.remove(BP.group); disposeBuilderGroup(BP.group); BP.group = null; }
+  try { BP.group = builderPreviewGroup(); BP.scene.add(BP.group); }
+  catch (e) { console.warn('builder preview failed', e); }
+}
+function frameBuilderPreview() {
+  if (!BP.group) return;
+  const box = new THREE.Box3().setFromObject(BP.group);
+  if (box.isEmpty()) { BP.controls.target.set(0, 1, 0); BP.camera.position.set(4, 3, 5); BP.controls.update(); return; }
+  const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+  const radius = Math.max(size.x, size.y, size.z, 1) * 0.5;
+  const dist = (radius / Math.sin(22 * DEG)) * 1.4;
+  BP.controls.target.copy(c);
+  BP.camera.position.copy(c).add(new THREE.Vector3(0.7, 0.55, 1).normalize().multiplyScalar(dist));
+  BP.camera.updateProjectionMatrix(); BP.controls.update();
+}
+
+// ---- builder UI ----
+function bFlash(msg, err = false) {
+  const el = document.getElementById('bMsg'); if (!el) return;
+  el.textContent = msg || ''; el.style.color = err ? '#ff8a7a' : '#7ab648';
+  clearTimeout(bFlash._t);
+  if (msg) bFlash._t = setTimeout(() => { el.textContent = ''; }, 3000);
+}
+function renderBuilderList() {
+  const box = document.getElementById('bList'); if (!box) return;
+  box.innerHTML = '';
+  const nb = document.createElement('button'); nb.className = 'new'; nb.textContent = '＋ new object';
+  nb.onclick = () => openBuilder(null); box.appendChild(nb);
+  const mkItem = (c, shared) => {
+    const b = document.createElement('button');
+    b.textContent = c.label || c.id;
+    if (shared) { const s = document.createElement('span'); s.className = 'shared'; s.textContent = 'repo'; b.appendChild(s); }
+    if (builderState && builderState.editingId === c.id) b.classList.add('on');
+    b.onclick = () => openBuilder(c.id);
+    box.appendChild(b);
+  };
+  if (CUSTOM_LOCAL.length) {
+    const h = document.createElement('h3'); h.textContent = 'your objects'; box.appendChild(h);
+    CUSTOM_LOCAL.forEach(c => mkItem(c, false));
+  }
+  const shadowed = new Set(CUSTOM_LOCAL.map(c => c.id));
+  const shared = CUSTOM_SHARED.filter(c => !shadowed.has(c.id));
+  if (shared.length) {
+    const h = document.createElement('h3'); h.textContent = 'repo-shared'; box.appendChild(h);
+    shared.forEach(c => mkItem(c, true));
+  }
+}
+function syncBuilderForm() {
+  const d = builderState.def;
+  document.getElementById('bName').value = d.label || '';
+  const isCp = d.cp === 'pass';
+  document.getElementById('bCp').checked = isCp;
+  document.getElementById('bPassRow').style.display = isCp ? 'flex' : 'none';
+  document.getElementById('bRefRow').style.display = isCp ? 'block' : 'none';
+  d.pass = withRef(d.pass || { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5] });
+  const p = d.pass;
+  document.getElementById('bPassW').value = p.dims[0]; document.getElementById('bPassD').value = p.dims[1];
+  document.getElementById('bPassH').value = p.dims[2]; document.getElementById('bPassZ').value = p.pos[2];
+  document.getElementById('bRefX').value = p.ref.pos[0]; document.getElementById('bRefY').value = p.ref.pos[1];
+  document.getElementById('bRefZ').value = p.ref.pos[2];
+  document.getElementById('bRefYaw').value = p.ref.rot[0]; document.getElementById('bRefPitch').value = p.ref.rot[1];
+  document.getElementById('bRefRoll').value = p.ref.rot[2];
+  const del = document.getElementById('bDelete');
+  del.textContent = builderState.editingId ? '✕ delete' : '⟲ reset';
+}
+function renderParts() {
+  const host = document.getElementById('bParts');
+  const parts = builderState.def.parts;
+  if (!parts.length) {
+    host.innerHTML = '<div style="color:#8a93a6;padding:4px 0;font-size:11.5px">no parts yet — add a box or cylinder</div>';
+    return;
+  }
+  const fv = v => (v === undefined || v === null ? 0 : v);
+  host.innerHTML = parts.map((p, i) => {
+    const cyl = p.shape === 'cyl', d = p.dims, pos = p.pos, rot = p.rot;
+    const size = cyl
+      ? `<span class="gl">size</span>
+         <input data-f="d0" type="number" step="0.05" min="0.01" value="${fv(d[0])}" title="radius (m)">
+         <input data-f="d1" type="number" step="0.1" min="0.05" value="${fv(d[1])}" title="height (m)">
+         <input type="number" value="" disabled style="opacity:.25" title="n/a">`
+      : `<span class="gl">size</span>
+         <input data-f="d0" type="number" step="0.1" min="0.01" value="${fv(d[0])}" title="x width (m)">
+         <input data-f="d1" type="number" step="0.1" min="0.01" value="${fv(d[1])}" title="y depth (m)">
+         <input data-f="d2" type="number" step="0.1" min="0.01" value="${fv(d[2])}" title="z height (m)">`;
+    return `<div class="part" data-i="${i}">
+      <div class="ph">
+        <span class="tag">${cyl ? 'cylinder' : 'box'}</span>
+        <input class="col" type="color" value="${p.color || '#cccccc'}" title="colour">
+        <span class="nm">${cyl ? 'radius · height' : 'x · y · z'}</span>
+        <button class="rm" title="remove part">✕</button>
+      </div>
+      <div class="grid3">
+        ${size}
+        <span class="gl">pos</span>
+        <input data-f="p0" type="number" step="0.1" value="${fv(pos[0])}" title="x">
+        <input data-f="p1" type="number" step="0.1" value="${fv(pos[1])}" title="y">
+        <input data-f="p2" type="number" step="0.1" value="${fv(pos[2])}" title="z (up)">
+        <span class="gl">rot°</span>
+        <input data-f="r0" type="number" step="5" value="${fv(rot[0])}" title="yaw">
+        <input data-f="r1" type="number" step="5" value="${fv(rot[1])}" title="pitch">
+        <input data-f="r2" type="number" step="5" value="${fv(rot[2])}" title="roll">
+      </div>
+    </div>`;
+  }).join('');
+}
+function addPart(shape) {
+  builderState.def.parts.push(shape === 'cyl'
+    ? { shape: 'cyl', pos: [0, 0, 1.2], rot: [0, 0, 0], dims: [0.08, 2.4], color: '#f2f2ee' }
+    : { shape: 'box', pos: [0, 0, 1], rot: [0, 0, 0], dims: [1, 0.1, 1], color: '#4a83ff' });
+  renderParts(); updateBuilderPreview();
+}
+
+function openBuilder(id) {
+  const src = id ? customById(id) : null;
+  builderState = { editingId: src ? src.id : null, def: src ? cloneForEdit(src) : blankComponent() };
+  document.getElementById('builder').classList.add('show');
+  builderOpen = true;
+  initBuilderPreview();
+  renderBuilderList(); syncBuilderForm(); renderParts();
+  bFlash('');
+  requestAnimationFrame(() => {
+    sizeBuilderPreview(); updateBuilderPreview(); frameBuilderPreview();
+    if (!BP.raf) builderLoop();
+  });
+}
+function closeBuilder() {
+  document.getElementById('builder').classList.remove('show');
+  builderOpen = false;
+  if (BP.raf) { cancelAnimationFrame(BP.raf); BP.raf = null; }
+}
+function saveComponent() {
+  const label = document.getElementById('bName').value.trim();
+  if (!label) return bFlash('give the object a name first', true);
+  if (!builderState.def.parts.length) return bFlash('add at least one part first', true);
+  builderState.def.label = label;
+  const id = builderState.editingId || uniqueComponentId(label);
+  upsertComponent(cleanComponent(builderState.def, id));
+  builderState.editingId = id;
+  renderPalette(); renderBuilderList(); syncBuilderForm();
+  bFlash('saved — “' + label + '” is now in the palette ✓');
+}
+function downloadJson(filename, obj) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+}
+function importComponents(text) {
+  let parsed; try { parsed = JSON.parse(text); } catch { return bFlash('not valid JSON', true); }
+  const arr = (Array.isArray(parsed) ? parsed : [parsed]).filter(isComponent);
+  if (!arr.length) return bFlash('no components found in that file', true);
+  let last = null;
+  arr.forEach(c => {
+    const id = (typeof c.id === 'string' && /^custom_/.test(c.id)) ? c.id : uniqueComponentId(c.label || 'object');
+    upsertComponent(cleanComponent(c, id)); last = id;
+  });
+  renderPalette();
+  if (arr.length === 1 && last) openBuilder(last);
+  else renderBuilderList();
+  bFlash(`imported ${arr.length} object${arr.length !== 1 ? 's' : ''} ✓`);
+}
+
+// ---------------------------------------------------------------------------
+// COPY A PLACED TRACK OBJECT INTO THE BUILDER
+// Turn the selected element's box/cylinder prims (+ any checkpoint trigger) into
+// a builder component, expressed in the object's OWN local frame (placement
+// translation/rotation/scale removed) so it stamps back down identically and can
+// be re-placed anywhere. Mesh-only library objects with no collision prims can't
+// be represented as boxes/cylinders and are rejected.
+// ---------------------------------------------------------------------------
+// exact sRGB hex a prim renders as: its inline <Material> baseColor (LINEAR) if
+// it names one, else the shape/tag hint fallback. Mirrors build()'s docMat.
+function primColorHex(p) {
+  if (p.material && editState?.doc) {
+    const def = [...editState.doc.getElementsByTagName('Material')]
+      .find(m => m.getAttribute('name') === p.material);
+    const bc = def && def.getElementsByTagName('baseColor')[0];
+    if (bc) {
+      const n = (a, d) => { const v = bc.getAttribute(a); return v == null || v === '' ? d : parseFloat(v); };
+      return '#' + new THREE.Color()
+        .setRGB(n('x', .5), n('y', .5), n('z', .5), THREE.LinearSRGBColorSpace).getHexString();
+    }
+  }
+  return '#' + matFor(p.hint).color.getHexString();
+}
+// three-space world matrix -> mrsim-space matrix, local to wrapper world `WmInv`
+function localMrsim(WmInv, worldThree) {
+  return WmInv.clone().multiply(Y_UP_TO_Z_UP).multiply(worldThree);
+}
+// a local mrsim matrix -> builder part {shape,pos,rot,dims}. Residual scale folds
+// into the dimensions (cyl: radius = x/y scale, height = z scale). rot uses the
+// same yaw/pitch/roll (ZXY) convention as the editor panel and quatFromRot.
+function partFromLocal(shape, dims, Lm) {
+  const e = Lm.elements;
+  const sx = Math.hypot(e[0], e[1], e[2]) || 1;
+  const sy = Math.hypot(e[4], e[5], e[6]) || 1;
+  const sz = Math.hypot(e[8], e[9], e[10]) || 1;
+  const r = eulerFromRot(e, sx, sy, sz);
+  const d = shape === 'cyl'
+    ? [(dims[0] || 0) * (sx + sy) / 2, (dims[1] || 0) * sz]
+    : [(dims[0] || 0) * sx, (dims[1] || 0) * sy, (dims[2] || 0) * sz];
+  return { shape, pos: [e[12], e[13], e[14]].map(r3), rot: [r.yaw, r.pitch, r.roll].map(r3), dims: d.map(r3) };
+}
+// wrapper world matrix (mrsim space) that defines an element's local origin: its
+// editable placement <Transform>, or — for library-include sub-objects with no
+// plain wrapper — a translation-only origin at the prims' footprint (x/y centre,
+// z floor) so the copy still lands sensibly at the local origin.
+function wrapperWorldMrsim(name, el) {
+  const rec = editState?.index.get(name);
+  if (rec?.trEl) return rec.A.clone().multiply(localMatrixDom(rec.trEl));
+  let cx = 0, cy = 0, n = 0, minZ = Infinity;
+  const p = new THREE.Vector3();
+  (el.prims || []).forEach(pr => {
+    p.setFromMatrixPosition(pr.matrix).applyMatrix4(Y_UP_TO_Z_UP);   // -> mrsim world
+    cx += p.x; cy += p.y; n++; minZ = Math.min(minZ, p.z);
+  });
+  return n ? new THREE.Matrix4().setPosition(cx / n, cy / n, isFinite(minZ) ? minZ : 0)
+           : new THREE.Matrix4();
+}
+// build a full builder component {label, cp, parts, pass} from a track element
+function elementToComponent(name) {
+  const ei = elemIndexByName(name);
+  if (ei < 0) return null;
+  const el = currentData.elements[ei];
+  const Wm = wrapperWorldMrsim(name, el);
+  const WmInv = Wm.clone().invert();
+  const parts = (el.prims || []).map(p => {
+    const part = partFromLocal(p.shape, p.dims, localMrsim(WmInv, p.matrix));
+    part.color = primColorHex(p);
+    return part;
+  });
+  if (!parts.length) return { empty: true, models: (el.models || []).length };
+  const def = blankComponent();
+  def.label = name;
+  def.parts = parts;
+  // carry the fly-through checkpoint (trigger box + aimed ring) when present
+  const sn = (el.sensors || [])[0];
+  if (sn) {
+    const sp = partFromLocal('box', sn.dims, localMrsim(WmInv, sn.matrix));
+    def.cp = 'pass';
+    def.pass = { pos: sp.pos, dims: sp.dims, ref: { pos: sp.pos.slice(), rot: [0, 0, 0] } };
+    // aim the ring with the authoritative lap crossing when this cp is in the lap.
+    // Work in the object's LOCAL mrsim frame so the direction becomes a clean
+    // yaw/pitch (roll about the crossing axis — invisible for the ring — stays 0).
+    const s = (currentData.seq || []).find(q => q.elemIndex === ei);
+    if (s) {
+      const Rinv = new THREE.Matrix4().extractRotation(WmInv);
+      const dirLocal = s.dir.clone()
+        .transformDirection(Y_UP_TO_Z_UP)   // three -> mrsim direction
+        .transformDirection(Rinv);          // world -> object-local
+      const m = new THREE.Matrix4().makeRotationFromQuaternion(
+        new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirLocal));
+      const r = eulerFromRot(m.elements, 1, 1, 1);
+      def.pass.ref = { pos: sp.pos.slice(), rot: [r.yaw, r.pitch, r.roll].map(r3) };
+    }
+  }
+  return def;
+}
+// transient status in the edit panel's hint line (overwritten on next select)
+function edFlash(msg, err = false) {
+  const h = document.getElementById('edHint'); if (!h) return;
+  h.innerHTML = `<span style="color:${err ? '#ff8a7a' : '#7ab648'}">${escapeHtml(msg)}</span>`;
+}
+function copySelectionToBuilder() {
+  const name = editUi.selectedName;
+  if (!name || elemIndexByName(name) < 0)
+    return edFlash('select a track object first, then copy it to the builder', true);
+  const def = elementToComponent(name);
+  if (!def || def.empty)
+    return edFlash(def && def.models
+      ? 'mesh-only object — no box/cylinder shapes to copy'
+      : 'nothing to copy from this object', true);
+  openBuilder(null);                       // a fresh, unsaved component…
+  builderState = { editingId: null, def }; // …seeded from the selection
+  renderBuilderList(); syncBuilderForm(); renderParts();   // preview framed by openBuilder's rAF
+  const ei = elemIndexByName(name);
+  const meshy = (currentData.elements[ei].models || []).length ? ' (collision shapes)' : '';
+  const cp = def.cp === 'pass' ? ' + checkpoint' : '';
+  bFlash(`copied ${def.parts.length} part${def.parts.length !== 1 ? 's' : ''}${cp}${meshy} from “${name}” — name it & save ✓`);
+}
+
+// ---- builder wiring (listeners attach once; guarded on builderState) ----
+document.getElementById('bAddBox').onclick = () => addPart('box');
+document.getElementById('bAddCyl').onclick = () => addPart('cyl');
+document.getElementById('bName').addEventListener('input', e => { if (builderState) builderState.def.label = e.target.value; });
+document.getElementById('bCp').addEventListener('change', e => {
+  if (!builderState) return;
+  builderState.def.cp = e.target.checked ? 'pass' : null;
+  builderState.def.pass = withRef(builderState.def.pass || { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5] });
+  document.getElementById('bPassRow').style.display = e.target.checked ? 'flex' : 'none';
+  document.getElementById('bRefRow').style.display = e.target.checked ? 'block' : 'none';
+  updateBuilderPreview();
+});
+for (const [id, apply] of [
+  ['bPassW', (p, v) => p.dims[0] = v], ['bPassD', (p, v) => p.dims[1] = v],
+  ['bPassH', (p, v) => p.dims[2] = v], ['bPassZ', (p, v) => p.pos[2] = v],
+  ['bRefX', (p, v) => p.ref.pos[0] = v], ['bRefY', (p, v) => p.ref.pos[1] = v],
+  ['bRefZ', (p, v) => p.ref.pos[2] = v], ['bRefYaw', (p, v) => p.ref.rot[0] = v],
+  ['bRefPitch', (p, v) => p.ref.rot[1] = v], ['bRefRoll', (p, v) => p.ref.rot[2] = v]]) {
+  document.getElementById(id).addEventListener('input', e => {
+    if (!builderState) return;
+    builderState.def.pass = withRef(builderState.def.pass || { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5] });
+    apply(builderState.def.pass, parseFloat(e.target.value) || 0);
+    updateBuilderPreview();
+  });
+}
+document.getElementById('bParts').addEventListener('input', e => {
+  if (!builderState) return;
+  const row = e.target.closest('.part'); if (!row) return;
+  const part = builderState.def.parts[+row.dataset.i]; if (!part) return;
+  if (e.target.classList.contains('col')) part.color = e.target.value;
+  else {
+    const f = e.target.dataset.f; if (!f) return;
+    const v = parseFloat(e.target.value); const val = isNaN(v) ? 0 : v;
+    (f[0] === 'd' ? part.dims : f[0] === 'p' ? part.pos : part.rot)[+f[1]] = val;
+  }
+  updateBuilderPreview();
+});
+document.getElementById('bParts').addEventListener('click', e => {
+  if (!builderState || !e.target.classList.contains('rm')) return;
+  const row = e.target.closest('.part'); if (!row) return;
+  builderState.def.parts.splice(+row.dataset.i, 1);
+  renderParts(); updateBuilderPreview();
+});
+document.getElementById('bSave').onclick = saveComponent;
+document.getElementById('bExportOne').onclick = () => {
+  if (!builderState) return;
+  const label = document.getElementById('bName').value.trim() || 'object';
+  if (!builderState.def.parts.length) return bFlash('nothing to export — add parts', true);
+  const id = builderState.editingId || uniqueComponentId(label);
+  downloadJson(id + '.component.json', cleanComponent({ ...builderState.def, label }, id));
+  bFlash('exported this object as JSON ✓');
+};
+document.getElementById('bExportAll').onclick = () => {
+  if (!CUSTOM_LOCAL.length) return bFlash('no saved objects yet — save one first', true);
+  downloadJson('components.json', CUSTOM_LOCAL.map(c => cleanComponent(c, c.id)));
+  bFlash(`exported ${CUSTOM_LOCAL.length} object(s) → drop components.json in the repo`);
+};
+document.getElementById('bImport').onclick = () => document.getElementById('bImportFile').click();
+document.getElementById('bImportFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (f) importComponents(await f.text());
+};
+document.getElementById('bDelete').onclick = () => {
+  if (!builderState) return;
+  const id = builderState.editingId;
+  if (!id) { openBuilder(null); return bFlash('cleared'); }
+  const i = CUSTOM_LOCAL.findIndex(c => c.id === id);
+  if (i >= 0) { CUSTOM_LOCAL.splice(i, 1); saveLocalComponents(); PV.cache?.delete(id); }
+  const stillShared = CUSTOM_SHARED.some(c => c.id === id);
+  renderPalette(); openBuilder(null);
+  bFlash(stillShared ? 'removed your copy — the repo-shared one remains' : 'deleted');
+};
+document.getElementById('bClose').onclick = closeBuilder;
+document.getElementById('builder').addEventListener('mousedown', e => {
+  if (e.target.id === 'builder') closeBuilder();   // click the dimmed backdrop
+});
+addEventListener('resize', () => { if (builderOpen) sizeBuilderPreview(); });
+
+// headless hooks for the object builder (mirrors __edit/__preview)
+window.__build = {
+  open: id => { openBuilder(id ?? null); return builderState?.editingId ?? null; },
+  close: () => { closeBuilder(); return true; },
+  isOpen: () => builderOpen,
+  list: () => customDefs().map(c => ({ id: c.id, label: c.label, cp: c.cp || null,
+    parts: (c.parts || []).length, shared: !!c.shared })),
+  get: id => customById(id),
+  addPart: shape => { if (builderState) { addPart(shape); return builderState.def.parts.length; } return 0; },
+  // convert a track element -> builder component (without opening the modal)
+  fromElement: name => elementToComponent(name),
+  // select an element and copy it into the builder (mirrors the panel button)
+  copyFromTrack: name => {
+    if (name != null) selectElementByName(name, true);
+    copySelectionToBuilder();
+    return builderState ? { editingId: builderState.editingId, def: builderState.def } : null;
+  },
+  // programmatic upsert of a full component {label, cp, parts, pass}; returns id
+  save: comp => {
+    if (!isComponent(comp)) return 'invalid component';
+    const id = (typeof comp.id === 'string' && /^custom_/.test(comp.id)) ? comp.id : uniqueComponentId(comp.label || 'object');
+    upsertComponent(cleanComponent(comp, id));
+    renderPalette(); if (builderOpen) renderBuilderList();
+    return id;
+  },
+  remove: id => { const i = CUSTOM_LOCAL.findIndex(c => c.id === id); if (i < 0) return false;
+    CUSTOM_LOCAL.splice(i, 1); saveLocalComponents(); PV.cache?.delete(id);
+    renderPalette(); if (builderOpen) renderBuilderList(); return true; },
+  exportAll: () => JSON.stringify(CUSTOM_LOCAL.map(c => cleanComponent(c, c.id)), null, 2),
+  clearAll: () => { CUSTOM_LOCAL = []; saveLocalComponents(); renderPalette(); return true; },
+};
 
 // ---- numeric panel ----
 const edIn = {
@@ -1712,19 +3150,7 @@ const pointer = new THREE.Vector2();
 let downAt = null;
 renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
 renderer.domElement.addEventListener('pointermove', e => {
-  if (!placeUi.def) return;
-  if (!placeUi.marker) {
-    const m = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.06, 8, 32),
-      new THREE.MeshBasicMaterial({ color: '#7ab648' }));
-    ring.rotation.x = Math.PI / 2;
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4),
-      new THREE.MeshBasicMaterial({ color: '#7ab648', transparent: true, opacity: 0.5 }));
-    post.position.y = 1.2;
-    m.add(ring, post);
-    scene.add(m);
-    placeUi.marker = m;
-  }
+  if (!placeUi.def || !placeUi.marker) return;   // ghost is built async by armPlace
   const p = groundHit(e);
   placeUi.marker.visible = !!p;
   if (p) placeUi.marker.position.copy(p);
@@ -1740,6 +3166,9 @@ renderer.domElement.addEventListener('pointerup', e => {
     }
     return;
   }
+  // Ctrl/⌘-click adds to (or removes from) the selection instead of replacing it
+  const additive = e.ctrlKey || e.metaKey;
+  const pick = name => additive ? toggleSelection(name) : selectElementByName(name);
   pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
   const targets = [trackGroup, sensorGroup];
@@ -1758,10 +3187,10 @@ renderer.domElement.addEventListener('pointerup', e => {
     }
     if (ei === undefined || ei === null || ei < 0) continue;
     if (isSensor) { sensorPick ??= ei; continue; }
-    selectElementByName(currentData.elements[ei].name);
+    pick(currentData.elements[ei].name);
     return;
   }
-  if (sensorPick !== null) selectElementByName(currentData.elements[sensorPick].name);
+  if (sensorPick !== null) pick(currentData.elements[sensorPick].name);
 });
 
 function setEditMode(on) {
@@ -1770,8 +3199,9 @@ function setEditMode(on) {
   document.getElementById('editPanel').classList.toggle('show', on);
   sensorGroup.visible = on;
   if (!on) tc.detach();
-  else if (editUi.selectedName) selectElementByName(editUi.selectedName);
-  if (on) refreshColorRow();
+  else if (editUi.selectedName) setPrimary(editUi.selectedName);
+  refreshSelectionHighlight();
+  if (on) { refreshColorRow(); refreshStartRow(); }
 }
 function setGizmoMode(mode) {
   tc.setMode(mode);
@@ -1784,7 +3214,13 @@ document.getElementById('edModeT').onclick = () => setGizmoMode('translate');
 document.getElementById('edModeR').onclick = () => setGizmoMode('rotate');
 document.getElementById('edModeS').onclick = () => setGizmoMode('scale');
 
+// Esc closes the object builder from anywhere (capture: fires even while a
+// builder input is focused, before the field-guarded editor shortcuts below)
 addEventListener('keydown', e => {
+  if (builderOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeBuilder(); }
+}, true);
+addEventListener('keydown', e => {
+  if (builderOpen) return;                 // modal owns the keyboard while open
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName)) return;
   if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undoEdit(); return; }
   if (!editUi.on) return;
@@ -1795,9 +3231,7 @@ addEventListener('keydown', e => {
   else if (e.key === 'd') duplicateSelected();
   else if (e.key === 'Escape') {
     if (placeUi.def) { armPlace(null); return; }
-    editUi.selectedName = null; tc.detach();
-    document.getElementById('edTitle').textContent = 'nothing selected';
-    refreshEditPanelNumbers(); renderLapPanel(); refreshColorRow(); }
+    clearSelection(); }
 });
 
 function exportXml() {
@@ -1815,8 +3249,11 @@ function exportXml() {
 window.__edit = {
   enable: v => setEditMode(v !== false),
   select: selectElementByName,
+  selectAdd: name => toggleSelection(name),   // Ctrl-click equivalent
+  selection: () => [...editUi.selection],
   mode: setGizmoMode,
-  state: () => ({ on: editUi.on, selected: editUi.selectedName, dirty: !!editState?.dirty,
+  state: () => ({ on: editUi.on, selected: editUi.selectedName,
+    selection: [...editUi.selection], dirty: !!editState?.dirty,
     undoDepth: editState?.undo.length || 0 }),
   setLocal: (name, vals) => {          // {x,y,z,yawDeg,s} — programmatic edit
     const rec = editState?.index.get(name);
@@ -1843,9 +3280,9 @@ window.__edit = {
   undo: undoEdit,
   _proxy: proxy, _commit: commitEdit,   // test hooks for the gizmo-drag path
   // editor feature hooks
-  palette: () => PALETTE.map(p => p.id),
+  palette: () => allPalette().map(p => p.id),
   place: (pid, mx, my, mz = 0) => {     // place at MRSIM coords, returns name
-    const def = PALETTE.find(p => p.id === pid);
+    const def = allPalette().find(p => p.id === pid);
     if (!def) return 'unknown palette id';
     // placeAt expects a three-space ground point: three = (mx, mz, -my)
     return placeAt(def, new THREE.Vector3(mx, mz, -my)).then(() => editUi.selectedName);
@@ -1856,6 +3293,11 @@ window.__edit = {
     if (hex) document.getElementById('edColor').value = hex;
     applyColor(scope);
     return rebuildFromDoc().then(() => 'ok');
+  },
+  setStart: name => {        // designate/undesignate the start/finish gate
+    if (name) selectElementByName(name, true);
+    return Promise.resolve(setAsStart(name)).then(() =>
+      (currentData.elements.find(e => e.isStart) || {}).name || null);
   },
   lap: () => ({ names: lapNames(), isCircuit: lapIsCircuit() }),
   lapAdd: name => { const ops = [];
@@ -1971,6 +3413,10 @@ document.getElementById('btnTop').onclick = e => {
   else camera.position.set(c.x + r * 0.5, c.y + r * 0.7, c.z + r * 0.9);  // back to an angled view
   controls.update();
 };
+document.getElementById('btnProj').onclick = () =>
+  setProjection(projection === 'ortho' ? 'perspective' : 'ortho');
+// restore last-used projection
+try { if (localStorage.getItem('mrsim.projection') === 'ortho') setProjection('ortho'); } catch {}
 document.getElementById('btnCp').onclick = e => {
   e.target.classList.toggle('on'); cpGroup.visible = e.target.classList.contains('on');
 };

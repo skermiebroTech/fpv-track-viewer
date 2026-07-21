@@ -8,9 +8,11 @@ Styled after the official AUFPV / Mission Foods Australian Drone Nationals track
 posters: green grid mat (1 m / 5 m lines), khaki racing line, white Mission gates,
 feather flags and a checkered start.
 
-Included tracks: **2024 AU NATS Quali** (6 gates, 6 flags, 1 elevated dive gate —
-validated against the official 2D layout poster) and
-**2022 Mission Foods Australian Drone Nationals**.
+Bundled tracks (dropdown, driven by `tracks/manifest.json`): **2024 AU NATS
+Quali** (6 gates, 6 flags, 1 elevated dive gate — validated against the
+official 2D layout poster), **2022 Mission Foods Australian Drone Nationals**,
+**Dutch Drone Madness 2021 Race 1**, **FAI World Cup Italy 2024**,
+**2025 MultiGP European Champs** and **DDR Race Series – Track 5**.
 
 ## Features
 
@@ -45,6 +47,10 @@ validated against the official 2D layout poster) and
   in-game) or VelociDrone → MRSIM `.xml`. The environment selector next to
   the button picks the target scene (Empty Scene Day/Night… for VD; Empty
   Grass World / Baylands Park / Hardesty BMX for MRSIM).
+- **🛠 Editor** — a full 3D MRSIM track editor (opens `mrsim-test.html`): place
+  any MRSIM object from a palette, edit the lap / checkpoint order, move-rotate-
+  scale with a gizmo, and import a VelociDrone `.trk`/`.json` or MRSIM `.xml` to
+  edit and re-export. See [Track editor](#track-editor).
 
 ## Human world-record line
 
@@ -109,8 +115,9 @@ python3 ghost_decode.py out/021_getFlight.txt --which faster --out line.json
 `{pilot, lap_time, frames:[{t, p:[x,y,z]}]}`. Drop it at
 `ghosts/<track-slug>-wr.json` (e.g. `ghosts/2024-au-nats-quali-wr.json`) and
 the viewer loads it automatically. `ghost_extract.py` instead pulls ghosts
-from the local `user11.db` after a Nemesis race. Bundled: **IQ0's 26.30 s
-WR** for the 2024 AU NATS Quali.
+from the local `user11.db` after a Nemesis race. Bundled WR lines: **IQ0's
+26.30 s** lap for the 2024 AU NATS Quali and **BMSThomas's 53.36 s** run for
+the 2022 Mission Foods Nationals (auto-loaded from `ghosts/<track-slug>-wr.json`).
 
 ## Quick start (local)
 
@@ -194,6 +201,73 @@ can decode the real meshes locally into `models/mrsim/` with
 `export_mrsim_models.py`; a gitignored `models/mrsim/models.local.json`
 overlay then makes the viewer prefer them on your own machine only. See
 [Assets & attribution](#assets--attribution).
+
+## Track editor
+
+The **🛠 Editor** button (top-right of the viewer) opens `mrsim-test.html`, a
+standalone 3D MRSIM track editor. It renders gates, flags, mat and terrain from
+the real decoded MRSIM meshes (falling back to collision primitives), and while
+it is MRSIM-native it can import either sim's tracks:
+
+- **Palette** — place any MRSIM library object: 5×5 / 7×6 / Champs gates,
+  start/finish, dive / climb / corner gates, hurdles, half-plane passages,
+  flags, towers, launch stands, mat and custom sensor boxes. Objects marked ◉
+  carry a checkpoint and auto-join the lap when placed; ▫ objects are scenery.
+  Click a palette entry, then click the ground to drop it (hold shift to place
+  several). A translucent **3D ghost of the actual object** follows the cursor
+  while placing, so you see exactly what you're dropping. Hover a palette entry
+  for a live 3D thumbnail of the object.
+- **＋ Build / manage objects** — the object builder (bottom of the palette)
+  lets you compose your **own** track object from box / cylinder parts — each
+  with a size, offset, rotation and colour — plus an optional fly-through
+  checkpoint whose **ring position and crossing direction** (yaw / pitch / roll)
+  you can aim, shown live in the preview. A 3D preview updates as you edit. Saved
+  objects appear in a **custom** section of the palette and place exactly like
+  the built-ins (the placed object is self-contained XML, so exported tracks
+  load in MRSIM as-is). See [Custom objects & components](#custom-objects--components).
+- **Move / rotate / scale** — select any object for a TransformControls gizmo
+  and a numeric panel (MRSIM coordinates, yaw / pitch / roll and uniform scale,
+  kept MRSIM-legal). **★ Set as start / finish** marks the red-banner gate the
+  lap begins and ends at; the **colour** picker recolours by material — just
+  this object, everything of its type, or all items.
+- **View** — toggle **perspective / orthographic / isometric** projection and
+  pick a **camera control scheme** (Orbit, Blender, Fusion / CAD or Maya) so
+  navigation matches whichever 3D tool you're used to; the choice is remembered.
+- **Lap panel** — the ordered checkpoint list from the track's
+  `<CheckpointList>`, with reorder (▲▼), remove (✕), add-selected (+ lap) and a
+  circuit toggle, written straight back into the scene.
+- **Delete / duplicate / undo** — Del removes an object (and cleans up its lap
+  entry), `d` duplicates it (renaming the subtree uniquely), Ctrl-Z undoes any
+  step.
+- **Import / New** — the file picker (or drag-and-drop) accepts a MRSIM `.xml`
+  directly, or a VelociDrone `.trk` / `.json` that is converted in-browser
+  first; **New track** starts from an Empty Grass World template.
+- **⤓ Export .xml** — writes the edited `<Simulation>` back out; objects you
+  didn't touch round-trip byte-for-byte. Copy it into `Documents/MRSIM/Tracks/`
+  and it appears in MRSIM's track list.
+
+### Custom objects & components
+
+The object builder saves each custom object as a small JSON **component** — a
+list of primitive `parts` (box / cylinder with `pos`, `rot`, `dims`, `color`)
+and an optional `pass` checkpoint (`pos`/`dims` trigger box plus a `ref` with
+`pos` + `rot` for the ring position and crossing direction). Components live in
+two places, and both feed the palette's **custom** section:
+
+- **Your browser** — objects you build are stored in `localStorage`, so they
+  persist across sessions on that machine (and stay private to it).
+- **`components.json`** (repo root) — a shared bundle loaded at startup and
+  shown as *repo-shared* objects for everyone who opens the editor.
+
+To **contribute an object to the repo**: build it, then use the builder's
+**⤓ Export all** button to download a `components.json` (your local objects in
+the shared format), drop it in the repo root, and commit — it now ships to every
+user. **⤓ Export this** downloads a single component for sharing one object;
+**⤒ Import** loads either back in. A repo-shared object can be tweaked locally
+(your copy shadows the shared one by id) without editing the file.
+
+Headless hooks mirror `__edit`/`__preview`: `window.__build.save(component)`,
+`.list()`, `.exportAll()`, `.open(id)`, `.remove(id)`.
 
 ## Converting between sims
 
@@ -319,8 +393,10 @@ for example) are the point — not re-hosting anyone's assets.
 | `trk.js` | VelociDrone `.trk` decoder/encoder (base64 + AES-128-ECB, pure JS) |
 | `mrsim.js` | MRSIM `.xml` track decoder (scene-graph walker) |
 | `mrsim-lib.js` | Embedded MRSIM object library (generated) |
+| `mrsim-test.html` | 3D MRSIM track editor (palette, lap editor, gizmo, object builder, import/export) |
+| `components.json` | Repo-shared custom objects for the editor's object builder |
 | `convert.js` | VelociDrone ⇄ MRSIM track converter (façade over `convert/`) |
-| `convert/*.js` | Converter modules: spaces, mapping, normalise, emit, validate |
+| `convert/*.js` | Converter modules: coordinate spaces, VD classify/normalise, mapping, XML emit, MRSIM→VD, validate |
 | `convert-cli.mjs` | Node CLI: `.trk`/`.json` → validated MRSIM XML |
 | `test/` | Converter test suite (`npm test`, node:test) |
 | `ghostfetch.js` | Live leaderboard/flight fetch + ghost decoding (zlib + MS-NRBF) |
@@ -332,4 +408,6 @@ for example) are the point — not re-hosting anyone's assets.
 | `export_tracks.py` | Export tracks from the VelociDrone user DB |
 | `export_models.py` | Extract prefab GLBs + `prefab-dims.json` from the asset bundles |
 | `export_mrsim_lib.py` | Regenerate `mrsim-lib.js` from `MRSIM.dkb` |
+| `export_mrsim_models.py` | Decode MRSIM `.model` meshes + atlases → `models/mrsim/` (local only) |
+| `ghost_extract.py` | Pull ghost lines from the local VelociDrone `user11.db` |
 | `.nojekyll` | Serve files verbatim on GitHub Pages |
