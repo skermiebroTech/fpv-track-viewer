@@ -1,0 +1,23 @@
+[
+  {
+    "id": "custom_twin-pylon",
+    "label": "twin pylon (turn marker)",
+    "cp": null,
+    "parts": [
+      { "shape": "cyl", "pos": [-1.5, 0, 1.25], "rot": [0, 0, 0], "dims": [0.12, 2.5], "color": "#e67300" },
+      { "shape": "cyl", "pos": [1.5, 0, 1.25], "rot": [0, 0, 0], "dims": [0.12, 2.5], "color": "#e67300" }
+    ]
+  },
+  {
+    "id": "custom_box-gate-2m",
+    "label": "box gate 2 m",
+    "cp": "pass",
+    "parts": [
+      { "shape": "box", "pos": [0, 0, 0.075], "rot": [0, 0, 0], "dims": [2.3, 0.1, 0.15], "color": "#00d9d9" },
+      { "shape": "box", "pos": [0, 0, 2.075], "rot": [0, 0, 0], "dims": [2.3, 0.1, 0.15], "color": "#00d9d9" },
+      { "shape": "box", "pos": [-1.075, 0, 1.075], "rot": [0, 0, 0], "dims": [0.15, 0.1, 2.0], "color": "#00d9d9" },
+      { "shape": "box", "pos": [1.075, 0, 1.075], "rot": [0, 0, 0], "dims": [0.15, 0.1, 2.0], "color": "#00d9d9" }
+    ],
+    "pass": { "pos": [0, 0, 1.1], "dims": [2.0, 0.3, 1.9], "ref": { "pos": [0, 0, 1.1], "rot": [0, 0, 0] } }
+  }
+]

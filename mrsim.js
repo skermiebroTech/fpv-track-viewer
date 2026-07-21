@@ -348,7 +348,11 @@ function assemble(st, fileName) {
     // nothing to render + a checkpoint = a pure sensor, whatever produced it
     kind: !e.prims.length && !e.models.length && e.cps.length
       ? 'pass' : classify(e.tags),
-    isStart: [...e.tags].some(t => /StartFinish/.test(t)),
+    // start/finish gate: either built from a StartFinish library macro/include
+    // (tag), or an editor-emitted/converted gate wearing the red start banner
+    // material (GateStartBannerMaterial) — those carry no macro name.
+    isStart: [...e.tags].some(t => /StartFinish/.test(t))
+      || e.prims.some(p => /Start(Finish|Banner)/.test(p.material || '')),
     tags: [...e.tags],
     prims: e.prims.map(p => ({
       shape: p.shape, dims: p.dims, hint: p.hint, material: p.material, matrix: three(p.m), src: p.src,
