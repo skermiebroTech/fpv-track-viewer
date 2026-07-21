@@ -23,6 +23,14 @@
 // that heading could be flown along edge-on and missed. Poles become a
 // column volume, flat squares a thick horizontal slab; both are yawed to the
 // local path heading only so the guidance arrow points along the lap.
+//
+// When a human racing line is supplied (opts.humanLines) the CheckpointReference
+// (the visible ring the pilot flies to) is placed on the CLOSEST POINT of that
+// line — not at the wide-radius centroid of nearby samples, which cuts corners
+// and can sit metres off the mark or, on a dive, several metres low. Windows
+// then fly as thin oriented planes on the line; poles keep the robust column
+// but re-seat the ring on it; dives/climbs keep the flat plate at the true
+// crossing height. (Matches how the perfected 2026 AU NATS edit was hand-tuned.)
 // ===========================================================================
 import * as THREE from 'three';
 import { Z_AXIS, toMrsim, fromMrsim, mrsimQuat, fmt, attrsFromQuat, rotAttrs, rotQuatForDir } from './space.js';
@@ -95,6 +103,39 @@ export function emitMrsim(normal, opts = {}) {
     return { c: placeFit(c), rH, rV, n: pts.length };
   }
 
+  // Where does the human line CROSS a marker, and which way is it flying there?
+  // Unlike fitPoint (a wide centroid that cuts corners), this returns the single
+  // closest point on the ghost polyline to the VD marker plus the smoothed flight
+  // tangent — so an invisible checkpoint's ring can sit exactly on the line and
+  // face along the lap, which is how the field actually flies the mark. Points
+  // are returned in placed (recentred) space; `near` are nearby samples for
+  // sizing the sensor to catch the whole field. Null when no lines are supplied.
+  function lineHit(porig, radius = 8) {
+    if (!humanLines.length) return null;
+    let best = Infinity, bp = null, bi = -1, bl = null;
+    for (const line of humanLines) {
+      for (let i = 0; i < line.length - 1; i++) {
+        const a = line[i], b = line[i + 1], ab = b.clone().sub(a);
+        const len2 = ab.lengthSq();
+        if (len2 < 1e-9) continue;
+        const t = Math.max(0, Math.min(1, a.clone().negate().add(porig).dot(ab) / len2));
+        const proj = a.clone().addScaledVector(ab, t);
+        const d = proj.distanceTo(porig);
+        if (d < best) { best = d; bp = proj; bi = i; bl = line; }
+      }
+    }
+    if (!bp || best > radius) return null;
+    // tangent smoothed over a short window around the hit (raw ghosts are ~10 Hz)
+    const w = 4;
+    const a = bl[Math.max(0, bi - w)], b = bl[Math.min(bl.length - 1, bi + 1 + w)];
+    const tangent = b.clone().sub(a);
+    if (tangent.lengthSq() < 1e-9) return null;
+    const near = [];
+    for (const line of humanLines)
+      for (const pt of line) if (pt.distanceTo(bp) < 5) near.push(placeFit(pt));
+    return { point: placeFit(bp), tangent: tangent.normalize(), d: best, near };
+  }
+
   // Box (centre + size) + checkpoint-reference offset for a sensor, in the
   // sensor's local frame (X = side, Z = up). Starts from a generous default
   // range that always catches the field, then expands to cover every supplied
@@ -135,6 +176,9 @@ export function emitMrsim(normal, opts = {}) {
     first ??= { pos: p.clone(), dir: (c.degenerate ? c.pathHeading : dir).clone() };
     const pm = toMrsim(p);
     const dm = toMrsim(dir);
+    // an invisible checkpoint's true placement is where the field crosses it —
+    // resolved from the ghost line when one is supplied (see the unified branch)
+    const hit = kind === 'checkpoint' ? lineHit(c.rawPos) : null;
 
     if (kind === 'flag') {
       const nm = `trkFlag${++nFlag}`;
@@ -202,26 +246,111 @@ export function emitMrsim(normal, opts = {}) {
         expectDir: new THREE.Vector3(dir.x, 0, dir.z).normalize(),
         sensor: { w: b.bw, h: b.bh, d: 0.01 },
       });
+    } else if (kind === 'checkpoint' && hit && !c.pole) {
+      // A ghost line is available: place this invisible checkpoint (a real
+      // window/aperture, not a turn pole — those keep a column, below) exactly
+      // where the field crosses it, facing along the flight there. Learned from
+      // the perfected 2026 AU NATS edit: windows fly as thin oriented planes ON
+      // the racing line, and dive/climb squares stay flat plates but sit at the
+      // actual crossing HEIGHT (the stored-centroid slab could be metres low).
+      // Without a ghost, the branches below fall back to the default volumes.
+      const nm = `trkCheck${++nCheck}`;
+      const P = hit.point;                                 // ring world (placed space)
+      let head = new THREE.Vector3(hit.tangent.x, 0, hit.tangent.z);   // flight heading
+      if (head.lengthSq() < 1e-4) head.copy(c.pathHeading);            // near-vertical dive
+      head.normalize();
+      // a multi-lap ghost may cross a mark on a return pass going the other way
+      // (out-and-back sections); flip only on CLEAR opposition to the lap travel,
+      // not near-perpendicularity — at sharp corners the prev->next chord heading
+      // is itself unreliable and would wrongly reverse a valid crossing
+      const lapH = new THREE.Vector3(c.pathHeading.x, 0, c.pathHeading.z);
+      if (lapH.lengthSq() > 1e-6 && head.dot(lapH.normalize()) < -0.3) head.negate();
+      const sideV = new THREE.Vector3(-head.z, 0, head.x);            // across the line
+      let sMax = 0, uMax = 0, hMax = 0;
+      for (const s of hit.near) {
+        const off = s.clone().sub(P);
+        sMax = Math.max(sMax, Math.abs(off.dot(sideV)));
+        uMax = Math.max(uMax, Math.abs(off.y));
+        hMax = Math.max(hMax, Math.hypot(off.x, off.z));
+      }
+      const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+      const plate = c.degenerate && !c.pole && Math.abs(dir.y) > 0.85;
+      const pmH = toMrsim(P);
+      if (plate) {
+        // a rolled/flat square you cross vertically: flat slab on the line, ring
+        // pointing up/down with the crossing sense (as MRSIM's own dive/climb gate)
+        const down = dir.y < 0;
+        const S = cl(2 * hMax + 3, 4, 14), T = cl(2 * uMax + 1.5, 2, 5);
+        parts.push(
+          `    <Transform x="${fmt(pmH.x)}" y="${fmt(pmH.y)}" z="${fmt(pmH.z)}"${rotAttrs(toMrsim(head), true)}>
+      <Entity name="${nm}">
+        <Entity name="${nm}_pass">
+          <WorldFromEntityComponent/>
+          <Box x="${fmt(S)}" y="${fmt(S)}" z="${fmt(T)}"/>
+          <StaticContact contactMaterial="-1"/>
+          <Entity name="CheckpointReference">
+            <WorldFromEntityComponent rx="1" angle="${down ? '-1.570796' : '1.570796'}"/>
+          </Entity>
+          <Checkpoint/>
+        </Entity>
+      </Entity>
+    </Transform>`);
+        emitted.push({
+          name: `${nm}_pass`, kind, form: 'plate', vdBadge: c.vdBadge,
+          expectPos: P.clone(),
+          expectDir: new THREE.Vector3(0, down ? -1 : 1, 0),
+          sensor: { w: S, h: T, d: S },
+        });
+      } else {
+        // upright plane crossing along the flight heading: keep the window's
+        // VD-derived crossing direction, falling back to the flight tangent if
+        // the stored direction is (near-)vertical and gives no usable heading
+        const nd = new THREE.Vector3(dir.x, 0, dir.z);
+        if (nd.lengthSq() < 0.09) nd.copy(head);
+        nd.normalize();
+        const W = cl(2 * sMax + 2.5, 4, 12), H = cl(2 * uMax + 2.5, 4, 12);
+        parts.push(
+          `    <Transform x="${fmt(pmH.x)}" y="${fmt(pmH.y)}" z="${fmt(pmH.z)}"${rotAttrs(toMrsim(nd))}>
+      <Entity name="${nm}">
+        <Entity name="${nm}_pass">
+          <WorldFromEntityComponent/>
+          <Box x="${fmt(W)}" y=".01" z="${fmt(H)}"/>
+          <StaticContact contactMaterial="-1"/>
+          <Entity name="CheckpointReference">
+            <WorldFromEntityComponent/>
+          </Entity>
+          <Checkpoint/>
+        </Entity>
+      </Entity>
+    </Transform>`);
+        emitted.push({
+          name: `${nm}_pass`, kind, form: 'upright', vdBadge: c.vdBadge,
+          expectPos: P.clone(),
+          expectDir: nd.clone(),
+          sensor: { w: W, h: H, d: 0.01 },
+        });
+      }
+      cpNames.push(`${nm}_pass`);
     } else if (kind === 'checkpoint' && c.pole) {
-      // Invisible turn pole (VD scale ~10000: pass anywhere beside it). A
-      // plane oriented off the stored (near-vertical) +Z could be missed
-      // edge-on, so emit a rotation-robust column volume around the pole,
-      // yawed to the path heading only so the guidance arrow follows the lap.
-      // The column always starts at the floor; a pole based on an elevated
-      // section (block tower) extends it upward so the pass height is covered.
-      // VD's scale-10000 pole triggers are effectively huge — racers round
-      // the pylons metres out — so the column is generous (16 x 16 m).
+      // Invisible turn pole (VD scale ~10000: pass anywhere beside it). The
+      // stored (near-vertical) +Z is no use as a heading, and the field rounds
+      // the pylon at a wide range of offsets, so the VOLUME stays a rotation-
+      // robust column from the floor to above the pass — generous (16 x 16 m) so
+      // it fires however wide the line goes round, yawed to the lap path heading
+      // for the guidance arrow. But the visible RING (the CheckpointReference)
+      // is what the pilot flies to, so when a ghost line is supplied sit it
+      // exactly where the field crosses (closest point on the line) rather than
+      // at the wide-radius centroid, which cuts corners metres off the line.
       const nm = `trkCheck${++nCheck}`;
       const dh = toMrsim(c.pathHeading);
-      // with a human line: centre the column on where the field actually
-      // rounds the pylon, sized to cover every sampled pass
       const fitC = fitPoint(c.rawPos, 9);
-      const cx = fitC ? fitC.c.x : p.x, cz = fitC ? fitC.c.z : p.z;
+      const cx = hit ? hit.point.x : (fitC ? fitC.c.x : p.x);
+      const cz = hit ? hit.point.z : (fitC ? fitC.c.z : p.z);
+      const ringY = hit ? hit.point.y : (fitC ? fitC.c.y : p.y);
       const colW = fitC ? Math.min(20, Math.max(10, 2 * fitC.rH + 5)) : 16;
-      const top = Math.max(8, p.y + 6, fitC ? fitC.c.y + fitC.rV + 2 : 0);
+      const top = Math.max(8, p.y + 6, ringY + (fitC ? fitC.rV : 0) + 2);
       const colH = top - 0.2, colC = (0.2 + top) / 2;
-      const refY = fitC ? Math.min(Math.max(0.8, fitC.c.y), top - 1)
-        : Math.min(Math.max(1.5, p.y), top - 1);
+      const refY = Math.min(Math.max(hit || fitC ? 0.8 : 1.5, ringY), top - 1);
       const cmC = toMrsim(new THREE.Vector3(cx, 0, cz));
       parts.push(
         `    <Transform x="${fmt(cmC.x)}" y="${fmt(cmC.y)}" z="0"${rotAttrs(dh, true)}>
