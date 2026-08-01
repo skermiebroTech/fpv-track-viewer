@@ -2478,9 +2478,15 @@ function convertCurrent() {
     const d = PREFAB_DIMS[prefab];
     return d ? d[4] - d[1] : undefined;
   };
+  // raw mesh bounds on VD's own axes — hurdle panels are rebuilt at true size
+  // from them, and a flag's X asymmetry says which side its cloth hangs on
+  const boundsFor = prefab => {
+    const d = PREFAB_DIMS[prefab];
+    return d ? d.slice(0, 6).map(Number) : undefined;
+  };
   const { xml, warnings, summary, normal } = vdToMrsim(
     currentTrack, classifySeq, id => prefabInfo(id)?.name ?? '',
-    { location: env || undefined, humanLines, gateWidthFor, heightFor,
+    { location: env || undefined, humanLines, gateWidthFor, heightFor, boundsFor,
       sceneName: CATALOG.scenes[currentTrack.meta?.scene_id] });
   const name = currentTrack.meta?.name || 'track';
   const extra = humanLines.length ? [`fitted to ${humanLines.length} human line(s)`] : [];

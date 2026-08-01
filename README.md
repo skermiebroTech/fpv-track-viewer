@@ -217,6 +217,13 @@ it is MRSIM-native it can import either sim's tracks:
   several). A translucent **3D ghost of the actual object** follows the cursor
   while placing, so you see exactly what you're dropping. Hover a palette entry
   for a live 3D thumbnail of the object.
+- **Track objects (VelociDrone)** — a second palette section with the objects
+  the converter emits, which MRSIM's own library has no equivalent for: the
+  true-size 3.2 m VD race gate and start/finish gate, the 4 m feather flag
+  with its one-sided pole-side pass, the MGP hurdle panel, upright and dive
+  checkpoint panes, net panels and stretch blocks. They carry the converter's
+  own material names, so one dropped next to a converted object matches it —
+  which is what you want when hand-fixing a conversion.
 - **＋ Build / manage objects** — the object builder (bottom of the palette)
   lets you compose your **own** track object from box / cylinder parts — each
   with a size, offset, rotation and colour — plus an optional fly-through
@@ -278,10 +285,10 @@ driven by what defines the race — the ordered checkpoint crossings
 | VelociDrone | MRSIM |
 |---|---|
 | MultiGP gate (285) | 7x6 gate (closest aperture), same tilt for dive gates |
-| 4 m flag (170) | `Flag.xml` on a pole riser at the exact scaled height + sensor plane |
+| 4 m flag (170) | pole + soft cloth at the exact scaled height + a one-sided pole-side sensor plane |
 | invisible checkpoint (88) | library-style `<Box>` sensor entity with a `<Checkpoint>` |
 | building blocks (all 13 colours) | coloured `<Box>` entities, exact size + orientation |
-| MGP hurdles | grey panel `<Box>` at the exact scaled size |
+| MGP hurdles | grey panel `<Box>` at the exact scaled size and full orientation (rolled slats stay rolled) |
 | decorative flags | `Flag.xml` (+ riser to the scaled height) |
 | blocks | ← pipe cube PVC structure |
 
@@ -317,12 +324,17 @@ Copy the exported XML into `Documents/MRSIM/Tracks/` and it appears in
 MRSIM's track list.
 
 VD invisible checkpoints store a near-vertical crossing axis (turn poles,
-flat "stay low" squares); a plane sensor with that heading could be flown
-past edge-on, so poles export as column volumes and flat squares as thick
-horizontal slabs — both impossible to miss, yawed to the lap direction so
-the guidance arrow still points along the course. Consecutive checkpoints
-stacked on the same spot (VD fires both in one pass) are merged into one
-sensor so the MRSIM lap counts exactly like the VD lap.
+flat "stay low" squares) that is no use as a heading. Every one of them
+exports as a **window pane** — 0.3 m thick, the same as MRSIM's own gate
+triggers — wide and tall enough that no line round the mark can miss it:
+markers you fly PAST (turn poles, offset flags) become an upright pane
+squared to the lap direction and anchored on the marker, so it fires exactly
+where VelociDrone fires; a rolled square, which is a real aperture you cross
+vertically, becomes a flat horizontal pane whose ring points down (dive) or
+up (climb). Flags follow VD's own one-sided trigger: a long thin box running
+out of the POLE side, away from the fabric. Consecutive checkpoints stacked
+on the same spot (VD fires both in one pass) are merged into one sensor so
+the MRSIM lap counts exactly like the VD lap.
 
 ## Data interpretation (verified against the official 2024 poster)
 

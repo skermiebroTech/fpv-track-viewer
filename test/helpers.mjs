@@ -22,6 +22,7 @@ export const CATALOG = {
     2232: ['DefaultInvisibleOffsetFlag', 'Invisible', 1],
     344: ['ControlCurve', 'Tools', 0],
     275: ['DefaultMGPHurdle', 'Barriers', 0],
+    729: ['KDRAHurdle', 'Barriers', 0],
     740: ['WDCFlag1', 'Barriers', 0],
     336: ['DefaultNetBlack', 'Barriers', 0],
     90: ['DefaultStartGrid', 'Barriers', 0],
@@ -34,6 +35,9 @@ export const DIMS = {
   742: [-1.6, 0, -0.02, 1.6, 2.56, 0.03],
   170: [-1.23, 0, -0.01, 0.01, 5.6, 0.01],
   740: [-0.88, 0, -0.01, 0.01, 3.99, 0.01],
+  275: [-1.52, 0, -0.02, 1.52, 1.52, 0.03],
+  // a 3-D structure that still matches /hurdle/i (KDRAHurdle's real bounds)
+  729: [-1.78, 0, -1.74, 1.78, 2.98, 1.74],
 };
 
 export function loadFixture(name) {
