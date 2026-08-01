@@ -40,6 +40,36 @@ import { normalizeVdTrack } from './vd-normalize.js';
 // VD scenes that carry no props of their own (no scenery warning needed)
 const EMPTY_VD_SCENES = new Set([16, 17, 42, 43]);
 
+// native MGPHurdle panel, VD local axes [width X, height Y] — only used when
+// the caller supplies no prefab dimensions
+const HURDLE_SIZE = [3.04, 1.52];
+// native DefaultMGP4MFlag mesh bounds on X: the pole sits at ~0 and the cloth
+// runs to -1.23. Same fallback shape as boundsFor's [x0,…,x1,…] slice.
+const FLAG_X = [-1.23, 0.01];
+
+// Which side of its pole a flag's cloth hangs on, and how wide it is, from the
+// prefab's mesh bounds. VD's flag families are NOT consistent: the feather
+// flags (DefaultMGP4MFlag, the WDC/TBS/Velo family) hang their cloth on local
+// -X, but DefaultFlagGateMultiGP and DefaultFlagGate hang it on +X — and the
+// trigger wall is always on the OTHER side, so guessing costs real passes.
+// A few prefabs give no answer at all (PolyFlagLine is a symmetric banner run;
+// the DefaultFlag family's cloth lies along Z), and those report side 0 so the
+// caller can fall back to a plane that catches both sides.
+function flagCloth(bounds, sx) {
+  const [x0, x1] = bounds ? [bounds[0], bounds[3]] : FLAG_X;
+  const w = x1 - x0, mid = (x0 + x1) / 2;
+  const side = w > 0.2 && Math.abs(mid) > 0.15 * w ? Math.sign(mid) : 0;
+  // the cloth reaches from the pole to the far edge on its own side; clamp so
+  // a banner-run prefab cannot hang a 13 m sheet off a 3 m pole
+  const reach = Math.max(Math.abs(x0), Math.abs(x1)) * sx - 0.06;
+  return { side, width: Math.min(1.6, Math.max(0.4, reach)) };
+}
+// Every checkpoint sensor is a WINDOW PANE: wide and tall enough to catch the
+// field, but only this thick through the crossing — the same depth the
+// converter's gate triggers have always used, and thin enough that the volume
+// reads as a plane in an editor instead of a solid block of air.
+const PANE_D = 0.3;
+
 export function emitMrsim(normal, opts = {}) {
   const location = opts.location || 'EmptyGrassWorld';
   const humanLines = opts.humanLines || [];
@@ -152,6 +182,42 @@ export function emitMrsim(normal, opts = {}) {
     return { cx, cz, bw: (s1 - s0) + 1.5, bh: (u1 - u0) + 1.5, refX: refS - cx, refZ: refU - cz };
   }
 
+  // A flag's one-sided trigger plane, in the placed flag's own frame.
+  // `trigSign` is which way along local +X the VD trigger wall runs (the side
+  // away from the cloth). Worked out in distance-from-the-pole coordinates so
+  // the near edge stays EXACTLY on the pole — slack is only ever added at the
+  // far end, never back across the fabric. Returns the box centre/size and the
+  // absolute ring offset (a CheckpointReference resolves against its parent).
+  function flagSensor(fit, trigSign, sided, reach = 11) {
+    if (!sided) {
+      // the prefab's mesh gives no pole side (a symmetric banner run, a cloth
+      // that lies along the other axis): guessing would drop every pass on the
+      // wrong guess, so keep a plane that reaches both ways
+      const s = sensorBox(fit, { s0: -8, s1: 8, u0: 0.4, u1: 6.3, refU: 2.6 });
+      return { cx: s.cx, cz: s.cz, bw: s.bw, bh: s.bh,
+        refS: s.cx + s.refX, refU: s.cz + s.refZ };
+    }
+    let near = 0, far = reach, u0 = 0.4, u1 = 6.3, refT = 0, refU = 2.6;
+    if (fit) {
+      const a = trigSign * fit.sMin, b = trigSign * fit.sMax;
+      near = Math.min(near, a, b); far = Math.max(far, a, b);
+      u0 = Math.min(u0, fit.uMin); u1 = Math.max(u1, fit.uMax);
+      refT = trigSign * fit.sC; refU = fit.uC;
+    }
+    // A drone's width of lip past the pole, no more. Real racing lines shave
+    // the pole so close that a hard cut exactly on it drops passes a few
+    // centimetres the wrong way (the 2024 AU NATS WR clips five of six flags
+    // within 0.75 m of the pole, which is why a ghost widens `near` above) —
+    // but the sensor must read as "out of the pole side", not as a wall
+    // hanging through the fabric.
+    near -= 0.4; far += 0.75;
+    return {
+      cx: trigSign * (near + far) / 2, cz: (u0 + u1) / 2,
+      bw: far - near, bh: (u1 - u0) + 1.5,
+      refS: trigSign * Math.min(Math.max(refT, near), far), refU,
+    };
+  }
+
   // round-trip breadcrumb for the community editors: the object's catalogue id
   const meta = (typeId, name) =>
     `    <!-- EditorMeta: {"typeId":"${typeId}","entityName":"${name}"} -->`;
@@ -166,6 +232,44 @@ export function emitMrsim(normal, opts = {}) {
   let usedHurdle = false, usedLeg = false, usedNet = false, usedRiser = false;
   let usedGateFrame = false, usedStartBanner = false, usedFlagParts = false;
   let first = null;   // {pos three, dir three} of the first crossing (start area)
+
+  // An upright window pane across the lap — what an invisible marker you fly
+  // PAST becomes: a turn pole, an offset flag, any checkpoint whose stored
+  // orientation is near-vertical noise. Squared to the lap path heading and
+  // made wide/tall enough that a line round the mark cannot miss it, but only
+  // PANE_D thick. (These used to be 16 x 16 m columns and metres-thick slabs:
+  // they fired reliably, but a checkpoint is a window you fly through, and in
+  // an editor a block of solid-looking air is impossible to work with.)
+  // `head` is the three-space heading the pane is crossed along; `refY` is the
+  // ring height (a CheckpointReference resolves against the wrapper, which
+  // sits on the floor, so it is simply the world height).
+  function uprightPane(nm, x, z, W, u0, u1, refY, head, badge) {
+    const cm = toMrsim(new THREE.Vector3(x, 0, z));
+    const H = u1 - u0, cU = (u0 + u1) / 2;
+    parts.push(
+      `    <Transform x="${fmt(cm.x)}" y="${fmt(cm.y)}" z="0"${rotAttrs(toMrsim(head), true)}>
+      <Entity name="${nm}">
+        <Entity name="${nm}_pass">
+          <WorldFromEntityComponent z="${fmt(cU)}"/>
+          <Box x="${fmt(W)}" y="${fmt(PANE_D)}" z="${fmt(H)}"/>
+          <StaticContact contactMaterial="-1"/>
+          <Entity name="CheckpointReference">
+            <WorldFromEntityComponent z="${fmt(refY)}"/>
+          </Entity>
+          <Checkpoint/>
+        </Entity>
+      </Entity>
+    </Transform>`);
+    cpNames.push(`${nm}_pass`);
+    emitted.push({
+      name: `${nm}_pass`, kind: 'checkpoint', form: 'pane', vdBadge: badge,
+      expectPos: new THREE.Vector3(x, refY, z),
+      expectDir: head.clone(),
+      // the ring sits at the pilot's crossing height, well below the middle of
+      // a floor-to-8 m pane — so the volume carries its own centre
+      sensor: { w: W, h: H, d: PANE_D, centre: new THREE.Vector3(x, cU, z) },
+    });
+  }
 
   crossings.forEach(c => {
     const { kind, quat: q, dir } = c;
@@ -183,29 +287,38 @@ export function emitMrsim(normal, opts = {}) {
     if (kind === 'flag') {
       const nm = `trkFlag${++nFlag}`;
       // VD 4 m flags: the real trigger (extracted from the race prefab) is a
-      // one-sided 25 x 7.5 m wall starting at the pole and extending along the
+      // ONE-SIDED 25 x 7.5 m wall that starts AT THE POLE and runs along the
       // flag's local +X — the side away from the cloth — centred 2.6 m up.
       // MRSIM's own FlagPass references a point 11 m out, which would bow the
-      // racing line, so keep the game's Flag.xml visual on its pole and emit a
-      // plane sensor: generous on the trigger side (8 m), lenient 3 m on the
-      // cloth side, 0.4–6.3 m up. When human lines are supplied the plane is
-      // centred where the field actually crosses and sized to catch everyone.
+      // racing line, so keep the flag visual on its pole and emit a plane
+      // sensor of our own: from the pole outwards on the trigger side only,
+      // 0.4–6.3 m up. (It used to straddle the pole, sticking 3 m out THROUGH
+      // the fabric — a checkpoint on the cloth side, which is not where VD
+      // fires.) With human lines the plane grows to cover every crossing.
       const fit = fitCrossings(c.rawPos, dir, true);
       const A = Math.atan2(dm.x, dm.y);
       const entX = new THREE.Vector3(Math.cos(A), 0, Math.sin(A));   // placed flag +X in three
       const vx = new THREE.Vector3(1, 0, 0).applyQuaternion(q);      // VD flag +X in three
-      const trigPlus = entX.dot(vx) > 0;      // VD trigger side along sensor +X?
-      const b = sensorBox(fit, {
-        s0: trigPlus ? -3 : -8, s1: trigPlus ? 8 : 3, u0: 0.4, u1: 6.3, refU: 2.6,
-      });
+      // Which way the cloth and the trigger point in the PLACED frame. Two
+      // things move them and BOTH must be followed, never assumed: the prefab
+      // decides which side of its own pole the cloth is on, and the entity is
+      // yawed to the lap crossing direction, which vd-normalize may have
+      // flipped away from the stored one. (When only the sensor followed the
+      // flip, a flipped flag drew its cloth on the trigger side and hid the
+      // pole side.) side 0 = the prefab gives no answer; see flagCloth.
+      const cloth = flagCloth(opts.boundsFor?.(c.prefab), sx);
+      const entPlus = entX.dot(vx) > 0 ? 1 : -1;   // entity +X vs VD +X
+      const clothSign = cloth.side ? cloth.side * entPlus : 1;
+      const trigSign = -clothSign;
+      const b = flagSensor(fit, trigSign, !!cloth.side);
       // Custom flag at the TRUE scaled VD height: solid pole (thin, exactly
       // where VD's pole is) + a render-only cloth — in VD the cloth is soft
       // enough to brush at race speed, so it must never be a hard collider
       // (simulating the WR line showed it grazing the game flag's solid
-      // cloth). Cloth hangs on the entity's +X (= VD's cloth side under the
-      // yaw convention). Never sink the pole below the floor.
+      // cloth). Never sink the pole below the floor.
       const flagH = Math.max(3, (opts.heightFor?.(c.prefab) ?? 4) * sy);
-      const clothH = flagH * 0.72, clothW = 0.75;
+      const clothH = flagH * 0.72;
+      const clothW = cloth.width;
       usedFlagParts = true;
       const zBase = Math.max(pm.z, 0);
       const clampD = zBase - pm.z;            // how far the clamp raised the pole
@@ -216,7 +329,7 @@ export function emitMrsim(normal, opts = {}) {
           <MeshRendererComponent material="FlagRiserMaterial" subdivisions="10"/>
         </Entity>
         <Entity name="${nm}_cloth">
-          <WorldFromEntityComponent x="${fmt(0.06 + clothW / 2)}" z="${fmt(flagH - clothH / 2)}"/>
+          <WorldFromEntityComponent x="${fmt(clothSign * (0.06 + clothW / 2))}" z="${fmt(flagH - clothH / 2)}"/>
           <Box x="${fmt(clothW)}" y=".03" z="${fmt(clothH)}"/>
           <MeshRendererComponent material="FlagClothMaterial" subdivisions="1"/>
         </Entity>`;
@@ -229,7 +342,7 @@ export function emitMrsim(normal, opts = {}) {
           <Box x="${fmt(b.bw)}" y=".01" z="${fmt(b.bh)}"/>
           <StaticContact contactMaterial="-1"/>
           <Entity name="CheckpointReference">
-            <WorldFromEntityComponent x="${fmt(b.cx + b.refX)}" z="${fmt(b.cz - clampD + b.refZ)}"/>
+            <WorldFromEntityComponent x="${fmt(b.refS)}" z="${fmt(b.refU - clampD)}"/>
           </Entity>
           <Checkpoint/>
         </Entity>
@@ -239,12 +352,14 @@ export function emitMrsim(normal, opts = {}) {
       // carries it — the _pass child, NOT the flag wrapper (verified against the
       // community "…-sloogus.xml"); referencing the wrapper drops the checkpoint
       cpNames.push(`${nm}_pass`);
-      const refS = b.cx + b.refX, refU = b.cz + b.refZ;
       emitted.push({
         name: `${nm}_pass`, kind, form: 'flag', vdBadge: c.vdBadge,
-        expectPos: p.clone().addScaledVector(entX, refS).add(new THREE.Vector3(0, refU, 0)),
+        expectPos: p.clone().addScaledVector(entX, b.refS)
+          .add(new THREE.Vector3(0, b.refU, 0)),
         expectDir: new THREE.Vector3(dir.x, 0, dir.z).normalize(),
-        sensor: { w: b.bw, h: b.bh, d: 0.01 },
+        sensor: { w: b.bw, h: b.bh, d: 0.01,
+          centre: p.clone().addScaledVector(entX, b.cx)
+            .add(new THREE.Vector3(0, b.cz, 0)) },
       });
     } else if (kind === 'checkpoint' && hit && !c.pole) {
       // A ghost line is available: place this invisible checkpoint (a real
@@ -274,13 +389,18 @@ export function emitMrsim(normal, opts = {}) {
         hMax = Math.max(hMax, Math.hypot(off.x, off.z));
       }
       const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-      const plate = c.degenerate && !c.pole && Math.abs(dir.y) > 0.85;
+      // only a rolled DefaultSquare is a genuine flat aperture you cross
+      // vertically; other markers store a near-vertical axis as noise and are
+      // flown PAST, so they take the upright plane below
+      const plate = c.degenerate && !c.pole && c.squareAxis && Math.abs(dir.y) > 0.85;
       const pmH = toMrsim(P);
       if (plate) {
-        // a rolled/flat square you cross vertically: flat slab on the line, ring
-        // pointing up/down with the crossing sense (as MRSIM's own dive/climb gate)
+        // a rolled/flat square you cross vertically: a thin horizontal pane on
+        // the line, ring pointing up/down with the crossing sense (as MRSIM's
+        // own dive/climb gate). Centred exactly on the ghost crossing, so it
+        // needs no thickness beyond a window pane's.
         const down = dir.y < 0;
-        const S = cl(2 * hMax + 3, 4, 14), T = cl(2 * uMax + 1.5, 2, 5);
+        const S = cl(2 * hMax + 3, 4, 14), T = PANE_D;
         parts.push(
           `    <Transform x="${fmt(pmH.x)}" y="${fmt(pmH.y)}" z="${fmt(pmH.z)}"${rotAttrs(toMrsim(head), true)}>
       <Entity name="${nm}">
@@ -308,6 +428,11 @@ export function emitMrsim(normal, opts = {}) {
         const nd = new THREE.Vector3(dir.x, 0, dir.z);
         if (nd.lengthSq() < 0.09) nd.copy(head);
         nd.normalize();
+        // a near-vertical marker's residual yaw is noise vd-normalize never
+        // vets (its facing pass only checks the VERTICAL sense once |dir.y|
+        // > 0.5), so reconcile against the flight before it becomes the
+        // trigger's facing — a checkpoint aimed backwards never fires
+        if (nd.dot(head) < -0.3) nd.negate();
         const W = cl(2 * sMax + 2.5, 4, 12), H = cl(2 * uMax + 2.5, 4, 12);
         parts.push(
           `    <Transform x="${fmt(pmH.x)}" y="${fmt(pmH.y)}" z="${fmt(pmH.z)}"${rotAttrs(toMrsim(nd))}>
@@ -331,70 +456,71 @@ export function emitMrsim(normal, opts = {}) {
         });
       }
       cpNames.push(`${nm}_pass`);
-    } else if (kind === 'checkpoint' && c.pole) {
-      // Invisible turn pole (VD scale ~10000: pass anywhere beside it). The
-      // stored (near-vertical) +Z is no use as a heading, and the field rounds
-      // the pylon at a wide range of offsets, so the VOLUME stays a rotation-
-      // robust column from the floor to above the pass — generous (16 x 16 m) so
-      // it fires however wide the line goes round, yawed to the lap path heading
-      // for the guidance arrow. But the visible RING (the CheckpointReference)
-      // is what the pilot flies to, so when a ghost line is supplied sit it
-      // exactly where the field crosses (closest point on the line) rather than
-      // at the wide-radius centroid, which cuts corners metres off the line.
+    } else if (kind === 'checkpoint' && (c.pole || (c.degenerate && !c.squareAxis))) {
+      // Invisible turn pole (VD scale ~10000: pass anywhere beside it) or any
+      // other invisible marker whose stored +Z is near-vertical noise — an
+      // offset flag, a bare pylon mark. Neither is an aperture you cross
+      // vertically, so both become an upright pane squared to the lap path
+      // heading, keeping the full lateral and vertical reach the old column
+      // had (the field rounds a pylon at a wide range of offsets) and losing
+      // only the 16 m of depth. The visible RING is what the pilot flies to,
+      // so with a ghost line it sits exactly where the field crosses (closest
+      // point on the line) rather than at the wide-radius centroid, which cuts
+      // corners metres off the line.
       const nm = `trkCheck${++nCheck}`;
-      const dh = toMrsim(c.pathHeading);
       const fitC = fitPoint(c.rawPos, 9);
-      const cx = hit ? hit.point.x : (fitC ? fitC.c.x : p.x);
-      const cz = hit ? hit.point.z : (fitC ? fitC.c.z : p.z);
+      const fx = hit ? hit.point.x : (fitC ? fitC.c.x : p.x);
+      const fz = hit ? hit.point.z : (fitC ? fitC.c.z : p.z);
       const ringY = hit ? hit.point.y : (fitC ? fitC.c.y : p.y);
-      const colW = fitC ? Math.min(20, Math.max(10, 2 * fitC.rH + 5)) : 16;
+      const W = fitC ? Math.min(20, Math.max(10, 2 * fitC.rH + 5)) : 16;
       const top = Math.max(8, p.y + 6, ringY + (fitC ? fitC.rV : 0) + 2);
-      const colH = top - 0.2, colC = (0.2 + top) / 2;
       const refY = Math.min(Math.max(hit || fitC ? 0.8 : 1.5, ringY), top - 1);
-      const cmC = toMrsim(new THREE.Vector3(cx, 0, cz));
-      parts.push(
-        `    <Transform x="${fmt(cmC.x)}" y="${fmt(cmC.y)}" z="0"${rotAttrs(dh, true)}>
-      <Entity name="${nm}">
-        <Entity name="${nm}_pass">
-          <WorldFromEntityComponent z="${fmt(colC)}"/>
-          <Box x="${fmt(colW)}" y="${fmt(colW)}" z="${fmt(colH)}"/>
-          <StaticContact contactMaterial="-1"/>
-          <Entity name="CheckpointReference">
-            <WorldFromEntityComponent z="${fmt(refY)}"/>
-          </Entity>
-          <Checkpoint/>
-        </Entity>
-      </Entity>
-    </Transform>`);
-      cpNames.push(`${nm}_pass`);
-      emitted.push({
-        name: `${nm}_pass`, kind, form: 'column', vdBadge: c.vdBadge,
-        expectPos: new THREE.Vector3(cx, refY, cz),
-        expectDir: c.pathHeading.clone(),
-        sensor: { w: colW, h: colH, d: colW },
-      });
+      // A pole is crossed however the lap runs; a marker that DOES carry a
+      // usable horizontal facing keeps it, so its guidance arrow stays true —
+      // but only after reconciling it with the lap. These markers reach here
+      // because their stored axis is near-VERTICAL, and vd-normalize's facing
+      // pass only vets the vertical sense once |dir.y| > 0.5, so the leftover
+      // yaw is unvetted noise that can point straight back down the course.
+      // As the pane's normal that is fatal: MRSIM fires a checkpoint only when
+      // the drone crosses ALONG its facing, so a backwards pane never fires.
+      const head = new THREE.Vector3(c.dir.x, 0, c.dir.z);
+      if (c.pole || head.lengthSq() < 0.09) head.copy(c.pathHeading);
+      head.normalize();
+      const lapH = new THREE.Vector3(c.pathHeading.x, 0, c.pathHeading.z);
+      if (lapH.lengthSq() > 1e-6 && head.dot(lapH.normalize()) < -0.3) head.negate();
+      // ALONG the lap the pane stays on the marker — VD's own volume is
+      // centred there, so the checkpoint fires at the same moment VD fires it.
+      // (Sliding it onto the ghost's closest point moves the trigger metres up
+      // or down the lap, which on a split-S tower let the drone reach the next
+      // gate before this checkpoint had fired and stalled the whole lap.)
+      // ACROSS the lap it still follows the field's line, so the ring the
+      // pilot flies to lands where the field really goes round.
+      const side = new THREE.Vector3(-head.z, 0, head.x);
+      const lat = new THREE.Vector3(fx - p.x, 0, fz - p.z).dot(side);
+      const cx = p.x + side.x * lat, cz = p.z + side.z * lat;
+      uprightPane(nm, cx, cz, W, 0.2, top, refY, head, c.vdBadge);
     } else if (kind === 'checkpoint' && c.degenerate) {
       // Flat invisible square: a dive/climb aperture (wall-top compartments,
-      // elevated hoops — crossed vertically). A thick horizontal slab CENTRED
-      // on the stored point can't be missed edge-on; footprint covers the
-      // square's scaled in-plane extent. The reference points up/down with
-      // the crossing sense, exactly like the game's own 7x7Dive/ClimbGate,
-      // so the in-game guidance shows "dive here" / "climb here".
+      // elevated hoops — crossed vertically). A horizontal pane CENTRED on the
+      // stored point, its footprint covering the square's scaled in-plane
+      // extent. The reference points up/down with the crossing sense, exactly
+      // like the game's own 7x7Dive/ClimbGate, so the in-game guidance shows
+      // "dive here" / "climb here".
       const nm = `trkCheck${++nCheck}`;
       const [, , sz] = c.scale;
       let S = Math.min(20, Math.max(4,
         2 * (c.squareAxis ? Math.max(sy, sz) : Math.max(sx, sy))));
       const dh = toMrsim(c.pathHeading);
       const down = dir.y < 0;
-      // with a human line: centre the slab on where the field actually
-      // makes the dive/climb, thick enough to cover every sampled pass
+      // with a human line: centre the pane on where the field actually makes
+      // the dive/climb, and widen it to cover every sampled pass
       const fitP = fitPoint(c.rawPos, 7);
       const ctr = fitP ? fitP.c.clone() : p.clone();
       if (fitP) S = Math.min(20, Math.max(S, 2 * fitP.rH + 2.5));
-      const T = fitP ? Math.min(5, Math.max(2, 2 * fitP.rV + 1)) : 2;
+      const T = PANE_D;
       // markers stored below the track's ground level still need a reachable
-      // crossing: keep the slab centre a little above the floor
-      ctr.y = Math.max(ctr.y, 0.2);
+      // crossing: keep the pane clear of the floor
+      ctr.y = Math.max(ctr.y, 0.3);
       const cmP = toMrsim(ctr);
       parts.push(
         `    <Transform x="${fmt(cmP.x)}" y="${fmt(cmP.y)}" z="${fmt(cmP.z)}"${rotAttrs(dh, true)}>
@@ -466,7 +592,9 @@ export function emitMrsim(normal, opts = {}) {
           expectPos: p.clone().addScaledVector(side, b.cx + b.refX)
             .add(new THREE.Vector3(0, b.cz + b.refZ, 0)),
           expectDir: new THREE.Vector3(dir.x, 0, dir.z).normalize(),
-          sensor: { w: b.bw, h: b.bh, d: 0.01 },
+          sensor: { w: b.bw, h: b.bh, d: 0.01,
+            centre: p.clone().addScaledVector(side, b.cx)
+              .add(new THREE.Vector3(0, b.cz, 0)) },
         });
       } else {
         // no human data: sensor plane centred on the stored point (kept a
@@ -760,14 +888,28 @@ export function emitMrsim(normal, opts = {}) {
       </Entity>
     </Transform>`);
     } else if (b.map.type === 'hurdle') {
-      // MGP hurdles are a single 3 x 1.5 m fabric panel: emit it at the
-      // exact scaled size instead of snapping to an MRSIM hurdle
+      // MGP hurdles are a single flat fabric panel (3.04 x 1.52 m native,
+      // base origin). Designers ROLL them: the 2025 MultiGP GQ tracks stand
+      // several on their short edge as tall narrow slats, and VD stores that
+      // as a 90 deg roll about the panel's own fly-past axis. A yaw-only
+      // heading threw that away and laid every rolled hurdle back down flat,
+      // so keep the WHOLE orientation — and with it VD's own axes (local X =
+      // width, local Y = height, local Z = thickness), exactly like blocks.
       const nm = `hurdle${++nHurdle}`;
       usedHurdle = true;
-      const dir = Z_AXIS.clone().applyQuaternion(q);
-      const w = 3.0 * sx, h = 1.5 * sy;
+      // Size from the real prefab, but ONLY when it really is a flat panel:
+      // /hurdle/ also catches 3-D structures (KDRAHurdle is 3.56 x 2.98 x 3.48
+      // m), and taking their bounding box as a panel would inflate a solid
+      // collider straight across the lap. Those keep the nominal MGP size, as
+      // before. Width/height come from the panel; the thickness stays a
+      // nominal 2 cm sheet — a scaled-up sheet would thicken into lines that
+      // legitimately brush past it.
+      const hb = opts.boundsFor?.(b.prefab);
+      const flat = hb && Math.min(hb[3] - hb[0], hb[4] - hb[1], hb[5] - hb[2]) <= 0.3;
+      const [nw, nh] = flat ? [hb[3] - hb[0], hb[4] - hb[1]] : HURDLE_SIZE;
+      const w = nw * sx, h = nh * sy;
       parts.push(
-        `    <Transform ${at}${rotAttrs(toMrsim(dir), true)}>
+        `    <Transform ${at}${attrsFromQuat(mrsimQuat(q))}>
       <Entity name="${nm}">
         <WorldFromEntityComponent z="${fmt(h / 2)}"/>
         <Box x="${fmt(w)}" y=".02" z="${fmt(h)}"/>
@@ -776,13 +918,19 @@ export function emitMrsim(normal, opts = {}) {
       </Entity>
     </Transform>`);
     } else if (b.map.type === 'flag') {
-      // scenery flags: same custom soft-cloth flag as the race branch —
-      // solid thin pole at the true scaled height, render-only cloth
+      // scenery flags: same custom soft-cloth flag as the race branch — solid
+      // thin pole at the true scaled height, render-only cloth. The yaw comes
+      // straight from the stored orientation (nothing flips a deco flag), so
+      // the placed entity's +X sits on VD's local -X and the cloth side is
+      // just the prefab's own, mirrored. No trigger here, so nothing depends
+      // on getting it right beyond the look.
       const nm = `decoFlag${++nDeco}`;
       const dir = Z_AXIS.clone().applyQuaternion(q);
       const dmF = toMrsim(dir);
       const flagH = Math.max(3, (opts.heightFor?.(b.prefab) ?? 4) * sy);
-      const clothH = flagH * 0.72, clothW = 0.75;
+      const clothH = flagH * 0.72;
+      const cloth = flagCloth(opts.boundsFor?.(b.prefab), sx);
+      const clothW = cloth.width, clothSign = -(cloth.side || -1);
       usedFlagParts = true;
       const zBase = Math.max(pm.z, 0);
       parts.push(
@@ -795,7 +943,7 @@ export function emitMrsim(normal, opts = {}) {
           <MeshRendererComponent material="FlagRiserMaterial" subdivisions="10"/>
         </Entity>
         <Entity name="${nm}_cloth">
-          <WorldFromEntityComponent x="${fmt(0.06 + clothW / 2)}" z="${fmt(flagH - clothH / 2)}"/>
+          <WorldFromEntityComponent x="${fmt(clothSign * (0.06 + clothW / 2))}" z="${fmt(flagH - clothH / 2)}"/>
           <Box x="${fmt(clothW)}" y=".03" z="${fmt(clothH)}"/>
           <MeshRendererComponent material="FlagClothMaterial" subdivisions="1"/>
         </Entity>

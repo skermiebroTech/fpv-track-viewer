@@ -317,13 +317,16 @@ export function validateMrsim(xml, { summary, normal, humanLines } = {}) {
       const e = summary.emitted[i];
       if (!e) return;
       const dims = e.sensor ?? { w: 2.6, h: 2.2, d: 2.4 };   // macro gates: aperture + slack
+      // the trigger box's own centre when the emitter supplies one: a tall
+      // pane's ring sits at the crossing height, not in the middle of the volume
+      const c = dims.centre ?? s.pos;
       const hw = dims.w / 2 + 0.75, hh = dims.h / 2 + 0.75;
       const hd = Math.max(dims.d / 2 + 0.75, 1.6);
       const vertical = Math.abs(s.dir.y) > 0.9;
       const dirH = vertical ? null
         : new THREE.Vector3(s.dir.x, 0, s.dir.z).normalize();
       const hit = pts.some(p => {
-        const ox = p.x - s.pos.x, oy = p.y - s.pos.y, oz = p.z - s.pos.z;
+        const ox = p.x - c.x, oy = p.y - c.y, oz = p.z - c.z;
         if (Math.abs(oy) > (vertical ? hh : hh)) return false;
         if (vertical) {   // square footprint, any yaw
           return Math.abs(ox) <= hw && Math.abs(oz) <= hw;

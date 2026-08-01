@@ -71,7 +71,7 @@ try {
   const root = dirname(fileURLToPath(import.meta.url));
   const catalog = JSON.parse(readFileSync(join(root, 'tracks/prefabs.json'), 'utf8'));
   const dims = JSON.parse(readFileSync(join(root, 'tracks/prefab-dims.json'), 'utf8'));
-  const { classify, prefabName, gateWidthFor, heightFor } = makeClassifier(catalog, dims);
+  const { classify, prefabName, gateWidthFor, heightFor, boundsFor } = makeClassifier(catalog, dims);
 
   // ---- parse the input track ------------------------------------------------
   const raw = readFileSync(inputPath, 'utf8').replace(/^﻿/, '');
@@ -109,7 +109,7 @@ try {
 
   // ---- convert --------------------------------------------------------------
   const { xml, warnings, summary, normal } = vdToMrsim(data, classify, prefabName, {
-    location: opts.location, humanLines, gateWidthFor, heightFor,
+    location: opts.location, humanLines, gateWidthFor, heightFor, boundsFor,
   });
 
   // embedded track names can contain path separators — never let the default

@@ -6,11 +6,11 @@ import { vdToMrsim } from '../convert/emit-mrsim.js';
 import { mrsimToVd } from '../convert/mrsim-to-vd.js';
 import { parseMrsim } from '../mrsim.js';
 
-const { classify, prefabName, gateWidthFor } = makeClassifier(CATALOG, DIMS);
+const { classify, prefabName, gateWidthFor, heightFor, boundsFor } = makeClassifier(CATALOG, DIMS);
 
 test('round trip VD -> MRSIM -> VD preserves the lap', () => {
   const src = loadFixture('synthetic-track.json');
-  const { xml, summary } = vdToMrsim(src, classify, prefabName, { gateWidthFor });
+  const { xml, summary } = vdToMrsim(src, classify, prefabName, { gateWidthFor, heightFor, boundsFor });
   const back = mrsimToVd(parseMrsim(xml, 'rt.xml'));
   // one VD gate per MRSIM checkpoint, in order
   assert.equal(back.json.gates.length, summary.cpNames.length);
@@ -26,7 +26,7 @@ test('round trip VD -> MRSIM -> VD preserves the lap', () => {
 
 test('round-trip gate positions survive within a metre', () => {
   const src = loadFixture('synthetic-track.json');
-  const { xml, normal } = vdToMrsim(src, classify, prefabName, { gateWidthFor });
+  const { xml, normal } = vdToMrsim(src, classify, prefabName, { gateWidthFor, heightFor, boundsFor });
   const back = mrsimToVd(parseMrsim(xml, 'rt.xml'));
   // compare the start gate: source crossing (recentred) vs round-tripped base
   const rt = back.json.gates[0].trans.pos.map(v => v / 100);

@@ -1765,6 +1765,68 @@ const MACRO_SHIFTS = {
 };
 
 // ---------------------------------------------------------------------------
+// TRACK OBJECTS — the things the VelociDrone converter emits, as placeable
+// palette entries. MRSIM's own library has no MultiGP hurdle, no feather flag
+// with a one-sided pass, no true-size race gate and no bare window-pane
+// checkpoint, so hand-fixing a converted track used to mean editing XML. These
+// are built from the same component schema as the object builder (`parts` +
+// optional `pass`), so placement, hover preview, placement ghost, duplicate,
+// recolour and undo all work on them for free — and they carry the converter's
+// own material names, so a placed object matches the converted ones beside it.
+//
+// Sizes are the converter's, for VD's standard prefabs: MGPHurdle 3.04 x 1.52
+// panel, DefaultMGP4MFlag 5.6 m pole with the cloth on one side and the
+// trigger wall running out of the OTHER (pole) side, and the 3.2 m race gate
+// whose true aperture is 2.96 x 2.46.
+// ---------------------------------------------------------------------------
+const GATE_AP_W = 2.96, GATE_AP_H = 2.46;   // true VD race-gate opening
+const gateFrameParts = banner => [
+  { suffix: '_postL', shape: 'cyl', pos: [-GATE_AP_W / 2 - 0.06, 0, (GATE_AP_H + 0.15) / 2],
+    dims: [0.06, GATE_AP_H + 0.15], material: 'GatePostMaterial' },
+  { suffix: '_postR', shape: 'cyl', pos: [GATE_AP_W / 2 + 0.06, 0, (GATE_AP_H + 0.15) / 2],
+    dims: [0.06, GATE_AP_H + 0.15], material: 'GatePostMaterial' },
+  { suffix: '_banner', shape: 'box', pos: [0, 0, GATE_AP_H + 0.075],
+    dims: [GATE_AP_W + 0.24, 0.04, 0.15], material: banner },
+];
+const gatePass = {
+  pos: [0, 0, GATE_AP_H / 2], dims: [GATE_AP_W, 0.3, GATE_AP_H],
+  ref: { pos: [0, 0, GATE_AP_H / 2], rot: [0, 0, 0] },
+};
+const TRACK_OBJECTS = [
+  { id: 'vdGate', label: 'VD race gate (3.2 m)', cp: 'pass',
+    parts: gateFrameParts('GateBannerMaterial'), pass: gatePass },
+  { id: 'vdGateSF', label: 'VD start/finish gate', cp: 'pass',
+    parts: gateFrameParts('GateStartBannerMaterial'), pass: gatePass },
+  { id: 'vdFlag', label: 'VD 4 m flag + pass', cp: 'pass',
+    parts: [
+      { suffix: '_pole', shape: 'cyl', pos: [0, 0, 2.8], dims: [0.045, 5.6],
+        material: 'FlagRiserMaterial' },
+      // cloth on -X; render-only, never a collider
+      { suffix: '_cloth', shape: 'box', pos: [-0.65, 0, 3.584], dims: [1.18, 0.03, 4.032],
+        material: 'FlagClothMaterial', solid: false },
+    ],
+    // the trigger runs out of the POLE side (+X), away from the fabric
+    pass: { pos: [5.5, 0, 3.35], dims: [12.5, 0.01, 7.4],
+      ref: { pos: [0, 0, 2.6], rot: [0, 0, 0] } } },
+  { id: 'vdHurdle', label: 'MGP hurdle panel', cp: null,
+    parts: [{ shape: 'box', pos: [0, 0, 0.76], dims: [3.04, 0.02, 1.52],
+      material: 'HurdlePanelMaterial' }] },
+  { id: 'vdPane', label: 'checkpoint pane (upright)', cp: 'pass', parts: [],
+    pass: { pos: [0, 0, 3.1], dims: [12, 0.3, 6],
+      ref: { pos: [0, 0, 1.5], rot: [0, 0, 0] } } },
+  { id: 'vdPaneFlat', label: 'checkpoint pane (dive)', cp: 'pass', parts: [],
+    // horizontal pane crossed downwards — the ring points at the floor
+    pass: { pos: [0, 0, 2.7], dims: [8, 8, 0.3],
+      ref: { pos: [0, 0, 2.7], rot: [0, -90, 0] } } },
+  { id: 'vdNet', label: 'net panel', cp: null,
+    parts: [{ shape: 'box', pos: [0, 0, 1], dims: [4, 0.1, 2],
+      material: 'NetPanelMaterial' }] },
+  { id: 'vdBlock', label: 'stretch block', cp: null,
+    parts: [{ shape: 'box', pos: [0, 0, 1], dims: [2, 2, 2],
+      material: 'BlockWhiteMaterial' }] },
+];
+
+// ---------------------------------------------------------------------------
 // CUSTOM COMPONENTS — user-built track objects. A component is a small entity
 // subtree (the same shape buildCustomGate emits): a list of primitive `parts`
 // (box/cylinder with an offset, rotation, size and colour) plus an optional
@@ -1805,8 +1867,14 @@ function customDefs() {
   const seen = new Set(CUSTOM_LOCAL.map(c => c.id));
   return [...CUSTOM_LOCAL, ...CUSTOM_SHARED.filter(c => !seen.has(c.id))];
 }
-// built-ins + custom — the full placeable set (palette, place() hook, arm)
-function allPalette() { return [...PALETTE, ...customDefs()]; }
+// built-ins + converter track objects + custom — the full placeable set
+// (palette, place() hook, arm). A user component with the same id shadows a
+// track object, same as it shadows a repo-shared one.
+function allPalette() {
+  const custom = customDefs();
+  const seen = new Set(custom.map(c => c.id));
+  return [...PALETTE, ...TRACK_OBJECTS.filter(d => !seen.has(d.id)), ...custom];
+}
 
 // ---- DOM building blocks ---------------------------------------------------
 function uniqueName(prefix) {
@@ -1875,6 +1943,14 @@ const GATE_MATERIALS = {
   GateBannerMaterial:      [0.09, 0.13, 0.38, '.5'],
   GateStartBannerMaterial: [0.55, 0.05, 0.05, '.4'],
   GateFabricMaterial:      [0.9, 0.35, 0.05, '.85'],
+  // the rest of the converter's palette, so a hand-placed track object shares
+  // its materials with the converted objects already in the document
+  HurdlePanelMaterial:     [0.6, 0.6, 0.6, '.4'],
+  FlagRiserMaterial:       [0.1, 0.1, 0.1, '.6'],
+  FlagClothMaterial:       [0.92, 0.92, 0.9, '.7'],
+  NetPanelMaterial:        [0.13, 0.13, 0.15, '.9'],
+  BlockWhiteMaterial:      [0.9, 0.9, 0.9, '.8'],
+  GateLegMaterial:         [0.85, 0.85, 0.85, '.5'],
 };
 function ensureMaterial(matName, ops) {
   const doc = editState.doc;
@@ -1956,15 +2032,25 @@ function buildCustomComponent(doc, ent, name, def, ops) {
   const mk = (tag, attrs) => { const e = doc.createElement(tag);
     for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== '') e.setAttribute(k, attrs[k]); return e; };
   (def.parts || []).forEach((part, i) => {
-    const material = ensureColorMaterial(part.color || '#c8c8c8', ops);
-    const e = mk('Entity', { name: `${name}_p${i}` });
+    // a named material (the converter's own) or a plain colour swatch
+    let material;
+    if (part.material) { ensureMaterial(part.material, ops); material = part.material; }
+    else material = ensureColorMaterial(part.color || '#c8c8c8', ops);
+    // `suffix` lets a built-in track object keep the converter's own part
+    // names (_postL/_banner/_pole/_cloth). That is not cosmetic: the start-
+    // gate machinery finds a gate's banner by material OR by a name ending
+    // in "banner", so a recoloured `_p2` banner would leave the track with no
+    // findable start gate. User-built parts stay `_p0`, `_p1`, …
+    const e = mk('Entity', { name: name + (part.suffix || `_p${i}`) });
     const wf = mk('WorldFromEntityComponent', {});
     writeVec(wf, part.pos); writeRotation(wf, partQuat(part));
     e.appendChild(wf);
     const d = (part.dims || []).map(v => (+v || 0).toFixed(3));
     if (part.shape === 'cyl') e.appendChild(mk('Cylinder', { radius: d[0] || '0.1', height: d[1] || '1' }));
     else e.appendChild(mk('Box', { x: d[0] || '0.5', y: d[1] || '0.5', z: d[2] || '0.5' }));
-    e.appendChild(mk('StaticContact', { contactMaterial: 'TrackPart' }));
+    // solid:false = render only, no collider — VD flag cloth is soft enough to
+    // brush at race speed, so the converter never makes it a hard surface
+    if (part.solid !== false) e.appendChild(mk('StaticContact', { contactMaterial: 'TrackPart' }));
     e.appendChild(mk('MeshRendererComponent', { material, subdivisions: part.shape === 'cyl' ? '12' : '1' }));
     ent.appendChild(e);
   });
@@ -2359,6 +2445,19 @@ function renderPalette() {
   };
   PALETTE.filter(def => !HIDDEN_NO_MODEL.has(def.id)).forEach(def => pal.appendChild(mkBtn(def)));
   const custom = customDefs();
+  const shadowed = new Set(custom.map(c => c.id));
+  const track = TRACK_OBJECTS.filter(d => !shadowed.has(d.id));
+  if (track.length) {
+    const div = document.createElement('div');
+    div.className = 'palDivide'; div.textContent = 'track objects (VelociDrone)';
+    pal.appendChild(div);
+    track.forEach(def => {
+      const b = mkBtn(def);
+      b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
+        ' · what the VelociDrone converter emits';
+      pal.appendChild(b);
+    });
+  }
   if (custom.length) {
     const div = document.createElement('div');
     div.className = 'palDivide'; div.textContent = 'custom';
@@ -2537,7 +2636,7 @@ function hidePreview() { PV.pending = null; PV.active = false; PV.el?.classList.
 
 // headless hook: __preview.show('gate7') renders a def's thumbnail, .cached() lists built ids
 window.__preview = {
-  show: id => { const def = [...PALETTE, ...customDefs()].find(p => p.id === id);
+  show: id => { const def = allPalette().find(p => p.id === id);
     return def ? showPreview(def, document.querySelector(`#palette button[data-pid="${id}"]`) || document.body) : 'unknown id'; },
   hide: hidePreview, cached: () => [...PV.cache.keys()],
   stat: () => { let meshes = 0; PV.group?.traverse(o => { if (o.isMesh) meshes++; });
@@ -3333,14 +3432,14 @@ async function convertVdText(text, fileName) {
       fetch('tracks/prefabs.json').then(r => r.json()),
       fetch('tracks/prefab-dims.json').then(r => r.json()),
     ]);
-    const { classify, prefabName, gateWidthFor, heightFor } = conv.makeClassifier(cat, dims);
-    convertMods = { conv, trk, classify, prefabName, gateWidthFor, heightFor };
+    const { classify, prefabName, gateWidthFor, heightFor, boundsFor } = conv.makeClassifier(cat, dims);
+    convertMods = { conv, trk, classify, prefabName, gateWidthFor, heightFor, boundsFor };
   }
-  const { conv, trk, classify, prefabName, gateWidthFor, heightFor } = convertMods;
+  const { conv, trk, classify, prefabName, gateWidthFor, heightFor, boundsFor } = convertMods;
   const data = /^\s*\{/.test(text) ? JSON.parse(text) : trk.parseTrk(text, fileName);
   if (!Array.isArray(data.gates)) throw new Error('no gates in this track');
   const { xml, warnings } = conv.vdToMrsim(data, classify, prefabName,
-    { gateWidthFor, heightFor });
+    { gateWidthFor, heightFor, boundsFor });
   return { xml, warnings, name: data.meta?.name || fileName.replace(/\.(trk|json)$/i, '') };
 }
 

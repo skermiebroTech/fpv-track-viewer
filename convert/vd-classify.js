@@ -45,5 +45,12 @@ export function makeClassifier(catalog = { prefabs: {} }, dims = {}) {
       const d = dims[id];
       return d ? d[4] - d[1] : undefined;
     },
+    // raw mesh bounds in VD's own local axes, [x0,y0,z0, x1,y1,z1] — panels
+    // (hurdles) are rebuilt at true size from them, and a flag's asymmetry
+    // along X is what says which side of the pole the cloth hangs on
+    boundsFor(id) {
+      const d = dims[id];
+      return d ? d.slice(0, 6).map(Number) : undefined;
+    },
   };
 }

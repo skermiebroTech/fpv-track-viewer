@@ -5,9 +5,10 @@ import { makeClassifier } from '../convert/vd-classify.js';
 import { vdToMrsim } from '../convert/emit-mrsim.js';
 import { validateMrsim } from '../convert/validate.js';
 
-const { classify, prefabName, gateWidthFor } = makeClassifier(CATALOG, DIMS);
+const { classify, prefabName, gateWidthFor, heightFor, boundsFor } = makeClassifier(CATALOG, DIMS);
 const converted = () =>
-  vdToMrsim(loadFixture('synthetic-track.json'), classify, prefabName, { gateWidthFor });
+  vdToMrsim(loadFixture('synthetic-track.json'), classify, prefabName,
+    { gateWidthFor, heightFor, boundsFor });
 
 test('a clean conversion validates with zero errors', () => {
   const { xml, summary, normal } = converted();
@@ -45,7 +46,7 @@ test('NaN coordinates are caught', () => {
 
 test('an oversized sensor is caught', () => {
   const { xml, summary, normal } = converted();
-  const bad = xml.replace('<Box x="16" y="16" z="7.8"/>', '<Box x="45" y="16" z="7.8"/>');
+  const bad = xml.replace('<Box x="16" y="0.3" z="7.8"/>', '<Box x="45" y="0.3" z="7.8"/>');
   const v = validateMrsim(bad, { summary, normal });
   assert.equal(v.ok, false);
   assert.ok(v.errors.some(e => /oversized/.test(e)));

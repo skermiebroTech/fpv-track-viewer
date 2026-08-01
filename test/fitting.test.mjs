@@ -9,9 +9,9 @@ import { mrsimToVd } from '../convert/mrsim-to-vd.js';
 import { validateMrsim } from '../convert/validate.js';
 import { parseMrsim } from '../mrsim.js';
 
-const { classify, prefabName, gateWidthFor, heightFor } = makeClassifier(CATALOG, DIMS);
+const { classify, prefabName, gateWidthFor, heightFor, boundsFor } = makeClassifier(CATALOG, DIMS);
 const convert = (data, opts = {}) =>
-  vdToMrsim(data, classify, prefabName, { gateWidthFor, heightFor, ...opts });
+  vdToMrsim(data, classify, prefabName, { gateWidthFor, heightFor, boundsFor, ...opts });
 
 // three laps of a ghost passing the fixture's flag (VD raw pos [3000,0,4800]
 // -> three (30, ·, -48)) ~1.5 m to the side, 2 m up

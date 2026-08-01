@@ -9,8 +9,10 @@ import { vdToMrsim } from '../convert/emit-mrsim.js';
 import { validateMrsim } from '../convert/validate.js';
 
 const { catalog, dims } = loadRealCatalog();
-const { classify, prefabName, gateWidthFor } = makeClassifier(catalog, dims);
-const convert = data => vdToMrsim(data, classify, prefabName, { gateWidthFor });
+// the shipped option set, so these goldens are the real converter output
+const { classify, prefabName, gateWidthFor, heightFor, boundsFor } = makeClassifier(catalog, dims);
+const convert = data =>
+  vdToMrsim(data, classify, prefabName, { gateWidthFor, heightFor, boundsFor });
 
 test('2024 AU NATS Quali converts and validates', () => {
   const data = localTrack('2024-au-nats-quali.json');
@@ -23,8 +25,8 @@ test('2024 AU NATS Quali converts and validates', () => {
   assert.equal(summary.isCircuit, true);
   const v = validateMrsim(xml, { summary, normal });
   assert.deepEqual(v.errors, []);
-  // the lone invisible checkpoint is a straight-down pole -> column volume
-  assert.equal(summary.emitted.find(e => e.kind === 'checkpoint').form, 'column');
+  // the lone invisible checkpoint is a straight-down pole -> upright pane
+  assert.equal(summary.emitted.find(e => e.kind === 'checkpoint').form, 'pane');
 });
 
 test('2026 AU NATS V3 Polished (local) converts and validates', t => {
@@ -38,11 +40,12 @@ test('2026 AU NATS V3 Polished (local) converts and validates', t => {
   assert.deepEqual(
     [summary.counts.gates, summary.counts.dives, summary.counts.flags, summary.counts.checkpoints],
     [27, 0, 0, 19]);
-  // sensor forms: 11 pole columns, 6 dive/climb plates (squares cross along
-  // local +X — rolled/tilted squares lie flat), 2 upright windows
+  // sensor forms: 12 panes across the lap (11 turn poles + one offset-flag
+  // marker — flown PAST, so not an aperture), 5 dive/climb plates (only a
+  // rolled DefaultSquare lies flat), 2 upright windows
   const forms = summary.emitted.filter(e => e.kind === 'checkpoint').map(e => e.form);
-  assert.equal(forms.filter(f => f === 'column').length, 11);
-  assert.equal(forms.filter(f => f === 'plate').length, 6);
+  assert.equal(forms.filter(f => f === 'pane').length, 12);
+  assert.equal(forms.filter(f => f === 'plate').length, 5);
   assert.equal(forms.filter(f => f === 'upright').length, 2);
   // every gate is a true-size frame (WDC gates are 3.2-3.84 m wide — bigger
   // than any MRSIM gate model)

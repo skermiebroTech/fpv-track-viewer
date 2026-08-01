@@ -59,13 +59,17 @@ export function simulateLine(xml, humanLines, { summary, normal }) {
   }
 
   // ---- checkpoint sensors from the converter's intent ----------------------
-  // vertical: plates fire on the slab; others on an upright box around the ref
+  // vertical: plates fire on the slab; others on an upright box around the ref.
+  // The trigger box is centred on `sensor.centre` when the emitter gives one —
+  // a tall pane's ring sits at the pilot's crossing height, metres below the
+  // middle of the volume, so using the ring as the centre would model the
+  // sensor several metres off and report phantom misses.
   const sensors = summary.emitted.map(e => {
     const dims = e.sensor ?? { w: e.form === '5x5' ? 1.6 : 2.3, h: e.form === '5x5' ? 1.55 : 1.9, d: 1.2 };
     const vertical = Math.abs(e.expectDir.y) > 0.9;
     const dirH = vertical ? null
       : new THREE.Vector3(e.expectDir.x, 0, e.expectDir.z).normalize();
-    return { name: e.name, pos: e.expectPos, dims, vertical, dirH,
+    return { name: e.name, pos: dims.centre ?? e.expectPos, dims, vertical, dirH,
       dir3: new THREE.Vector3(e.expectDir.x, e.expectDir.y, e.expectDir.z) };
   });
   const insideSensor = (s, wp) => {
