@@ -47,10 +47,11 @@ official 2D layout poster), **2022 Mission Foods Australian Drone Nationals**,
   in-game) or VelociDrone → MRSIM `.xml`. The environment selector next to
   the button picks the target scene (Empty Scene Day/Night… for VD; Empty
   Grass World / Baylands Park / Hardesty BMX for MRSIM).
-- **🛠 Editor** — a full 3D MRSIM track editor (opens `mrsim-test.html`): place
-  any MRSIM object from a palette, edit the lap / checkpoint order, move-rotate-
-  scale with a gizmo, and import a VelociDrone `.trk`/`.json` or MRSIM `.xml` to
-  edit and re-export. See [Track editor](#track-editor).
+- **🛠 Editor** — the **FPV Track Editor**, a full 3D MRSIM track editor (opens
+  `mrsim-test.html`): place any MRSIM object from a palette, edit the lap /
+  checkpoint order, move-rotate-scale with a gizmo, and import a VelociDrone
+  `.trk`/`.json` or MRSIM `.xml` to edit and re-export. See
+  [FPV Track Editor](#fpv-track-editor).
 
 ## Human world-record line
 
@@ -202,12 +203,13 @@ can decode the real meshes locally into `models/mrsim/` with
 overlay then makes the viewer prefer them on your own machine only. See
 [Assets & attribution](#assets--attribution).
 
-## Track editor
+## FPV Track Editor
 
-The **🛠 Editor** button (top-right of the viewer) opens `mrsim-test.html`, a
-standalone 3D MRSIM track editor. It renders gates, flags, mat and terrain from
-the real decoded MRSIM meshes (falling back to collision primitives), and while
-it is MRSIM-native it can import either sim's tracks:
+The **🛠 Editor** button (top-right of the viewer) opens `mrsim-test.html`, the
+**FPV Track Editor** — a standalone 3D MRSIM track editor. It renders gates,
+flags, mat and terrain from the real decoded MRSIM meshes (falling back to
+collision primitives), and while it is MRSIM-native it can import either sim's
+tracks:
 
 - **Palette** — place any MRSIM library object: 5×5 / 7×6 / Champs gates,
   start/finish, dive / climb / corner gates, hurdles, half-plane passages,
@@ -405,7 +407,7 @@ for example) are the point — not re-hosting anyone's assets.
 | `trk.js` | VelociDrone `.trk` decoder/encoder (base64 + AES-128-ECB, pure JS) |
 | `mrsim.js` | MRSIM `.xml` track decoder (scene-graph walker) |
 | `mrsim-lib.js` | Embedded MRSIM object library (generated) |
-| `mrsim-test.html` | 3D MRSIM track editor (palette, lap editor, gizmo, object builder, import/export) |
+| `mrsim-test.html` | FPV Track Editor — 3D MRSIM track editor (palette, lap editor, gizmo, object builder, import/export) |
 | `components.json` | Repo-shared custom objects for the editor's object builder |
 | `convert.js` | VelociDrone ⇄ MRSIM track converter (façade over `convert/`) |
 | `convert/*.js` | Converter modules: coordinate spaces, VD classify/normalise, mapping, XML emit, MRSIM→VD, validate |
