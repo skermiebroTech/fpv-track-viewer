@@ -18,10 +18,28 @@
     border-radius: 5px; padding: 5px 9px; font: inherit; cursor: pointer; }
   #bar button:hover, #bar label.file:hover, #bar select:hover { border-color: #4a83ff; }
   #bar button.on { background: #24406e; border-color: #4a83ff; }
+  #bar button:disabled { opacity: .35; cursor: default; }
+  #bar button:disabled:hover { border-color: #2b3242; }
+  #bar button.hist { padding: 4px 9px; font-size: 15px; line-height: 1.1; }
   #bar .title { font-weight: 600; color: #fff; margin-right: 4px; }
-  #bar .spacer { flex: 1; }
-  #bar .status { color: #8a93a6; }
+  /* the bar is at capacity on a 1366-wide laptop: pin every control to its
+     natural width so labels never wrap onto a second line, and let the track
+     name and the status text be the only things that give way */
+  #bar > * { flex: 0 0 auto; white-space: nowrap; }
+  #bar select { min-width: 0; }
+  #bar #track { flex: 0 1 auto; min-width: 90px; text-overflow: ellipsis; }
+  #bar .spacer { flex: 1 1 auto; min-width: 0; }
+  #bar .status { flex: 0 1 auto; min-width: 0; color: #8a93a6;
+    overflow: hidden; text-overflow: ellipsis; }
   #file { display: none; }
+
+  /* diagnostics is a validity chip that opens the panel, not a panel that is
+     always open — the count is filled in by refreshDiagChip() after each load */
+  #bar button.diagchip.ok { color: #6bd08a; border-color: #2f4a37; }
+  #bar button.diagchip.ok:hover { border-color: #6bd08a; }
+  #bar button.diagchip.warn { color: #ffb27a; border-color: #5a3f28; }
+  #bar button.diagchip.warn:hover { border-color: #ffb27a; }
+  #bar button.diagchip.on { background: #1c2230; }
 
   /* ---- diagnostics panel ---- */
   #diag { position: fixed; top: 46px; right: 10px; width: 380px; z-index: 5;
@@ -102,6 +120,27 @@
     border: 1px solid #2b3242; border-radius: 4px; padding: 3px 0; font: inherit; cursor: pointer; }
   #editPanel .modes button.on { background: #2a4a1e; border-color: #7ab648; }
   #bar button.edit-on { background: #2a4a1e; border-color: #7ab648; }
+
+  /* ---- snapping row ---- */
+  #editPanel .snap { display: flex; align-items: center; gap: 5px; margin: 5px 0 2px;
+    font-size: 11px; color: #8a93a6; }
+  #editPanel .snap > span { flex: 0 0 auto; }
+  #editPanel .snap select { flex: 1; min-width: 0; background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 4px; padding: 2px 4px;
+    font: inherit; font-size: 11px; cursor: pointer; }
+  #editPanel .snap select:hover { border-color: #7ab648; }
+  #editPanel .snap select.act { border-color: #7ab648; color: #b7e07a; }
+
+  /* ---- palette search ---- */
+  #palSearchRow { display: flex; gap: 4px; margin: 2px 0 6px; }
+  #palSearch { flex: 1; min-width: 0; background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 6px;
+    font: inherit; font-size: 11px; }
+  #palSearch:focus { border-color: #7ab648; outline: none; }
+  #palSearchRow button { background: #1a1e28; color: #8a93a6; border: 1px solid #2b3242;
+    border-radius: 4px; padding: 0 7px; font: inherit; font-size: 11px; cursor: pointer; }
+  #palSearchRow button:hover { border-color: #7ab648; color: #dfe3ea; }
+  #editPanel .palNone { grid-column: 1 / -1; color: #8a93a6; font-size: 11px; padding: 5px 2px; }
 
   /* ---- palette hover preview ---- */
   #palPreview { position: fixed; z-index: 8; width: 312px; display: none;
@@ -204,15 +243,17 @@
   <span class="title">MRSIM editor</span>
   <select id="track"></select>
   <label class="file">import<input id="file" type="file" accept=".xml,.trk,.json"></label>
-  <button id="btnNew">new track</button>
-  <button id="btnTop">top view</button>
+  <button id="btnNew" title="start a blank track">new</button>
+  <button id="btnTop" title="snap the camera directly overhead">top</button>
   <button id="btnProj" title="perspective — click for orthographic / isometric">perspective</button>
   <select id="ctrlScheme" title="camera control scheme — matches popular 3D/CAD tools"></select>
   <button id="btnCp" class="on">checkpoints</button>
-  <button id="btnDiag" class="on">diagnostics</button>
   <button id="btnEdit">✎ edit</button>
-  <button id="btnExport">⤓ export .xml</button>
+  <button id="btnUndo" class="hist" title="undo (Ctrl-Z)" disabled>↶</button>
+  <button id="btnRedo" class="hist" title="redo (Ctrl-Shift-Z / Ctrl-Y)" disabled>↷</button>
+  <button id="btnExport" title="download the edited track as MRSIM .xml">⤓ export</button>
   <span class="spacer"></span>
+  <button id="btnDiag" class="diagchip ok" title="track validity — click for full diagnostics">✓ track valid</button>
   <span class="status" id="status">…</span>
 </div>
 <div id="diag" class="hidden"></div>
@@ -222,6 +263,25 @@
     <button id="edModeT" class="on">move</button>
     <button id="edModeR">rotate</button>
     <button id="edModeS">scale</button>
+  </div>
+  <div class="snap">
+    <span>snap</span>
+    <select id="snapPos" title="position snap — gizmo drags land on this grid">
+      <option value="0">pos: off</option>
+      <option value="0.1">0.1 m</option>
+      <option value="0.25">0.25 m</option>
+      <option value="0.5">0.5 m</option>
+      <option value="1">1 m</option>
+      <option value="2">2 m</option>
+    </select>
+    <select id="snapRot" title="rotation snap — gizmo rotation lands on this increment">
+      <option value="0">rot: off</option>
+      <option value="5">5°</option>
+      <option value="15">15°</option>
+      <option value="30">30°</option>
+      <option value="45">45°</option>
+      <option value="90">90°</option>
+    </select>
   </div>
   <div class="row"><label>x</label><input id="edX" type="number" step="0.1"></div>
   <div class="row"><label>y</label><input id="edY" type="number" step="0.1"></div>
@@ -270,10 +330,15 @@
   <div class="hint" id="edHint">click an object or checkpoint ring to select ·
     <b>Ctrl</b>-click adds/removes from the selection (move many at once) ·
     keys: <b>g</b> move / <b>r</b> rotate / <b>s</b> scale / <b>Esc</b> deselect /
-    <b>Ctrl-Z</b> undo · MRSIM coords (z up), yaw = angleDegrees</div>
+    <b>Ctrl-Z</b> undo / <b>Ctrl-Shift-Z</b> redo · MRSIM coords (z up), yaw = angleDegrees</div>
 
   <details class="edSect" id="edPlaceSect" open>
     <summary>place object <span>(click canvas · shift = multi)</span></summary>
+    <div id="palSearchRow">
+      <input id="palSearch" type="search" placeholder="search objects…" autocomplete="off"
+        spellcheck="false">
+      <button id="palClear" title="clear search">✕</button>
+    </div>
     <div class="pal" id="palette"></div>
   </details>
 
@@ -471,7 +536,7 @@ renderer.domElement.addEventListener('auxclick', noAutoscroll, { passive: false 
 {
   const sel = document.getElementById('ctrlScheme');
   for (const [k, v] of Object.entries(CTRL_SCHEMES)) {
-    const o = document.createElement('option'); o.value = k; o.textContent = 'controls: ' + v.label;
+    const o = document.createElement('option'); o.value = k; o.textContent = '⟲ ' + v.label;
     sel.appendChild(o);
   }
   sel.addEventListener('change', () => setCtrlScheme(sel.value));
@@ -928,6 +993,38 @@ function frameCamera(box) {
 // diagnostics panel  (the point of this tool — inspectable headlessly)
 // ---------------------------------------------------------------------------
 const diagEl = document.getElementById('diag');
+const diagChip = document.getElementById('btnDiag');
+function setDiag(on) {
+  diagEl.classList.toggle('hidden', !on);
+  diagChip.classList.toggle('on', on);
+}
+
+// The toolbar chip is the resting state of diagnostics: one glance at whether
+// the track is sound, with the 380px panel one click away. It counts parser
+// issues plus the two structural faults the panel already flags in red.
+function refreshDiagChip(data) {
+  const orphans = data ? data.seq.filter(s => s.elemIndex < 0).length : 0;
+  const noStart = data && !data.elements.some(e => e.isStart) ? 1 : 0;
+  const n = (data?.issues?.length || 0) + orphans + noStart;
+  diagChip.classList.toggle('warn', !!n);
+  diagChip.classList.toggle('ok', !n);
+  diagChip.textContent = n ? `⚠ ${n} track issue${n > 1 ? 's' : ''}` : '✓ track valid';
+  const bits = [];
+  if (data?.issues?.length) bits.push(`${data.issues.length} parser issue(s)`);
+  if (orphans) bits.push(`${orphans} checkpoint(s) with no element`);
+  if (noStart) bits.push('no start element');
+  diagChip.title = (bits.join(' · ') || 'no parser issues · start element set') +
+    ' — click for full diagnostics';
+}
+
+// a track that never loaded has no data to summarise — say so on the chip
+// rather than leaving the previous track's "✓ track valid" showing
+function diagChipError(label, detail) {
+  diagChip.classList.add('warn'); diagChip.classList.remove('ok');
+  diagChip.textContent = '⚠ ' + label;
+  diagChip.title = detail + ' — click for details';
+}
+
 function renderDiag(data, extra) {
   const counts = {};
   data.elements.forEach(e => counts[e.kind] = (counts[e.kind] || 0) + 1);
@@ -973,6 +1070,9 @@ function renderDiag(data, extra) {
         `<td>${num3(s.pos.x)}, ${num3(s.pos.y)}, ${num3(s.pos.z)}</td>` +
         `<td>${num3(s.dir.x)}, ${num3(s.dir.y)}, ${num3(s.dir.z)}</td></tr>`
       ).join('') + `</table></details></section>`;
+  // innerHTML above detaches the #err node prepended at init — put it back, or
+  // the next parse/load/convert error writes into an orphan and shows nothing
+  diagEl.prepend(errEl);
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => (
   { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
@@ -996,7 +1096,8 @@ async function loadFromText(text, fileName, opts = {}) {
     data = parseMrsim(text, fileName);
   } catch (e) {
     statusEl.textContent = 'parse error';
-    diagEl.classList.remove('hidden');
+    setDiag(true);
+    diagChipError('parse failed', 'PARSE ERROR: ' + e.message);
     errEl.textContent = 'PARSE ERROR: ' + e.message;
     window.__mrsim = { error: e.message, fileName };
     return;
@@ -1004,16 +1105,18 @@ async function loadFromText(text, fileName, opts = {}) {
   if (!opts.reuseDoc) {
     editState = {
       doc: new DOMParser().parseFromString(text, 'text/xml'),
-      fileName, index: new Map(), dirty: false, undo: [],
+      fileName, index: new Map(), dirty: false, undo: [], redo: [],
     };
   }
   currentData = data;
   buildEditIndex(data);
   const extra = await build(data, opts.keepCamera);
   renderDiag(data, extra);
+  refreshDiagChip(data);
+  refreshHistoryButtons();
   statusEl.textContent =
-    `${data.elements.length} elements · ${data.seq.length} cps · ${data.issues.length} issues` +
-    (editState.dirty ? ' · EDITED' : '');
+    `${data.elements.length} elements · ${data.seq.length} cps` +
+    (hasUnsavedWork() ? ' · UNSAVED' : editState.dirty ? ' · exported' : '');
   document.getElementById('legend').textContent =
     'blue rings = checkpoints (arrow = fly-through dir) · red = start · axes at origin';
   if (opts.keepSelection != null) selectElementByName(opts.keepSelection, true);
@@ -1038,6 +1141,28 @@ async function loadFromText(text, fileName, opts = {}) {
   };
 }
 
+// ---- unsaved-work guard ---------------------------------------------------
+// Edits live only in the in-memory DOM until "export .xml" writes a file, so
+// anything that replaces the document has to ask first. dirty means "differs
+// from the file it was loaded from" (it also picks the -edited export name);
+// savedMark records where the undo stack stood at the last export, so exporting
+// and then undoing back to that point counts as saved again. The mark stores the
+// top entry as well as the depth because the stack shifts once past 100 entries.
+const historyMark = () => ({ len: editState.undo.length, top: editState.undo.at(-1) || null });
+function hasUnsavedWork() {
+  if (!editState?.dirty) return false;
+  const m = editState.savedMark;
+  return !m || m.len !== editState.undo.length || m.top !== editState.undo.at(-1);
+}
+function confirmDiscard(what) {
+  if (!hasUnsavedWork()) return true;
+  return confirm(`This track has unsaved edits.\n\n${what} will discard them.\n\n` +
+    'Cancel and use “⤓ export .xml” first if you want to keep them.');
+}
+addEventListener('beforeunload', e => {
+  if (hasUnsavedWork()) { e.preventDefault(); e.returnValue = ''; }
+});
+
 async function loadFromUrl(url) {
   statusEl.textContent = 'loading…';
   try {
@@ -1046,7 +1171,8 @@ async function loadFromUrl(url) {
     await loadFromText(await res.text(), url.split('/').pop());
   } catch (e) {
     statusEl.textContent = 'load error';
-    diagEl.classList.remove('hidden');
+    setDiag(true);
+    diagChipError('load failed', 'LOAD ERROR (' + url + '): ' + e.message);
     errEl.textContent = 'LOAD ERROR (' + url + '): ' + e.message;
   }
 }
@@ -1156,6 +1282,35 @@ tc.addEventListener('objectChange', () => {
   applyLiveDelta();
   refreshEditPanelNumbers(true);
 });
+
+// ---- snapping -------------------------------------------------------------
+// TransformControls snaps to absolute multiples in world space, so a 0.5 m
+// position snap lands objects ON the visible ground grid rather than merely
+// quantising the drag delta. With a multi-selection the gizmo anchor snaps and
+// the rest follow by the same delta, which is what every 3D tool does.
+const snapUi = { pos: 0, rot: 0 };
+const snapPosSel = document.getElementById('snapPos');
+const snapRotSel = document.getElementById('snapRot');
+function applySnap() {
+  tc.setTranslationSnap(snapUi.pos || null);
+  tc.setRotationSnap(snapUi.rot ? snapUi.rot * DEG : null);
+  snapPosSel.classList.toggle('act', !!snapUi.pos);
+  snapRotSel.classList.toggle('act', !!snapUi.rot);
+}
+function setSnap(kind, v) {
+  snapUi[kind] = +v || 0;
+  try { localStorage.setItem('mrsim.snap.' + kind, String(snapUi[kind])); } catch {}
+  applySnap();
+}
+snapPosSel.onchange = e => setSnap('pos', e.target.value);
+snapRotSel.onchange = e => setSnap('rot', e.target.value);
+try {
+  snapUi.pos = +localStorage.getItem('mrsim.snap.pos') || 0;
+  snapUi.rot = +localStorage.getItem('mrsim.snap.rot') || 0;
+  snapPosSel.value = String(snapUi.pos);
+  snapRotSel.value = String(snapUi.rot);
+} catch {}
+applySnap();
 
 function elemIndexByName(name) {
   return currentData ? currentData.elements.findIndex(e => e.name === name) : -1;
@@ -1523,30 +1678,84 @@ function setTransformPos(tr, x, y, z) {
 function pushUndoOps(ops) {
   editState.undo.push(ops);
   if (editState.undo.length > 100) editState.undo.shift();
+  (editState.redo ||= []).length = 0;   // a fresh edit invalidates the redo branch
+  refreshHistoryButtons();
 }
 const attrsOp = el => ({ type: 'attrs', el, attrs: [...el.attributes].map(a => [a.name, a.value]) });
 function pushUndo(tr) { pushUndoOps([attrsOp(tr)]); }
 
-function undoEdit() {
-  const ops = editState?.undo.pop();
-  if (!ops) return;
+// Apply a recorded op set and RETURN the op set that reverses it, so undo and
+// redo are the same replay run in opposite directions. Ops are applied in
+// reverse order (later ops are peeled off first) and the inverse is collected
+// in that same reversed order — so replaying the inverse reverses it a second
+// time and lands back in the original order. That double flip is what makes
+// nested structure work: undo removes a child before its parent, redo
+// re-inserts the parent before the child.
+function applyOps(ops) {
+  const inv = [];
   for (const u of [...ops].reverse()) {
     if (u.type === 'attrs') {
+      inv.push(attrsOp(u.el));
       [...u.el.attributes].forEach(a => u.el.removeAttribute(a.name));
       u.attrs.forEach(([n, v]) => u.el.setAttribute(n, v));
     } else if (u.type === 'insert') {
+      // capture where it sits BEFORE unlinking it, so the reverse can put it back
+      inv.push({ type: 'remove', parent: u.node.parentNode,
+        node: u.node, next: u.node.nextSibling });
       u.node.parentNode?.removeChild(u.node);
     } else if (u.type === 'remove') {
       u.parent.insertBefore(u.node, u.next || null);
+      inv.push({ type: 'insert', node: u.node });
     } else if (u.type === 'text') {
+      inv.push({ type: 'text', el: u.el, text: u.el.textContent });
       u.el.textContent = u.text;
     }
   }
-  editState.dirty = editState.undo.length > 0;
-  rebuildFromDoc();
+  return inv;
 }
 
-async function rebuildFromDoc() {
+function undoEdit() {
+  const ops = editState?.undo.pop();
+  if (!ops) return;
+  (editState.redo ||= []).push(applyOps(ops));
+  editState.dirty = editState.undo.length > 0;
+  refreshHistoryButtons();
+  return rebuildFromDoc();
+}
+
+function redoEdit() {
+  const ops = editState?.redo?.pop();
+  if (!ops) return;
+  editState.undo.push(applyOps(ops));
+  editState.dirty = true;
+  refreshHistoryButtons();
+  return rebuildFromDoc();
+}
+
+const btnUndo = document.getElementById('btnUndo');
+const btnRedo = document.getElementById('btnRedo');
+function refreshHistoryButtons() {
+  const u = editState?.undo?.length || 0, r = editState?.redo?.length || 0;
+  btnUndo.disabled = !u; btnRedo.disabled = !r;
+  btnUndo.title = u ? `undo ${u} step${u > 1 ? 's' : ''} (Ctrl-Z)` : 'nothing to undo';
+  btnRedo.title = r ? `redo ${r} step${r > 1 ? 's' : ''} (Ctrl-Shift-Z / Ctrl-Y)` : 'nothing to redo';
+}
+
+// build() writes shared module state (renderRefs, trackGroup, the instanced
+// meshes), so two rebuilds must never overlap: the second one resets renderRefs
+// to the new element count while the first is still indexing into it with the
+// old one, which throws. Every mutation path funnels through here — place,
+// delete, duplicate, recolour, undo, redo — so serialising at this one point
+// makes rapid input (double-clicking ↶, holding Ctrl-Z) safe. Failures keep the
+// chain alive; each caller still gets its own rejection.
+let rebuildChain = Promise.resolve();
+function rebuildFromDoc() {
+  const next = rebuildChain.then(doRebuildFromDoc, doRebuildFromDoc);
+  rebuildChain = next.catch(() => {});
+  return next;
+}
+
+async function doRebuildFromDoc() {
   const savedSelection = [...editUi.selection];
   const text = new XMLSerializer().serializeToString(editState.doc);
   await loadFromText(text, editState.fileName,
@@ -2248,7 +2457,8 @@ function groundHit(e) {
 
 function placeAt(def, p3) {
   // three ground point -> mrsim: (x, -z, y)
-  const mx = p3.x, my = -p3.z, mz = Math.abs(p3.y) > 5e-4 ? p3.y : 0;
+  const q = v => snapUi.pos ? Math.round(v / snapUi.pos) * snapUi.pos : v;
+  const mx = q(p3.x), my = q(-p3.z), mz = Math.abs(p3.y) > 5e-4 ? p3.y : 0;
   const ops = [];
   const name = uniqueName('ed' + def.id[0].toUpperCase() + def.id.slice(1));
   buildPlacement(def, name, mx, my, mz, ops);
@@ -2424,6 +2634,16 @@ document.getElementById('edColAll').onclick = () => applyColor('all');
 // Restore them by emptying this set once the models ship in models.json.
 const HIDDEN_NO_MODEL = new Set(['champs', 'divecl', 'poleC25', 'standC']);
 
+// the search term is module state rather than being read off the input, so the
+// palette can be re-rendered from anywhere (a component was saved, the shared
+// components arrived) without silently dropping the filter the user typed.
+let palFilter = '';
+const palMatches = def => {
+  if (!palFilter) return true;
+  const hay = (def.label + ' ' + def.id).toLowerCase();
+  return palFilter.split(/\s+/).every(t => hay.includes(t));
+};
+
 // palette buttons — built-ins, then a "custom" section of user/repo components,
 // then the "build object" entry point. Re-rendered whenever components change.
 function renderPalette() {
@@ -2443,10 +2663,14 @@ function renderPalette() {
     b.addEventListener('mouseleave', () => { clearTimeout(previewHover); hidePreview(); });
     return b;
   };
-  PALETTE.filter(def => !HIDDEN_NO_MODEL.has(def.id)).forEach(def => pal.appendChild(mkBtn(def)));
-  const custom = customDefs();
-  const shadowed = new Set(custom.map(c => c.id));
-  const track = TRACK_OBJECTS.filter(d => !shadowed.has(d.id));
+  const builtin = PALETTE.filter(def => !HIDDEN_NO_MODEL.has(def.id) && palMatches(def));
+  builtin.forEach(def => pal.appendChild(mkBtn(def)));
+  const allCustom = customDefs();
+  const custom = allCustom.filter(palMatches);
+  // shadowing is by the FULL custom set, not the filtered one — a search must
+  // never resurrect a built-in that a custom component has replaced
+  const shadowed = new Set(allCustom.map(c => c.id));
+  const track = TRACK_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
   if (track.length) {
     const div = document.createElement('div');
     div.className = 'palDivide'; div.textContent = 'track objects (VelociDrone)';
@@ -2471,6 +2695,12 @@ function renderPalette() {
       pal.appendChild(b);
     });
   }
+  if (palFilter && !builtin.length && !track.length && !custom.length) {
+    const none = document.createElement('div');
+    none.className = 'palNone';
+    none.textContent = `no objects match “${palFilter}”`;
+    pal.appendChild(none);
+  }
   const build = document.createElement('button');
   build.className = 'palBuild'; build.textContent = '＋ build / manage objects…';
   build.dataset.pid = '__build';
@@ -2478,6 +2708,24 @@ function renderPalette() {
   build.onclick = () => openBuilder(null);
   pal.appendChild(build);
 }
+
+const palSearchEl = document.getElementById('palSearch');
+palSearchEl.addEventListener('input', () => {
+  palFilter = palSearchEl.value.trim().toLowerCase();
+  hidePreview();
+  renderPalette();
+});
+// Esc clears the box first (and only deselects/cancels placement once empty),
+// since the global Esc handler ignores keys typed into inputs anyway
+palSearchEl.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && palSearchEl.value) {
+    e.stopPropagation(); palSearchEl.value = ''; palFilter = ''; renderPalette();
+  }
+});
+document.getElementById('palClear').onclick = () => {
+  palSearchEl.value = ''; palFilter = ''; renderPalette(); palSearchEl.focus();
+};
+
 loadLocalComponents();
 renderPalette();
 loadSharedComponents().then(renderPalette);
@@ -2517,7 +2765,7 @@ function initPreview() {
 function previewXml(def) {
   const saved = editState;
   editState = { doc: new DOMParser().parseFromString('<Simulation></Simulation>', 'text/xml'),
-    fileName: 'preview.xml', index: new Map(), dirty: false, undo: [] };
+    fileName: 'preview.xml', index: new Map(), dirty: false, undo: [], redo: [] };
   try { buildPlacement(def, 'pv_' + def.id, 0, 0, 0, []);
     return new XMLSerializer().serializeToString(editState.doc); }
   finally { editState = saved; }               // sync only — restored before any await
@@ -3321,7 +3569,10 @@ addEventListener('keydown', e => {
 addEventListener('keydown', e => {
   if (builderOpen) return;                 // modal owns the keyboard while open
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName)) return;
-  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undoEdit(); return; }
+  if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault(); e.shiftKey ? redoEdit() : undoEdit(); return; }
+  if (e.key.toLowerCase() === 'y' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault(); redoEdit(); return; }
   if (!editUi.on) return;
   if (e.key === 'g' || e.key === 't') setGizmoMode('translate');
   else if (e.key === 'r') setGizmoMode('rotate');
@@ -3342,6 +3593,9 @@ function exportXml() {
   a.download = editState.dirty ? `${stem}-edited.xml` : `${stem}.xml`;
   a.click();
   URL.revokeObjectURL(a.href);
+  // the work is now on disk — stop the discard prompts until the next edit
+  editState.savedMark = historyMark();
+  statusEl.textContent = statusEl.textContent.replace(' · UNSAVED', ' · exported');
 }
 
 // headless hooks for automated testing of the editor itself
@@ -3353,7 +3607,11 @@ window.__edit = {
   mode: setGizmoMode,
   state: () => ({ on: editUi.on, selected: editUi.selectedName,
     selection: [...editUi.selection], dirty: !!editState?.dirty,
-    undoDepth: editState?.undo.length || 0 }),
+    unsaved: hasUnsavedWork(),
+    // snap reports what actually reached the gizmo, not just the select values
+    snap: { ...snapUi, gizmoT: tc.translationSnap, gizmoR: tc.rotationSnap },
+    undoDepth: editState?.undo.length || 0,
+    redoDepth: editState?.redo?.length || 0 }),
   setLocal: (name, vals) => {          // {x,y,z,yawDeg,s} — programmatic edit
     const rec = editState?.index.get(name);
     if (!rec || !rec.trEl) return 'not editable';
@@ -3377,6 +3635,7 @@ window.__edit = {
   },
   xml: () => new XMLSerializer().serializeToString(editState.doc),
   undo: undoEdit,
+  redo: redoEdit,
   _proxy: proxy, _commit: commitEdit,   // test hooks for the gizmo-drag path
   // editor feature hooks
   palette: () => allPalette().map(p => p.id),
@@ -3419,7 +3678,16 @@ BUNDLED.forEach(([path, label]) => {
   const o = document.createElement('option'); o.value = path; o.textContent = label;
   trackSel.appendChild(o);
 });
-trackSel.onchange = () => loadFromUrl(trackSel.value);
+// the select is the record of which bundled track is showing, so every path
+// that changes it goes through syncTrackSel — that keeps the value to fall
+// back to when a load is cancelled at the unsaved-edits prompt
+let lastTrackValue = '';
+function syncTrackSel(idx) { trackSel.selectedIndex = idx; lastTrackValue = trackSel.value; }
+trackSel.onchange = () => {
+  if (!confirmDiscard('Loading another track')) { trackSel.value = lastTrackValue; return; }
+  lastTrackValue = trackSel.value;
+  loadFromUrl(trackSel.value);
+};
 
 // import: MRSIM .xml directly; VelociDrone .trk / viewer .json through the
 // same converter the main viewer uses (checkpoints face the lap direction,
@@ -3445,7 +3713,8 @@ async function convertVdText(text, fileName) {
 
 document.getElementById('file').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
-  trackSel.selectedIndex = -1;
+  if (!confirmDiscard(`Importing ${f.name}`)) { e.target.value = ''; return; }
+  syncTrackSel(-1);
   const text = await f.text();
   if (/\.(trk|json)$/i.test(f.name)) {
     statusEl.textContent = 'converting VelociDrone track…';
@@ -3454,11 +3723,12 @@ document.getElementById('file').onchange = async e => {
       await loadFromText(xml, name + '-MRSIM.xml');
       if (warnings.length) {
         errEl.textContent = 'converter notes:\n· ' + warnings.join('\n· ');
-        diagEl.classList.remove('hidden');
+        setDiag(true);
       }
     } catch (err) {
       statusEl.textContent = 'convert error';
-      diagEl.classList.remove('hidden');
+      setDiag(true);
+      diagChipError('convert failed', 'CONVERT ERROR: ' + err.message);
       errEl.textContent = 'CONVERT ERROR: ' + err.message;
     }
   } else {
@@ -3493,7 +3763,8 @@ const NEW_TRACK_XML = `<Simulation>
 </Simulation>
 `;
 document.getElementById('btnNew').onclick = async () => {
-  trackSel.selectedIndex = -1;
+  if (!confirmDiscard('Starting a new track')) return;
+  syncTrackSel(-1);
   await loadFromText(NEW_TRACK_XML, 'new-track.xml');
   setEditMode(true);
 };
@@ -3519,16 +3790,16 @@ try { if (localStorage.getItem('mrsim.projection') === 'ortho') setProjection('o
 document.getElementById('btnCp').onclick = e => {
   e.target.classList.toggle('on'); cpGroup.visible = e.target.classList.contains('on');
 };
-document.getElementById('btnDiag').onclick = e => {
-  e.target.classList.toggle('on'); diagEl.classList.toggle('hidden', !e.target.classList.contains('on'));
-};
+diagChip.onclick = () => setDiag(diagEl.classList.contains('hidden'));
 document.getElementById('btnEdit').onclick = () => setEditMode(!editUi.on);
 document.getElementById('btnExport').onclick = exportXml;
 
-// initial load: ?track= param, else first bundled
-diagEl.classList.remove('hidden');
-document.getElementById('btnDiag').classList.add('on');
+// initial load: ?track= param, else first bundled. Diagnostics stays closed —
+// the toolbar chip reports validity, and load/parse/convert errors open the
+// panel on their own via setDiag(true).
+document.getElementById('btnUndo').onclick = undoEdit;
+document.getElementById('btnRedo').onclick = redoEdit;
 const qs = new URLSearchParams(location.search).get('track');
-if (qs) { trackSel.selectedIndex = -1; loadFromUrl(qs); }
-else { trackSel.selectedIndex = 0; loadFromUrl(BUNDLED[0][0]); }
+if (qs) { syncTrackSel(-1); loadFromUrl(qs); }
+else { syncTrackSel(0); loadFromUrl(BUNDLED[0][0]); }
 </script>

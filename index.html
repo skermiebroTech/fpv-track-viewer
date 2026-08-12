@@ -68,14 +68,14 @@
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
-  #btnTrk, #btnConvert, #btnBrowse, #btnTheme {
+  #btnTrk, #btnConvert, #btnDownload, #btnBrowse, #btnTheme {
     flex: 0 0 auto; background: var(--green); color: #fff;
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 12px; font-size: 13px; font-weight: 800; cursor: pointer;
   }
-  #btnConvert, #btnBrowse, #btnTheme { background: var(--card); color: var(--green); }
+  #btnConvert, #btnDownload, #btnBrowse, #btnTheme { background: var(--card); color: var(--green); }
   #btnTheme { padding: 7px 9px; }
-  #btnTrk:hover, #btnConvert:hover, #btnBrowse:hover, #btnTheme:hover { filter: brightness(1.12); }
+  #btnTrk:hover, #btnConvert:hover, #btnDownload:hover, #btnBrowse:hover, #btnTheme:hover { filter: brightness(1.12); }
   #convEnv {
     flex: 0 0 auto; max-width: 170px; background: var(--card); color: var(--ink);
     border: 2px solid var(--line); border-radius: 8px;
@@ -287,7 +287,7 @@
     #header .btxt { display: none; }            /* icon-only buttons */
     #trackSelect { flex: 1 1 130px; min-width: 0; margin-left: 0;
       padding: 8px 6px; font-size: 12px; }
-    #btnTrk, #btnConvert, #btnBrowse, #btnTheme { padding: 8px 10px; }
+    #btnTrk, #btnConvert, #btnDownload, #btnBrowse, #btnTheme { padding: 8px 10px; }
     #convEnv { max-width: 96px; font-size: 11px; padding: 8px 4px; }
 
     #panel { left: 10px; width: min(300px, calc(100vw - 20px)); }
@@ -317,8 +317,11 @@
   <select id="trackSelect"></select>
   <button id="btnBrowse" title="Search and view official VelociDrone tracks (community index)">🌐<span class="btxt"> Browse</span></button>
   <button id="btnTrk" title="View a VelociDrone .trk or MRSIM .xml track file">📂<span class="btxt"> Open track</span></button>
-  <select id="convEnv" title="Environment for the converted track"></select>
-  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)">⇄<span class="btxt"> Convert</span></button>
+  <button id="btnDownload" title="Download the displayed track as a VelociDrone .trk file" style="display:none">⬇<span class="btxt"> Download .trk</span></button>
+  <!-- converter kept in the DOM (still reachable via window.convertCurrent) but
+       hidden from the header — flip these back to show it again -->
+  <select id="convEnv" title="Environment for the converted track" style="display:none"></select>
+  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)" style="display:none">⇄<span class="btxt"> Convert</span></button>
   <button id="btnEditor" title="3D track editor — place MRSIM gates and checkpoints, edit the lap, import VelociDrone or MRSIM tracks" onclick="location.href='mrsim-test.html'">🛠<span class="btxt"> Editor</span></button>
   <button id="btnTheme" title="Toggle dark mode">🌙</button>
   <input type="file" id="trkFile" accept=".trk,.xml" hidden>
@@ -502,6 +505,6 @@
 <!-- bump ?v= together with the importmap entries above whenever the modules
      change — plain dev servers send no cache headers and browsers happily
      serve stale modules otherwise -->
-<script type="module" src="app.js?v=23"></script>
+<script type="module" src="app.js?v=24"></script>
 </body>
 </html>
