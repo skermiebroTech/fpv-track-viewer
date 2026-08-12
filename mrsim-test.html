@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>MRSIM 3D track editor</title>
+<title>FPV Track Editor</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -236,11 +236,26 @@
   #builder .addRow button:hover { border-color: #7ab648; color: #b7e07a; }
   #builder .cpRow { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; color: #8a93a6; }
   #builder .bImport { display: none; }
+
+  /* ---- first-run notice (shown once, then remembered in localStorage) ---- */
+  #notice { position: fixed; inset: 0; z-index: 30; display: none;
+    background: #05070bcc; backdrop-filter: blur(2px); }
+  #notice.show { display: flex; align-items: center; justify-content: center; }
+  #notice .sheet { width: min(440px, 92vw); background: #12151d;
+    border: 1px solid #2b3242; border-radius: 10px; padding: 18px 20px 16px;
+    box-shadow: 0 24px 80px #000a; }
+  #notice h2 { font-size: 15px; margin: 0 0 8px; color: #fff; }
+  #notice p { margin: 0 0 8px; color: #dfe3ea; }
+  #notice p.sub { color: #8a93a6; margin-bottom: 14px; }
+  #notice button { display: block; margin-left: auto; background: #24406e;
+    border: 1px solid #4a83ff; color: #dfe3ea; border-radius: 5px;
+    padding: 5px 14px; font: inherit; cursor: pointer; }
+  #notice button:hover { background: #2b4c82; }
 </style>
 
 <div id="app"></div>
 <div id="bar">
-  <span class="title">MRSIM editor</span>
+  <span class="title">FPV Track Editor</span>
   <select id="track"></select>
   <label class="file">import<input id="file" type="file" accept=".xml,.trk,.json"></label>
   <button id="btnNew" title="start a blank track">new</button>
@@ -410,6 +425,41 @@
 
 <div id="legend"></div>
 <div id="ctrlLegend"></div>
+
+<div id="notice">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="noticeTitle">
+    <h2 id="noticeTitle">Heads up</h2>
+    <p>This editor currently only supports editing and exporting tracks from the
+      MRSIM simulator.</p>
+    <p class="sub">VelociDrone <code>.trk</code>/<code>.json</code> files can still be
+      imported — they are converted to MRSIM on load, and export is always MRSIM
+      <code>.xml</code>.</p>
+    <button id="noticeOk" autofocus>Got it</button>
+  </div>
+</div>
+
+<!-- plain (non-module) script so the notice paints immediately, before the
+     editor module and its Three.js imports have finished loading -->
+<script>
+(function () {
+  const KEY = 'mrsim.notice.mrsimOnly';        // bump the suffix to re-show a new notice
+  let seen = false;
+  try { seen = localStorage.getItem(KEY) === '1'; } catch {}
+  if (seen) return;
+  const el = document.getElementById('notice');
+  el.classList.add('show');
+  function dismiss() {
+    el.classList.remove('show');
+    try { localStorage.setItem(KEY, '1'); } catch {}
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) { if (e.key === 'Escape' || e.key === 'Enter') dismiss(); }
+  document.getElementById('noticeOk').addEventListener('click', dismiss);
+  el.addEventListener('mousedown', e => { if (e.target === el) dismiss(); });
+  document.addEventListener('keydown', onKey);
+  document.getElementById('noticeOk').focus();
+})();
+</script>
 
 <script type="importmap">
 {
