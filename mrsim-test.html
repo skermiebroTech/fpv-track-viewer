@@ -89,7 +89,13 @@
   #editPanel .pal button:hover { border-color: #7ab648; }
   #editPanel .pal button.arm { background: #2a4a1e; border-color: #7ab648; }
   #editPanel .lapRow { display: flex; align-items: center; gap: 4px; padding: 1px 0;
-    font-size: 11.5px; }
+    font-size: 11.5px; border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
+  #editPanel .lapRow .grip { color: #4a5468; cursor: grab; flex: 0 0 auto;
+    font-size: 10px; letter-spacing: -1px; user-select: none; }
+  #editPanel .lapRow .grip:hover { color: #b7e07a; }
+  #editPanel .lapRow.dragging { opacity: .35; }
+  #editPanel .lapRow.dropBefore { border-top-color: #7ab648; }
+  #editPanel .lapRow.dropAfter { border-bottom-color: #7ab648; }
   #editPanel .lapRow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; cursor: pointer; }
   #editPanel .lapRow .nm:hover { color: #fff; }
@@ -222,7 +228,8 @@
     padding: 1px 6px; font-size: 10.5px; color: #9aa4b8; }
   #builder .part .ph input[type=color] { width: 24px; height: 20px; padding: 0; border: 1px solid #2b3242;
     border-radius: 4px; background: none; cursor: pointer; flex: 0 0 auto; }
-  #builder .part .ph .nm { flex: 1; }
+  #builder .part .ph input.pnm { flex: 1; min-width: 0; width: auto;
+    padding: 2px 6px; font-size: 11px; }
   #builder .part .ph .rm { background: none; border: none; color: #8a93a6; cursor: pointer;
     font: inherit; padding: 0 3px; }
   #builder .part .ph .rm:hover { color: #ff8a7a; }
@@ -230,9 +237,9 @@
     align-items: center; }
   #builder .part .grid3 .gl { color: #8a93a6; font-size: 10.5px; }
   #builder .part .grid3 input { padding: 2px 4px; font-size: 11px; }
-  #builder .addRow { display: flex; gap: 6px; margin-top: 4px; }
-  #builder .addRow button { flex: 1; background: #1a1e28; color: #dfe3ea; border: 1px dashed #3a4358;
-    border-radius: 5px; padding: 5px 0; font: inherit; cursor: pointer; }
+  #builder .addRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  #builder .addRow button { flex: 1 0 30%; background: #1a1e28; color: #dfe3ea; border: 1px dashed #3a4358;
+    border-radius: 5px; padding: 5px 0; font: inherit; font-size: 11.5px; cursor: pointer; }
   #builder .addRow button:hover { border-color: #7ab648; color: #b7e07a; }
   #builder .cpRow { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; color: #8a93a6; }
   #builder .bImport { display: none; }
@@ -326,7 +333,7 @@
     <button id="edDel" class="danger">✕ delete</button>
   </div>
   <div class="btnRow"><button id="edToBuilder"
-    title="copy this object's shapes (and checkpoint) into the object builder as a new, reusable custom object">＋ copy to object builder</button></div>
+    title="copy the selected object's shapes (and checkpoint) into the object builder as a new, reusable custom object — with a multi-selection, all selected objects merge into one">＋ copy to object builder</button></div>
   <div id="edStartRow" style="display:none;border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
     <div class="btnRow"><button id="edSetStart">★ set as start / finish</button></div>
     <div class="hint" id="edStartTip" style="margin-top:4px">the red-banner gate the lap starts &amp; finishes at</div>
@@ -344,6 +351,7 @@
   <div class="hint" id="edHint">click an object or checkpoint ring to select ·
     <b>Ctrl</b>-click adds/removes from the selection (move many at once) ·
     keys: <b>g</b> move / <b>r</b> rotate / <b>s</b> scale / <b>Esc</b> deselect /
+    <b>Ctrl-G</b> group selection / <b>Ctrl-Shift-G</b> ungroup /
     <b>Ctrl-Z</b> undo / <b>Ctrl-Shift-Z</b> redo · MRSIM coords (z up), yaw = angleDegrees</div>
 
   <details class="edSect" id="edPlaceSect" open>
@@ -403,6 +411,10 @@
         <div class="addRow">
           <button id="bAddBox">＋ box</button>
           <button id="bAddCyl">＋ cylinder</button>
+          <button id="bAddSphere">＋ sphere</button>
+          <button id="bAddPyramid">＋ pyramid</button>
+          <button id="bAddWedge">＋ wedge</button>
+          <button id="bAddCone">＋ cone</button>
         </div>
       </div>
     </div>
@@ -462,7 +474,7 @@
   "imports": {
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
-    "./mrsim.js": "./mrsim.js?v=10",
+    "./mrsim.js": "./mrsim.js?v=11",
     "./mrsim-lib.js": "./mrsim-lib.js?v=6"
   }
 }
@@ -812,6 +824,36 @@ function matFor(hint) {
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const unitCyl = new THREE.CylinderGeometry(1, 1, 1, 14); unitCyl.rotateX(Math.PI / 2);
+const unitSphere = new THREE.SphereGeometry(1, 20, 14);
+const unitCone = new THREE.ConeGeometry(1, 1, 20); unitCone.rotateX(Math.PI / 2);
+
+// pyramid/wedge unit geometry, built from the SAME vertex/triangle generator the
+// XML emitter uses (polyGeo) so the editor shows exactly what MRSIM will build.
+// Flat-shaded: expand the indexed triangles so each face gets its own normals.
+function geoFromPoly(shape) {
+  const { verts, tris } = polyGeo(shape, shape === 'cone' ? [1, 1] : [1, 1, 1]);
+  const pos = [];
+  for (const [a, b, c] of tris)
+    for (const i of [a, b, c]) pos.push(verts[i][0], verts[i][1], verts[i][2]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+const unitPyramid = geoFromPoly('pyramid');
+const unitWedge = geoFromPoly('wedge');
+// every shared unit geometry — excluded from disposal in clearGroup etc.
+const UNIT_GEOS = new Set([unitBox, unitCyl, unitSphere, unitCone, unitPyramid, unitWedge]);
+const GEO_FOR = { box: unitBox, cyl: unitCyl, sphere: unitSphere, cone: unitCone,
+  pyramid: unitPyramid, wedge: unitWedge };
+// prim {shape, dims} -> per-axis scale of its unit geometry. `poly` (a foreign
+// inline polyhedron) has no unit geometry — render its bounding box.
+function primScale(p) {
+  if (p.shape === 'cyl') return [p.dims[0], p.dims[0], p.dims[1]];
+  if (p.shape === 'cone') return [p.dims[0], p.dims[0], p.dims[1]];
+  if (p.shape === 'sphere') { const r = p.dims[0] || 0.1; return [r, r, r]; }
+  return p.dims.map(d => Math.max(d, 0.02));   // box / pyramid / wedge / poly bbox
+}
 const sensorMat = new THREE.MeshBasicMaterial({
   color: '#e0c040', transparent: true, opacity: 0.08,
   depthWrite: false, side: THREE.DoubleSide });
@@ -823,7 +865,7 @@ const KIND_LABEL = { gate:'gate', dive:'dive gate', cube:'pipe cube', pole:'pole
 // build the parsed track into the scene + compute diagnostics
 // ---------------------------------------------------------------------------
 function clearGroup(g) {
-  g.traverse(o => { if (o.geometry && o.geometry !== unitBox && o.geometry !== unitCyl) o.geometry.dispose?.(); });
+  g.traverse(o => { if (o.geometry && !UNIT_GEOS.has(o.geometry)) o.geometry.dispose?.(); });
   while (g.children.length) g.remove(g.children[0]);
 }
 
@@ -900,15 +942,12 @@ async function build(data, keepCamera = false) {
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;
       const hint = p.hint;
-      let scale;
-      if (p.shape === 'cyl') {
-        const r = hint === 'pvc' ? Math.max(p.dims[0], 0.04) : p.dims[0];
-        scale = [r, r, p.dims[1]];
-      } else scale = p.dims.map(d => Math.max(d, 0.02));
+      const scale = primScale(p);
+      if (p.shape === 'cyl' && hint === 'pvc') scale[0] = scale[1] = Math.max(p.dims[0], 0.04);
       const dm = docMat(p.material);
       const key = `${dm ? 'mat:' + p.material : hint}|${p.shape}`;
       if (!buckets.has(key))
-        buckets.set(key, { geo: p.shape === 'cyl' ? unitCyl : unitBox, mat: dm || matFor(hint), list: [], elems: [] });
+        buckets.set(key, { geo: GEO_FOR[p.shape] || unitBox, mat: dm || matFor(hint), list: [], elems: [] });
       const b = buckets.get(key);
       b.list.push(p.matrix.clone().scale(V.set(scale[0], scale[1], scale[2])));
       b.elems.push(ei);
@@ -1430,7 +1469,7 @@ function setPrimary(name, silent = false) {
   editUi.startScale = proxy.scale.x;
   if (editUi.on) tc.attach(proxy);
   document.getElementById('edHint').innerHTML = more > 0
-    ? `moving <b>${editUi.selection.length}</b> objects together · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl</b>-click adds/removes`
+    ? `moving <b>${editUi.selection.length}</b> objects together · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl</b>-click adds/removes · <b>Ctrl+G</b> group`
     : isFreeSensor(name)
       ? 'sensor box: <b>g</b> move · <b>r</b> rotate (any axis) · <b>s</b> scale (per-axis) · <b>w×h×d</b> fields'
       : 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl</b>-click multi · <b>Ctrl-Z</b> undo';
@@ -2280,12 +2319,69 @@ function writeVec(el, pos) {
     if (Math.abs(val) > 5e-4) el.setAttribute(a, val.toFixed(3)); else el.removeAttribute(a);
   });
 }
+// ---- pyramid / wedge / cone as MRSIM <Polyhedron> --------------------------
+// MRSIM has no native pyramid/wedge/cone prim, but its Polyhedron accepts an
+// inline mesh: <Vertices count>x, y, z, …</Vertices> + <Triangles count>a, b, c,
+// …</Triangles> (Source/Math/PolyhedronXml.cpp — the same "%lf, %lf, %lf" lines
+// the engine itself writes). All three generators are origin-centred like <Box>
+// (z spans −h/2..+h/2), with outward CCW winding. The parser (mrsim.js) detects
+// these exact structures so a placed object round-trips into copy-to-builder.
+function polyGeo(shape, dims) {
+  if (shape === 'cone') {
+    const [r = 0.5, h = 1] = dims, hh = h / 2, N = 16;
+    const verts = [];
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      verts.push([r * Math.cos(a), r * Math.sin(a), -hh]);
+    }
+    verts.push([0, 0, hh], [0, 0, -hh]);           // apex 16, base centre 17
+    const tris = [];
+    for (let i = 0; i < N; i++) {
+      tris.push([i, (i + 1) % N, N]);              // side
+      tris.push([(i + 1) % N, i, N + 1]);          // base (faces down)
+    }
+    return { verts, tris };
+  }
+  const [x = 1, y = 1, z = 1] = dims;
+  const hw = x / 2, hd = y / 2, hh = z / 2;
+  if (shape === 'wedge') {
+    // triangular prism: rectangular base, ridge along y at the top
+    const verts = [[-hw, -hd, -hh], [hw, -hd, -hh], [hw, hd, -hh], [-hw, hd, -hh],
+      [0, -hd, hh], [0, hd, hh]];
+    const tris = [[0, 3, 2], [0, 2, 1],            // bottom
+      [0, 4, 5], [0, 5, 3],                        // -x slope
+      [1, 2, 5], [1, 5, 4],                        // +x slope
+      [0, 1, 4], [2, 3, 5]];                       // end caps
+    return { verts, tris };
+  }
+  // pyramid: rectangular base, apex centred above
+  const verts = [[-hw, -hd, -hh], [hw, -hd, -hh], [hw, hd, -hh], [-hw, hd, -hh], [0, 0, hh]];
+  const tris = [[0, 3, 2], [0, 2, 1],              // bottom
+    [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]];   // sides
+  return { verts, tris };
+}
+const POLY_SHAPES = new Set(['pyramid', 'wedge', 'cone']);
+function mkPolyhedronEl(doc, shape, dims) {
+  const { verts, tris } = polyGeo(shape, dims);
+  const el = doc.createElement('Polyhedron');
+  const fmt = (rows, dec) => '\n' + rows.map((r, i) =>
+    '            ' + r.map(v => dec ? String(Math.round(v)) : (+v.toFixed(4)).toString()).join(', ') +
+    (i < rows.length - 1 ? ',' : '')).join('\n') + '\n        ';
+  const V = doc.createElement('Vertices'); V.setAttribute('count', String(verts.length));
+  V.textContent = fmt(verts, false);
+  const T = doc.createElement('Triangles'); T.setAttribute('count', String(tris.length));
+  T.textContent = fmt(tris, true);
+  el.append(V, T);
+  return el;
+}
+
 // emit a saved component `def` (from the builder) as parts + optional checkpoint,
 // mirroring buildCustomGate but data-driven. Part colours reuse the recolour
 // machinery's EdColor_<HEX> materials, so a placed object is self-contained XML.
 function buildCustomComponent(doc, ent, name, def, ops) {
   const mk = (tag, attrs) => { const e = doc.createElement(tag);
     for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== '') e.setAttribute(k, attrs[k]); return e; };
+  const usedSuffixes = new Set();
   (def.parts || []).forEach((part, i) => {
     // a named material (the converter's own) or a plain colour swatch
     let material;
@@ -2295,18 +2391,33 @@ function buildCustomComponent(doc, ent, name, def, ops) {
     // names (_postL/_banner/_pole/_cloth). That is not cosmetic: the start-
     // gate machinery finds a gate's banner by material OR by a name ending
     // in "banner", so a recoloured `_p2` banner would leave the track with no
-    // findable start gate. User-built parts stay `_p0`, `_p1`, …
-    const e = mk('Entity', { name: name + (part.suffix || `_p${i}`) });
+    // findable start gate. User-built parts use their builder name, else `_p<i>`;
+    // "_pass" is reserved for the checkpoint trigger and duplicates get the
+    // index appended so every entity name stays unique.
+    let suffix = part.suffix;
+    if (!suffix) {
+      const nm = (part.name || '').trim().replace(/[^A-Za-z0-9_-]+/g, '_')
+        .replace(/^_+|_+$/g, '').slice(0, 24);
+      suffix = nm ? '_' + nm : `_p${i}`;
+      if (suffix === '_pass' || usedSuffixes.has(suffix)) suffix += `_${i}`;
+    }
+    usedSuffixes.add(suffix);
+    const e = mk('Entity', { name: name + suffix });
     const wf = mk('WorldFromEntityComponent', {});
     writeVec(wf, part.pos); writeRotation(wf, partQuat(part));
     e.appendChild(wf);
     const d = (part.dims || []).map(v => (+v || 0).toFixed(3));
     if (part.shape === 'cyl') e.appendChild(mk('Cylinder', { radius: d[0] || '0.1', height: d[1] || '1' }));
+    else if (part.shape === 'sphere') e.appendChild(mk('Sphere', { radius: d[0] || '0.5' }));
+    else if (POLY_SHAPES.has(part.shape))
+      e.appendChild(mkPolyhedronEl(doc, part.shape, (part.dims || []).map(v => +v || 0)));
     else e.appendChild(mk('Box', { x: d[0] || '0.5', y: d[1] || '0.5', z: d[2] || '0.5' }));
     // solid:false = render only, no collider — VD flag cloth is soft enough to
     // brush at race speed, so the converter never makes it a hard surface
     if (part.solid !== false) e.appendChild(mk('StaticContact', { contactMaterial: 'TrackPart' }));
-    e.appendChild(mk('MeshRendererComponent', { material, subdivisions: part.shape === 'cyl' ? '12' : '1' }));
+    // subdivisions tessellates curved prims (BaylandsPark spheres use 32)
+    e.appendChild(mk('MeshRendererComponent', { material,
+      subdivisions: part.shape === 'cyl' ? '12' : part.shape === 'sphere' ? '24' : '1' }));
     ent.appendChild(e);
   });
   if (def.cp) {   // fly-through trigger box + ring reference (resolved vs parent)
@@ -2549,14 +2660,61 @@ function setSelectionSet(names, primary) {
   refreshSelectionHighlight();
 }
 
+// ---- grouping (Ctrl+G / Ctrl+Shift+G) --------------------------------------
+// A group is an `edGroup="g<n>"` attribute on each member's placement
+// <Transform>: it survives export/re-import (MRSIM ignores unknown attributes,
+// and so does our parser), it is undo-able like any attribute edit, and a plain
+// click on any member selects the whole group. Ctrl-click still toggles single
+// objects, so members can be cherry-picked out of a group selection.
+function groupIdOf(name) {
+  return editState?.index.get(name)?.trEl?.getAttribute('edGroup') || null;
+}
+function groupMembers(gid) {
+  if (!gid || !currentData) return [];
+  return currentData.elements.map(e => e.name).filter(n => groupIdOf(n) === gid);
+}
+function groupSelection() {
+  const names = editUi.selection.filter(n => editState?.index.get(n)?.trEl);
+  if (names.length < 2)
+    return edFlash('Ctrl-click two or more objects first, then Ctrl+G groups them', true);
+  const used = new Set(currentData.elements.map(e => groupIdOf(e.name)).filter(Boolean));
+  let n = 1;
+  while (used.has('g' + n)) n++;
+  const gid = 'g' + n;
+  const ops = [];
+  for (const nm of names) {
+    const tr = editState.index.get(nm).trEl;
+    ops.push(attrsOp(tr));
+    tr.setAttribute('edGroup', gid);
+  }
+  pushUndoOps(ops);
+  editState.dirty = true;
+  edFlash(`grouped ${names.length} objects (${gid}) — click any member to select them all · Ctrl+Shift+G ungroups`);
+  return gid;
+}
+function ungroupSelection() {
+  const ops = [];
+  for (const nm of editUi.selection) {
+    const tr = editState?.index.get(nm)?.trEl;
+    if (!tr || !tr.hasAttribute('edGroup')) continue;
+    ops.push(attrsOp(tr));
+    tr.removeAttribute('edGroup');
+  }
+  if (!ops.length) return edFlash('nothing grouped in the selection', true);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  edFlash(`ungrouped ${ops.length} object${ops.length > 1 ? 's' : ''}`);
+}
+
 function duplicateSelected() {
   const names = editUi.selection.filter(n => editState?.index.get(n)?.trEl);
   if (!names.length) return;
   const ops = [];
   const newNames = [];
   let newPrimary = null;
+  const gidMap = new Map();   // source group id -> fresh id for this batch of copies
   for (const n of names) {
-    const nn = duplicateOne(n, ops);
+    const nn = duplicateOne(n, ops, gidMap);
     if (nn) { newNames.push(nn); if (n === editUi.selectedName) newPrimary = nn; }
   }
   if (!ops.length) return;
@@ -2567,10 +2725,23 @@ function duplicateSelected() {
 
 // clone one element (inserted into the DOM so later clones stay name-unique) and
 // return the copy's leaf name; appends its undo ops to `ops`.
-function duplicateOne(name, ops) {
+function duplicateOne(name, ops, gidMap = new Map()) {
   const rec = editState?.index.get(name);
   if (!rec?.trEl) return null;
   const clone = rec.trEl.cloneNode(true);
+  // duplicated group members form their OWN group, not the source's — one fresh
+  // id per source group per duplicate batch keeps a duplicated pair grouped
+  const srcGid = clone.getAttribute('edGroup');
+  if (srcGid) {
+    if (!gidMap.has(srcGid)) {
+      const used = new Set(currentData.elements.map(e => groupIdOf(e.name)).filter(Boolean));
+      gidMap.forEach(v => used.add(v));
+      let n = 1;
+      while (used.has('g' + n)) n++;
+      gidMap.set(srcGid, 'g' + n);
+    }
+    clone.setAttribute('edGroup', gidMap.get(srcGid));
+  }
   // rename every named entity in the clone to keep names unique
   const renames = new Map();
   const walk = el => {
@@ -2621,7 +2792,8 @@ function renderLapPanel() {
   const names = lapNames();
   const selListName = editUi.selectedName ? listNameFor(editUi.selectedName) : null;
   box.innerHTML = names.map((n, i) =>
-    `<div class="lapRow${n === selListName ? ' sel' : ''}" data-i="${i}">` +
+    `<div class="lapRow${n === selListName ? ' sel' : ''}" data-i="${i}" draggable="true">` +
+    `<span class="grip" title="drag to reorder">⠿</span>` +
     `<span class="num">${i + 1}</span><span class="nm" title="${escapeHtml(n)}">${escapeHtml(n)}</span>` +
     `<button data-act="up" title="earlier">▲</button>` +
     `<button data-act="dn" title="later">▼</button>` +
@@ -2651,6 +2823,58 @@ document.getElementById('lapList').addEventListener('click', e => {
   editState.dirty = true;
   rebuildFromDoc();
 });
+// drag a lap row to reorder (the ▲▼ arrows still work). Standard HTML5 DnD on
+// the delegated container: the row under the cursor shows a green insert line
+// above or below its midpoint, and drop rewrites the CheckpointList like the
+// arrows do — one undo step, same rebuild.
+{
+  const box = document.getElementById('lapList');
+  let dragI = null;
+  const clearMarks = () => box.querySelectorAll('.lapRow').forEach(r =>
+    r.classList.remove('dragging', 'dropBefore', 'dropAfter'));
+  // cursor above/below the row's midpoint -> insert before/after it
+  const target = e => {
+    const row = e.target.closest('.lapRow');
+    if (!row) return null;
+    const r = row.getBoundingClientRect();
+    return { row, i: +row.dataset.i, before: e.clientY < r.top + r.height / 2 };
+  };
+  box.addEventListener('dragstart', e => {
+    const row = e.target.closest('.lapRow');
+    if (!row) return;
+    dragI = +row.dataset.i;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', row.dataset.i);   // Firefox needs data set
+    row.classList.add('dragging');
+  });
+  box.addEventListener('dragover', e => {
+    if (dragI === null) return;
+    const t = target(e);
+    if (!t) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    box.querySelectorAll('.lapRow').forEach(r => r.classList.remove('dropBefore', 'dropAfter'));
+    if (t.i !== dragI) t.row.classList.add(t.before ? 'dropBefore' : 'dropAfter');
+  });
+  box.addEventListener('drop', e => {
+    const t = target(e);
+    if (dragI === null || !t) return;
+    e.preventDefault();
+    let to = t.i + (t.before ? 0 : 1);
+    if (to > dragI) to--;                                 // account for the removed row
+    const from = dragI;
+    dragI = null; clearMarks();
+    if (to === from) return;
+    const names = lapNames();
+    names.splice(to, 0, names.splice(from, 1)[0]);
+    const ops = [];
+    writeLap(names, lapIsCircuit(), ops);
+    pushUndoOps(ops);
+    editState.dirty = true;
+    rebuildFromDoc();
+  });
+  box.addEventListener('dragend', () => { dragI = null; clearMarks(); });
+}
 document.getElementById('lapCircuit').addEventListener('change', e => {
   const ops = [];
   writeLap(lapNames(), e.target.checked, ops);
@@ -2750,7 +2974,7 @@ function renderPalette() {
   const build = document.createElement('button');
   build.className = 'palBuild'; build.textContent = '＋ build / manage objects…';
   build.dataset.pid = '__build';
-  build.title = 'design your own track object from boxes & cylinders';
+  build.title = 'design your own track object from boxes, cylinders, spheres, pyramids, wedges & cones';
   build.onclick = () => openBuilder(null);
   pal.appendChild(build);
 }
@@ -2844,10 +3068,9 @@ function buildPreviewGroup(data, doc) {
     const meshSrcs = new Set((el.models || []).filter(m => templates.has(m.model)).map(m => m.src));
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;         // collision shadow of a rendered mesh
-      let scale;
-      if (p.shape === 'cyl') { const r = p.hint === 'pvc' ? Math.max(p.dims[0], 0.04) : p.dims[0]; scale = [r, r, p.dims[1]]; }
-      else scale = p.dims.map(d => Math.max(d, 0.02));
-      const mesh = new THREE.Mesh(p.shape === 'cyl' ? unitCyl : unitBox,
+      const scale = primScale(p);
+      if (p.shape === 'cyl' && p.hint === 'pvc') scale[0] = scale[1] = Math.max(p.dims[0], 0.04);
+      const mesh = new THREE.Mesh(GEO_FOR[p.shape] || unitBox,
         previewDocMat(doc, p.material, matCache) || matFor(p.hint));
       mesh.matrixAutoUpdate = false;
       mesh.matrix.copy(p.matrix).scale(V.set(scale[0], scale[1], scale[2]));
@@ -2973,10 +3196,14 @@ const withRef = pass => ({ ...pass, ref: pass.ref
   : defaultRef(pass) });
 const blankComponent = () => ({ label: '', cp: null, parts: [],
   pass: { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5], ref: { pos: [0, 0, 1.25], rot: [0, 0, 0] } } });
+// every shape a builder part can be, with how many dims it carries
+const PART_SHAPES = { box: 3, cyl: 2, sphere: 1, pyramid: 3, wedge: 3, cone: 2 };
+const normShape = s => (s in PART_SHAPES ? s : 'box');
 const cloneForEdit = c => {
   const d = JSON.parse(JSON.stringify(c)); delete d.shared; delete d.id;
   d.cp = d.cp === 'pass' ? 'pass' : null;
-  d.parts = (d.parts || []).map(p => ({ shape: p.shape === 'cyl' ? 'cyl' : 'box',
+  d.parts = (d.parts || []).map(p => ({ shape: normShape(p.shape),
+    name: typeof p.name === 'string' ? p.name : '',
     pos: (p.pos || [0, 0, 0]).slice(0, 3), rot: (p.rot || [0, 0, 0]).slice(0, 3),
     dims: (p.dims || []).slice(0, 3), color: p.color || '#cccccc' }));
   d.pass = withRef(d.pass || { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5] });
@@ -2985,13 +3212,19 @@ const cloneForEdit = c => {
 const r3 = v => Math.round((+v || 0) * 1000) / 1000;
 // strip runtime fields, round numbers — the canonical stored/exported shape
 function cleanComponent(def, id) {
-  const parts = (def.parts || []).map(p => ({
-    shape: p.shape === 'cyl' ? 'cyl' : 'box',
-    pos: (p.pos || [0, 0, 0]).slice(0, 3).map(r3),
-    rot: (p.rot || [0, 0, 0]).slice(0, 3).map(r3),
-    dims: (p.shape === 'cyl' ? (p.dims || []).slice(0, 2) : (p.dims || []).slice(0, 3)).map(r3),
-    color: /^#[0-9a-fA-F]{6}$/.test(p.color || '') ? p.color.toLowerCase() : '#cccccc',
-  }));
+  const parts = (def.parts || []).map(p => {
+    const shape = normShape(p.shape);
+    const out = {
+      shape,
+      pos: (p.pos || [0, 0, 0]).slice(0, 3).map(r3),
+      rot: (p.rot || [0, 0, 0]).slice(0, 3).map(r3),
+      dims: (p.dims || []).slice(0, PART_SHAPES[shape]).map(r3),
+      color: /^#[0-9a-fA-F]{6}$/.test(p.color || '') ? p.color.toLowerCase() : '#cccccc',
+    };
+    const nm = typeof p.name === 'string' ? p.name.trim().slice(0, 24) : '';
+    if (nm) out.name = nm;
+    return out;
+  });
   const out = { id, label: (def.label || 'object').slice(0, 40), cp: def.cp === 'pass' ? 'pass' : null, parts };
   if (out.cp) {
     const pass = withRef(def.pass || {});
@@ -3077,7 +3310,7 @@ function disposeBuilderGroup(g) {
   g.traverse(o => {
     if (o.type === 'ArrowHelper') { o.dispose?.(); return; }
     if (!o.isMesh) return;
-    if (o.geometry && o.geometry !== unitBox && o.geometry !== unitCyl) o.geometry.dispose?.();
+    if (o.geometry && !UNIT_GEOS.has(o.geometry)) o.geometry.dispose?.();
     (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m && !shared.has(m)) m.dispose?.(); });
   });
 }
@@ -3152,26 +3385,34 @@ function renderParts() {
   const host = document.getElementById('bParts');
   const parts = builderState.def.parts;
   if (!parts.length) {
-    host.innerHTML = '<div style="color:#8a93a6;padding:4px 0;font-size:11.5px">no parts yet — add a box or cylinder</div>';
+    host.innerHTML = '<div style="color:#8a93a6;padding:4px 0;font-size:11.5px">no parts yet — add a box, cylinder, sphere, pyramid, wedge or cone</div>';
     return;
   }
   const fv = v => (v === undefined || v === null ? 0 : v);
+  // per-shape size fields: [data-f, title] triples; null = disabled filler
+  const SIZE_FIELDS = {
+    box: [['d0', 'x width (m)'], ['d1', 'y depth (m)'], ['d2', 'z height (m)']],
+    pyramid: [['d0', 'x base (m)'], ['d1', 'y base (m)'], ['d2', 'z height (m)']],
+    wedge: [['d0', 'x base (m)'], ['d1', 'y length (m)'], ['d2', 'z height (m)']],
+    cyl: [['d0', 'radius (m)'], ['d1', 'height (m)'], null],
+    cone: [['d0', 'base radius (m)'], ['d1', 'height (m)'], null],
+    sphere: [['d0', 'radius (m)'], null, null],
+  };
+  const TAG = { box: 'box', cyl: 'cylinder', sphere: 'sphere',
+    pyramid: 'pyramid', wedge: 'wedge', cone: 'cone' };
   host.innerHTML = parts.map((p, i) => {
-    const cyl = p.shape === 'cyl', d = p.dims, pos = p.pos, rot = p.rot;
-    const size = cyl
-      ? `<span class="gl">size</span>
-         <input data-f="d0" type="number" step="0.05" min="0.01" value="${fv(d[0])}" title="radius (m)">
-         <input data-f="d1" type="number" step="0.1" min="0.05" value="${fv(d[1])}" title="height (m)">
-         <input type="number" value="" disabled style="opacity:.25" title="n/a">`
-      : `<span class="gl">size</span>
-         <input data-f="d0" type="number" step="0.1" min="0.01" value="${fv(d[0])}" title="x width (m)">
-         <input data-f="d1" type="number" step="0.1" min="0.01" value="${fv(d[1])}" title="y depth (m)">
-         <input data-f="d2" type="number" step="0.1" min="0.01" value="${fv(d[2])}" title="z height (m)">`;
+    const shape = normShape(p.shape), d = p.dims, pos = p.pos, rot = p.rot;
+    const size = `<span class="gl">size</span>` + SIZE_FIELDS[shape].map((f, k) => f
+      ? `<input data-f="${f[0]}" type="number" step="${f[0] === 'd0' && (shape === 'cyl' || shape === 'cone' || shape === 'sphere') ? 0.05 : 0.1}"
+           min="0.01" value="${fv(d[k])}" title="${f[1]}">`
+      : `<input type="number" value="" disabled style="opacity:.25" title="n/a">`).join('');
     return `<div class="part" data-i="${i}">
       <div class="ph">
-        <span class="tag">${cyl ? 'cylinder' : 'box'}</span>
+        <span class="tag">${TAG[shape]}</span>
         <input class="col" type="color" value="${p.color || '#cccccc'}" title="colour">
-        <span class="nm">${cyl ? 'radius · height' : 'x · y · z'}</span>
+        <input class="pnm" type="text" maxlength="24" spellcheck="false"
+          value="${escapeHtml(p.name || '')}" placeholder="part name (optional)"
+          title="names this part's entity in the exported XML">
         <button class="rm" title="remove part">✕</button>
       </div>
       <div class="grid3">
@@ -3188,10 +3429,18 @@ function renderParts() {
     </div>`;
   }).join('');
 }
+const PART_DEFAULTS = {
+  box: { pos: [0, 0, 1], dims: [1, 0.1, 1], color: '#4a83ff' },
+  cyl: { pos: [0, 0, 1.2], dims: [0.08, 2.4], color: '#f2f2ee' },
+  sphere: { pos: [0, 0, 0.5], dims: [0.5], color: '#e67300' },
+  pyramid: { pos: [0, 0, 0.5], dims: [1, 1, 1], color: '#7ab648' },
+  wedge: { pos: [0, 0, 0.25], dims: [1, 1, 0.5], color: '#b07ae0' },
+  cone: { pos: [0, 0, 0.5], dims: [0.5, 1], color: '#e0c040' },
+};
 function addPart(shape) {
-  builderState.def.parts.push(shape === 'cyl'
-    ? { shape: 'cyl', pos: [0, 0, 1.2], rot: [0, 0, 0], dims: [0.08, 2.4], color: '#f2f2ee' }
-    : { shape: 'box', pos: [0, 0, 1], rot: [0, 0, 0], dims: [1, 0.1, 1], color: '#4a83ff' });
+  const d = PART_DEFAULTS[normShape(shape)];
+  builderState.def.parts.push({ shape: normShape(shape), name: '',
+    pos: d.pos.slice(), rot: [0, 0, 0], dims: d.dims.slice(), color: d.color });
   renderParts(); updateBuilderPreview();
 }
 
@@ -3280,10 +3529,12 @@ function partFromLocal(shape, dims, Lm) {
   const sy = Math.hypot(e[4], e[5], e[6]) || 1;
   const sz = Math.hypot(e[8], e[9], e[10]) || 1;
   const r = eulerFromRot(e, sx, sy, sz);
-  const d = shape === 'cyl'
-    ? [(dims[0] || 0) * (sx + sy) / 2, (dims[1] || 0) * sz]
-    : [(dims[0] || 0) * sx, (dims[1] || 0) * sy, (dims[2] || 0) * sz];
-  return { shape, pos: [e[12], e[13], e[14]].map(r3), rot: [r.yaw, r.pitch, r.roll].map(r3), dims: d.map(r3) };
+  let d;
+  if (shape === 'cyl' || shape === 'cone') d = [(dims[0] || 0) * (sx + sy) / 2, (dims[1] || 0) * sz];
+  else if (shape === 'sphere') d = [(dims[0] || 0) * (sx + sy + sz) / 3];
+  else d = [(dims[0] || 0) * sx, (dims[1] || 0) * sy, (dims[2] || 0) * sz]; // box/pyramid/wedge (+ foreign poly -> its bounding box)
+  return { shape: normShape(shape), pos: [e[12], e[13], e[14]].map(r3),
+    rot: [r.yaw, r.pitch, r.roll].map(r3), dims: d.map(r3) };
 }
 // wrapper world matrix (mrsim space) that defines an element's local origin: its
 // editable placement <Transform>, or — for library-include sub-objects with no
@@ -3301,25 +3552,37 @@ function wrapperWorldMrsim(name, el) {
   return n ? new THREE.Matrix4().setPosition(cx / n, cy / n, isFinite(minZ) ? minZ : 0)
            : new THREE.Matrix4();
 }
-// build a full builder component {label, cp, parts, pass} from a track element
-function elementToComponent(name) {
-  const ei = elemIndexByName(name);
-  if (ei < 0) return null;
-  const el = currentData.elements[ei];
-  const Wm = wrapperWorldMrsim(name, el);
+// build one builder component {label, cp, parts, pass} from a SET of track
+// elements, all expressed in the PRIMARY element's local frame — a single
+// selection is just the one-element case. When several selected objects carry
+// checkpoints, only the primary's (else the first found) survives: a component
+// supports at most one trigger. Returns {droppedCps} so the caller can say so.
+function selectionToComponent(names, primaryName) {
+  const primary = names.includes(primaryName) ? primaryName : names[names.length - 1];
+  const pEi = elemIndexByName(primary);
+  if (pEi < 0) return null;
+  const Wm = wrapperWorldMrsim(primary, currentData.elements[pEi]);
   const WmInv = Wm.clone().invert();
-  const parts = (el.prims || []).map(p => {
-    const part = partFromLocal(p.shape, p.dims, localMrsim(WmInv, p.matrix));
-    part.color = primColorHex(p);
-    return part;
-  });
-  if (!parts.length) return { empty: true, models: (el.models || []).length };
   const def = blankComponent();
-  def.label = name;
-  def.parts = parts;
-  // carry the fly-through checkpoint (trigger box + aimed ring) when present
-  const sn = (el.sensors || [])[0];
-  if (sn) {
+  def.label = primary;
+  let models = 0, droppedCps = 0;
+  // primary first so its checkpoint (if any) is the one that is kept
+  const ordered = [primary, ...names.filter(n => n !== primary)];
+  for (const name of ordered) {
+    const ei = elemIndexByName(name);
+    if (ei < 0) continue;
+    const el = currentData.elements[ei];
+    models += (el.models || []).length;
+    (el.prims || []).forEach(p => {
+      const part = partFromLocal(p.shape, p.dims, localMrsim(WmInv, p.matrix));
+      part.color = primColorHex(p);
+      if (names.length > 1) part.name = name.replace(/^ed/, '');
+      def.parts.push(part);
+    });
+    // carry ONE fly-through checkpoint (trigger box + aimed ring)
+    const sn = (el.sensors || [])[0];
+    if (!sn) continue;
+    if (def.cp === 'pass') { droppedCps++; continue; }
     const sp = partFromLocal('box', sn.dims, localMrsim(WmInv, sn.matrix));
     def.cp = 'pass';
     def.pass = { pos: sp.pos, dims: sp.dims, ref: { pos: sp.pos.slice(), rot: [0, 0, 0] } };
@@ -3338,34 +3601,46 @@ function elementToComponent(name) {
       def.pass.ref = { pos: sp.pos.slice(), rot: [r.yaw, r.pitch, r.roll].map(r3) };
     }
   }
+  if (!def.parts.length) return { empty: true, models };
+  def.droppedCps = droppedCps;
   return def;
 }
+// single-element form (kept for __build.fromElement and internal callers)
+function elementToComponent(name) { return selectionToComponent([name], name); }
 // transient status in the edit panel's hint line (overwritten on next select)
 function edFlash(msg, err = false) {
   const h = document.getElementById('edHint'); if (!h) return;
   h.innerHTML = `<span style="color:${err ? '#ff8a7a' : '#7ab648'}">${escapeHtml(msg)}</span>`;
 }
 function copySelectionToBuilder() {
-  const name = editUi.selectedName;
-  if (!name || elemIndexByName(name) < 0)
+  const names = editUi.selection.filter(n => elemIndexByName(n) >= 0);
+  if (!names.length)
     return edFlash('select a track object first, then copy it to the builder', true);
-  const def = elementToComponent(name);
+  const def = selectionToComponent(names, editUi.selectedName);
   if (!def || def.empty)
     return edFlash(def && def.models
       ? 'mesh-only object — no box/cylinder shapes to copy'
-      : 'nothing to copy from this object', true);
+      : 'nothing to copy from this selection', true);
+  const droppedCps = def.droppedCps || 0;
+  delete def.droppedCps;
   openBuilder(null);                       // a fresh, unsaved component…
   builderState = { editingId: null, def }; // …seeded from the selection
   renderBuilderList(); syncBuilderForm(); renderParts();   // preview framed by openBuilder's rAF
-  const ei = elemIndexByName(name);
-  const meshy = (currentData.elements[ei].models || []).length ? ' (collision shapes)' : '';
+  const meshy = names.some(n =>
+    (currentData.elements[elemIndexByName(n)].models || []).length) ? ' (collision shapes)' : '';
   const cp = def.cp === 'pass' ? ' + checkpoint' : '';
-  bFlash(`copied ${def.parts.length} part${def.parts.length !== 1 ? 's' : ''}${cp}${meshy} from “${name}” — name it & save ✓`);
+  const from = names.length > 1 ? `${names.length} objects (merged)` : `“${names[0]}”`;
+  const dropped = droppedCps ? ` · ${droppedCps} extra checkpoint${droppedCps > 1 ? 's' : ''} dropped (one per object)` : '';
+  bFlash(`copied ${def.parts.length} part${def.parts.length !== 1 ? 's' : ''}${cp}${meshy} from ${from} — name it & save ✓${dropped}`);
 }
 
 // ---- builder wiring (listeners attach once; guarded on builderState) ----
 document.getElementById('bAddBox').onclick = () => addPart('box');
 document.getElementById('bAddCyl').onclick = () => addPart('cyl');
+document.getElementById('bAddSphere').onclick = () => addPart('sphere');
+document.getElementById('bAddPyramid').onclick = () => addPart('pyramid');
+document.getElementById('bAddWedge').onclick = () => addPart('wedge');
+document.getElementById('bAddCone').onclick = () => addPart('cone');
 document.getElementById('bName').addEventListener('input', e => { if (builderState) builderState.def.label = e.target.value; });
 document.getElementById('bCp').addEventListener('change', e => {
   if (!builderState) return;
@@ -3392,6 +3667,7 @@ document.getElementById('bParts').addEventListener('input', e => {
   if (!builderState) return;
   const row = e.target.closest('.part'); if (!row) return;
   const part = builderState.def.parts[+row.dataset.i]; if (!part) return;
+  if (e.target.classList.contains('pnm')) { part.name = e.target.value; return; }  // no geometry change
   if (e.target.classList.contains('col')) part.color = e.target.value;
   else {
     const f = e.target.dataset.f; if (!f) return;
@@ -3452,6 +3728,8 @@ window.__build = {
   addPart: shape => { if (builderState) { addPart(shape); return builderState.def.parts.length; } return 0; },
   // convert a track element -> builder component (without opening the modal)
   fromElement: name => elementToComponent(name),
+  // convert a SET of elements -> one merged component (the multi-select copy)
+  fromSelection: (names, primary) => selectionToComponent(names, primary ?? names[names.length - 1]),
   // select an element and copy it into the builder (mirrors the panel button)
   copyFromTrack: name => {
     if (name != null) selectElementByName(name, true);
@@ -3559,9 +3837,15 @@ renderer.domElement.addEventListener('pointerup', e => {
     }
     return;
   }
-  // Ctrl/⌘-click adds to (or removes from) the selection instead of replacing it
+  // Ctrl/⌘-click adds to (or removes from) the selection instead of replacing
+  // it; a plain click on a grouped object selects its whole group
   const additive = e.ctrlKey || e.metaKey;
-  const pick = name => additive ? toggleSelection(name) : selectElementByName(name);
+  const pick = name => {
+    if (additive) return toggleSelection(name);
+    const members = groupMembers(groupIdOf(name));
+    if (members.length > 1) return setSelectionSet(members, name);
+    selectElementByName(name);
+  };
   pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
   const targets = [trackGroup, sensorGroup];
@@ -3620,6 +3904,11 @@ addEventListener('keydown', e => {
   if (e.key.toLowerCase() === 'y' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault(); redoEdit(); return; }
   if (!editUi.on) return;
+  if (e.key.toLowerCase() === 'g' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    e.shiftKey ? ungroupSelection() : groupSelection();
+    return;
+  }
   if (e.key === 'g' || e.key === 't') setGizmoMode('translate');
   else if (e.key === 'r') setGizmoMode('rotate');
   else if (e.key === 's') setGizmoMode('scale');
@@ -3693,6 +3982,10 @@ window.__edit = {
   },
   del: deleteSelected,
   dup: duplicateSelected,
+  group: () => groupSelection(),            // Ctrl+G equivalent, returns the new gid
+  ungroup: () => ungroupSelection(),        // Ctrl+Shift+G equivalent
+  groupOf: name => groupIdOf(name),
+  groupMembers: gid => groupMembers(gid),
   color: (scope, hex) => {   // recolour: scope 'this'|'type'|'all'
     if (hex) document.getElementById('edColor').value = hex;
     applyColor(scope);
