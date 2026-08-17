@@ -333,10 +333,19 @@ function parseInlinePolyhedron(el) {
   const ext = [px - nx, py - ny, pz - nz];
   const n = verts.length / 3, t = tris.length / 3;
   // the editor's generators: pyramid = 4 base + apex; wedge = 6 verts / 8 tris;
-  // cone = 16-gon + apex + base centre (see polyGeo in the editor)
-  if (n === 5 && t === 6) return { shape: 'pyramid', dims: ext };
-  if (n === 6 && t === 8) return { shape: 'wedge', dims: ext };
-  if (n === 18 && t === 32) return { shape: 'cone', dims: [ext[0] / 2, ext[2]] };
+  // cone = 16-gon + apex + base centre (see polyGeo in the editor). Counts alone
+  // could coincide with an imported OBJ mesh, so also require the generator's
+  // z-structure (how many vertices sit on the bottom/top planes) before naming
+  // a shape — anything else stays a raw 'poly' and renders as its real mesh.
+  const eps = Math.max(ext[2], 1e-3) * 1e-3;
+  let bot = 0, top = 0;
+  for (let i = 2; i < verts.length; i += 3) {
+    if (Math.abs(verts[i] - nz) < eps) bot++;
+    else if (Math.abs(verts[i] - pz) < eps) top++;
+  }
+  if (n === 5 && t === 6 && bot === 4 && top === 1) return { shape: 'pyramid', dims: ext };
+  if (n === 6 && t === 8 && bot === 4 && top === 2) return { shape: 'wedge', dims: ext };
+  if (n === 18 && t === 32 && bot === 17 && top === 1) return { shape: 'cone', dims: [ext[0] / 2, ext[2]] };
   return { shape: 'poly', dims: ext, verts, tris };
 }
 

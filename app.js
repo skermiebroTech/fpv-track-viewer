@@ -1585,6 +1585,22 @@ function buildTrackMrsim(data) {
         layer.add(mesh);
         return;
       }
+      if (p.shape === 'poly' && p.verts) {
+        // imported OBJ / raw inline polyhedron — real mesh, one-off geometry
+        const pos = [];
+        for (let i = 0; i < p.tris.length; i++) {
+          const v = p.tris[i] * 3;
+          pos.push(p.verts[v] || 0, p.verts[v + 1] || 0, p.verts[v + 2] || 0);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, matFor(hint));
+        mesh.applyMatrix4(p.matrix);
+        mesh.userData.debug = debug;
+        layer.add(mesh);
+        return;
+      }
       let scale;
       if (p.shape === 'cyl') {
         // real PVC is 2 cm radius — bump it a little so frames read at distance
@@ -2515,7 +2531,10 @@ function humanLinesForConvert() {
     .map(l => l.frames.map(f => new THREE.Vector3(f.p[0], f.p[1], -f.p[2])));
 }
 
-function convertCurrent() {
+// last credit typed at an export, so a re-export is one Enter and not a retype
+let lastPilot = '';
+
+function convertCurrent(pilotName = '') {
   if (!currentTrack) throw new Error('no track loaded');
   const env = document.getElementById('convEnv').value;
   if (currentTrack.format === 'mrsim') {
@@ -2551,7 +2570,7 @@ function convertCurrent() {
   const { xml, warnings, summary, normal } = vdToMrsim(
     currentTrack, classifySeq, id => prefabInfo(id)?.name ?? '',
     { location: env || undefined, humanLines, gateWidthFor, heightFor, boundsFor,
-      sceneName: CATALOG.scenes[currentTrack.meta?.scene_id] });
+      sceneName: CATALOG.scenes[currentTrack.meta?.scene_id], pilotName });
   const name = currentTrack.meta?.name || 'track';
   const extra = humanLines.length ? [`fitted to ${humanLines.length} human line(s)`] : [];
   return { fileName: `${name}-MRSIM.xml`, type: 'text/xml', target: 'mrsim',
@@ -2618,7 +2637,14 @@ document.getElementById('cvClose').addEventListener('click',
 
 document.getElementById('btnConvert').addEventListener('click', () => {
   try {
-    const res = convertCurrent();
+    // only the MRSIM side carries a credit comment — a .trk has nowhere to put one
+    let pilot = '';
+    if (currentTrack && currentTrack.format !== 'mrsim') {
+      const answer = prompt('Pilot name for the credit in the file (optional):', lastPilot);
+      if (answer === null) return;               // cancelled — don't export
+      pilot = lastPilot = answer.trim();
+    }
+    const res = convertCurrent(pilot);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([res.content], { type: res.type }));
     a.download = res.fileName;
