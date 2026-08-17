@@ -240,6 +240,14 @@ function processComponents(node, ctx, st) {
       case 'Cylinder':
         shapes.push({ shape: 'cyl', dims: [num(c, 'radius'), num(c, 'height')] });
         break;
+      case 'Sphere':
+        shapes.push({ shape: 'sphere', dims: [num(c, 'radius')] });
+        break;
+      case 'Polyhedron': {
+        const p = parseInlinePolyhedron(c);
+        if (p) shapes.push(p);
+        break;
+      }
       case 'StaticContact': contact = c.getAttribute('contactMaterial'); break;
       case 'MeshRendererComponent': material = c.getAttribute('material'); break;
       case 'BinaryModelRenderer': models.push(c.getAttribute('file')); break;
@@ -302,6 +310,36 @@ function processComponents(node, ctx, st) {
   }
 }
 
+// Inline <Polyhedron> — <Vertices count="N">x, y, z, …</Vertices> +
+// <Triangles count="M">a, b, c, …</Triangles> children (the editor's pyramid/
+// wedge/cone emit). Polyhedra that reference a binaryModelFile are the game
+// gates' passage-geometry colliders and stay skipped, as before. The canonical
+// editor shapes are recognised by their vertex/triangle structure so they
+// round-trip through copy-to-builder; anything else renders as a raw mesh.
+function parseInlinePolyhedron(el) {
+  if (el.getAttribute('binaryModelFile')) return null;
+  const numsOf = tag => {
+    const c = directChild(el, tag);
+    return c ? (c.textContent.match(/-?\d*\.?\d+(?:[eE][-+]?\d+)?/g) || []).map(Number) : [];
+  };
+  const verts = numsOf('Vertices'), tris = numsOf('Triangles');
+  if (verts.length < 9 || verts.length % 3 || tris.length < 3) return null;
+  let nx = Infinity, ny = Infinity, nz = Infinity, px = -Infinity, py = -Infinity, pz = -Infinity;
+  for (let i = 0; i < verts.length; i += 3) {
+    nx = Math.min(nx, verts[i]);     px = Math.max(px, verts[i]);
+    ny = Math.min(ny, verts[i + 1]); py = Math.max(py, verts[i + 1]);
+    nz = Math.min(nz, verts[i + 2]); pz = Math.max(pz, verts[i + 2]);
+  }
+  const ext = [px - nx, py - ny, pz - nz];
+  const n = verts.length / 3, t = tris.length / 3;
+  // the editor's generators: pyramid = 4 base + apex; wedge = 6 verts / 8 tris;
+  // cone = 16-gon + apex + base centre (see polyGeo in the editor)
+  if (n === 5 && t === 6) return { shape: 'pyramid', dims: ext };
+  if (n === 6 && t === 8) return { shape: 'wedge', dims: ext };
+  if (n === 18 && t === 32) return { shape: 'cone', dims: [ext[0] / 2, ext[2]] };
+  return { shape: 'poly', dims: ext, verts, tris };
+}
+
 function walkInclude(node, ctx, st) {
   const file = node.getAttribute('file') || '';
   const path = file.startsWith('/') ? file : dirname(ctx.src) + file;
@@ -357,6 +395,7 @@ function assemble(st, fileName) {
     prims: e.prims.map(p => ({
       shape: p.shape, dims: p.dims, hint: p.hint, material: p.material, matrix: three(p.m), src: p.src,
       solid: p.solid !== false,
+      ...(p.verts ? { verts: p.verts, tris: p.tris } : {}),
     })),
     models: e.models.map(md => ({ model: md.model, matrix: three(md.m), src: md.src })),
     sensors: e.sensors.map(s => ({

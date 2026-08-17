@@ -1485,6 +1485,28 @@ function buildTrackMrsim(data) {
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
   const unitCyl = new THREE.CylinderGeometry(1, 1, 1, 12);
   unitCyl.rotateX(Math.PI / 2);         // axis -> local Z (mrsim is Z-up)
+  const unitSphere = new THREE.SphereGeometry(1, 18, 12);
+  const unitCone = new THREE.ConeGeometry(1, 1, 18);
+  unitCone.rotateX(Math.PI / 2);
+  // editor-built pyramid/wedge prims (emitted as inline MRSIM Polyhedra) —
+  // unit-sized, origin-centred, flat-shaded, matching the editor's generators
+  const flatGeo = tris => {
+    const pos = [];
+    tris.forEach(t => t.forEach(v => pos.push(...v)));
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    return g;
+  };
+  const P = [[-.5, -.5, -.5], [.5, -.5, -.5], [.5, .5, -.5], [-.5, .5, -.5], [0, 0, .5]];
+  const unitPyramid = flatGeo([[P[0], P[3], P[2]], [P[0], P[2], P[1]],
+    [P[0], P[1], P[4]], [P[1], P[2], P[4]], [P[2], P[3], P[4]], [P[3], P[0], P[4]]]);
+  const W = [[-.5, -.5, -.5], [.5, -.5, -.5], [.5, .5, -.5], [-.5, .5, -.5], [0, -.5, .5], [0, .5, .5]];
+  const unitWedge = flatGeo([[W[0], W[3], W[2]], [W[0], W[2], W[1]],
+    [W[0], W[4], W[5]], [W[0], W[5], W[3]], [W[1], W[2], W[5]], [W[1], W[5], W[4]],
+    [W[0], W[1], W[4]], [W[2], W[3], W[5]]]);
+  const GEO_FOR = { box: unitBox, cyl: unitCyl, sphere: unitSphere, cone: unitCone,
+    pyramid: unitPyramid, wedge: unitWedge };
 
   // element visits from the checkpoint sequence
   const visits = new Map();
@@ -1568,13 +1590,18 @@ function buildTrackMrsim(data) {
         // real PVC is 2 cm radius — bump it a little so frames read at distance
         const r = hint === 'pvc' ? Math.max(p.dims[0], 0.04) : p.dims[0];
         scale = [r, r, p.dims[1]];
+      } else if (p.shape === 'cone') {
+        scale = [p.dims[0], p.dims[0], p.dims[1]];
+      } else if (p.shape === 'sphere') {
+        const r = p.dims[0] || 0.1;
+        scale = [r, r, r];
       } else {
-        scale = p.dims.map(d => Math.max(d, 0.02));
+        scale = p.dims.map(d => Math.max(d, 0.02));   // box/pyramid/wedge (+ poly bbox)
       }
       const key = `${layerName}|${hint}|${p.shape}`;
       if (!buckets.has(key)) {
         buckets.set(key, {
-          geo: p.shape === 'cyl' ? unitCyl : unitBox,
+          geo: GEO_FOR[p.shape] || unitBox,
           mat: matFor(hint), layerName, list: [],
         });
       }
