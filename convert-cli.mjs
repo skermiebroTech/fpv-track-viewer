@@ -12,6 +12,7 @@
 //                         actually flies (same fitting the viewer applies)
 //   -s, --summary FILE    also write the conversion summary + validation
 //                         report as JSON
+//   -p, --pilot NAME      credit the pilot in the XML header comment
 //   -q, --quiet           errors only
 //   --no-validate         skip validation (not recommended)
 //
@@ -46,6 +47,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a === '-l' || a === '--location') opts.location = val();
   else if (a === '-g' || a === '--ghost') opts.ghosts.push(val());
   else if (a === '-s' || a === '--summary') opts.summaryOut = val();
+  else if (a === '-p' || a === '--pilot') opts.pilotName = val();
   else if (a === '-q' || a === '--quiet') opts.quiet = true;
   else if (a === '--no-validate') opts.validate = false;
   else if (a === '-h' || a === '--help') { usage(); process.exit(0); }
@@ -58,7 +60,7 @@ if (opts.location && !MRSIM_LOCATIONS.some(l => l[0] === opts.location)) {
 }
 function usage() {
   console.error('usage: node convert-cli.mjs <track.trk|track.json> ' +
-    '[-o out.xml] [-l location] [-g ghost.json]… [-s summary.json] [-q] [--no-validate]');
+    '[-o out.xml] [-l location] [-g ghost.json]… [-s summary.json] [-p pilot] [-q] [--no-validate]');
   console.error('locations: ' + MRSIM_LOCATIONS.map(l => l[0]).join(' | '));
 }
 if (positional.length !== 1) { usage(); process.exit(2); }
@@ -110,6 +112,7 @@ try {
   // ---- convert --------------------------------------------------------------
   const { xml, warnings, summary, normal } = vdToMrsim(data, classify, prefabName, {
     location: opts.location, humanLines, gateWidthFor, heightFor, boundsFor,
+    pilotName: opts.pilotName,
   });
 
   // embedded track names can contain path separators — never let the default

@@ -18,6 +18,69 @@ test('conversion is deterministic', () => {
   assert.equal(a, b);
 });
 
+// the credit comment the emitter puts on the second line of every export
+const credit = xml => xml.split('\n')[1];
+
+test('header credits the pilot when one is given, the editor when not', () => {
+  assert.equal(credit(convert(fixture()).xml),
+    "  <!-- created with 9dtr's track editor -->");
+  assert.equal(credit(convert(fixture(), { pilotName: 'Joel Skerman' }).xml),
+    "  <!-- created by Joel Skerman using 9dtr's track editor -->");
+  // a name typed into the prompt arrives with whatever spacing the user left
+  assert.equal(credit(convert(fixture(), { pilotName: '  Joel  ' }).xml),
+    "  <!-- created by Joel using 9dtr's track editor -->");
+  assert.equal(credit(convert(fixture(), { pilotName: '   ' }).xml),
+    "  <!-- created with 9dtr's track editor -->");
+  // real names must survive intact — sanitising must not mangle the ordinary case
+  for (const nm of ['Jean-Luc', 'Šimon Ólafs', 'Joel \u{1F680}']) {
+    assert.equal(credit(convert(fixture(), { pilotName: nm }).xml),
+      `  <!-- created by ${nm} using 9dtr's track editor -->`);
+  }
+});
+
+// Anything typed into the export prompt must still yield a LOADABLE file. Each
+// input below was verified to produce an unparseable track before it was
+// handled — a file the game silently refuses, which is far worse than a mangled
+// credit. The surrogate cases need no hostile intent at all: a name ending in an
+// emoji is cut in half by the length cap.
+test('no pilot name can corrupt the exported file', () => {
+  // Built from code points, never pasted as literals: a raw control character
+  // in a source file makes git treat it as BINARY, and editors quietly eat the
+  // invisible ones. Same reason convert/credit.js uses numeric ranges.
+  const cp = c => String.fromCodePoint(c);
+  const BEL = cp(0x07), NUL = cp(0x00), C1 = cp(0x9f);
+  const HI_SURROGATE = cp(0xd83d), LO_SURROGATE = cp(0xdc00), GRIN = cp(0x1f600);
+  const NONCHAR = cp(0xffff) + cp(0xfffe), RLO = cp(0x202e), ZWSP = cp(0x200b);
+  const hostile = {
+    'comment close': 'x --> <Entity name="pwn"><Checkpoint/></Entity><!--',
+    'hyphen run': 'A--B',
+    'control char': `Joel${BEL}Sker`,
+    NUL: `Joel${NUL}Sker`,
+    'C1 control': `Joel${C1}Sker`,
+    'lone high surrogate': `Joel${HI_SURROGATE}`,
+    'lone low surrogate': `Joel${LO_SURROGATE}`,
+    'emoji split by the cap': 'A'.repeat(59) + GRIN,
+    'emoji wall': GRIN.repeat(200),
+    noncharacter: `Joel${NONCHAR}x`,
+    'bidi spoof': `Joel${RLO}namrekS`,
+    'zero-width padding': `J${ZWSP}oel`.repeat(50),
+    'very long': 'A'.repeat(1000),
+    newline: 'Joel\nSkerman',
+  };
+  for (const [label, name] of Object.entries(hostile)) {
+    const xml = convert(fixture(), { pilotName: name }).xml;
+    // the whole file must still parse, and the lap must be intact
+    const t = parseMrsim(xml, 'hostile.xml');
+    assert.ok(t.seq.length > 0, `${label}: track did not survive`);
+    // exactly one credit, and nothing smuggled out of the comment into the scene
+    assert.equal(xml.match(/9dtr's track editor/g).length, 1, `${label}: credit count`);
+    assert.equal(t.seq.some(s => s.name === 'pwn'), false, `${label}: injected node`);
+    assert.ok(!/<!--[^]*?--[^>]/.test(credit(xml)), `${label}: "--" inside the comment`);
+    // the credit stays on its own single line, so the header stays readable
+    assert.match(credit(xml), /^ {2}<!-- created (by .+ using|with) 9dtr's track editor -->$/);
+  }
+});
+
 test('output parses and every checkpoint resolves in order', () => {
   const { xml, summary } = convert(fixture());
   const t = parseMrsim(xml, 'synthetic.xml');

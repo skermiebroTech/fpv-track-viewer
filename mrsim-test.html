@@ -415,6 +415,8 @@
           <button id="bAddPyramid">＋ pyramid</button>
           <button id="bAddWedge">＋ wedge</button>
           <button id="bAddCone">＋ cone</button>
+          <button id="bAddObj" title="BETA — import a .obj mesh as a part (exported as an inline MRSIM polyhedron)">＋ import .obj… <span style="color:#e0c040">beta</span></button>
+          <input type="file" id="bObjFile" class="bImport" accept=".obj">
         </div>
       </div>
     </div>
@@ -474,7 +476,7 @@
   "imports": {
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
-    "./mrsim.js": "./mrsim.js?v=11",
+    "./mrsim.js": "./mrsim.js?v=12",
     "./mrsim-lib.js": "./mrsim-lib.js?v=6"
   }
 }
@@ -486,6 +488,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { parseMrsim } from './mrsim.js';
+// the export credit — a tiny dependency-free module, so stamping a credit never
+// has to pull in the (lazily loaded) VelociDrone converter
+import { creditComment, CREDIT_RE, CREDIT_PILOT_RE } from './convert/credit.js';
 
 // ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
 // Any file that parses as <Simulation>. Add to this list or use ?track=<path>
@@ -842,6 +847,21 @@ function geoFromPoly(shape) {
 }
 const unitPyramid = geoFromPoly('pyramid');
 const unitWedge = geoFromPoly('wedge');
+// flat-shaded BufferGeometry from a parsed inline polyhedron's flat number
+// arrays (verts = x,y,z…, tris = a,b,c…) — imported OBJ meshes and any foreign
+// inline <Polyhedron>. Per-prim geometry, so it is NOT in UNIT_GEOS and gets
+// disposed by clearGroup on rebuild.
+function geoFromVertsTris(verts, tris) {
+  const pos = [];
+  for (let i = 0; i < tris.length; i++) {
+    const v = tris[i] * 3;
+    pos.push(verts[v] || 0, verts[v + 1] || 0, verts[v + 2] || 0);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
 // every shared unit geometry — excluded from disposal in clearGroup etc.
 const UNIT_GEOS = new Set([unitBox, unitCyl, unitSphere, unitCone, unitPyramid, unitWedge]);
 const GEO_FOR = { box: unitBox, cyl: unitCyl, sphere: unitSphere, cone: unitCone,
@@ -942,6 +962,19 @@ async function build(data, keepCamera = false) {
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;
       const hint = p.hint;
+      if (p.shape === 'poly' && p.verts) {
+        // real mesh geometry (imported OBJ / foreign inline polyhedron) — one
+        // mesh per prim, unshared geometry, no instancing
+        const mesh = new THREE.Mesh(geoFromVertsTris(p.verts, p.tris),
+          docMat(p.material) || matFor(hint));
+        mesh.matrixAutoUpdate = false;
+        mesh.matrix.copy(p.matrix);
+        mesh.castShadow = true;
+        mesh.userData.elemIndex = ei;
+        trackGroup.add(mesh);
+        renderRefs[ei].push({ obj: mesh, base: mesh.matrix.clone() });
+        return;
+      }
       const scale = primScale(p);
       if (p.shape === 'cyl' && hint === 'pvc') scale[0] = scale[1] = Math.max(p.dims[0], 0.04);
       const dm = docMat(p.material);
@@ -2140,7 +2173,9 @@ function loadLocalComponents() {
   } catch { CUSTOM_LOCAL = []; }
 }
 function saveLocalComponents() {
-  try { localStorage.setItem(CUSTOM_STORE_KEY, JSON.stringify(CUSTOM_LOCAL)); } catch {}
+  // meshes can be big — surface a quota failure instead of silently losing work
+  try { localStorage.setItem(CUSTOM_STORE_KEY, JSON.stringify(CUSTOM_LOCAL)); return true; }
+  catch { return false; }
 }
 async function loadSharedComponents() {
   try {
@@ -2361,8 +2396,7 @@ function polyGeo(shape, dims) {
   return { verts, tris };
 }
 const POLY_SHAPES = new Set(['pyramid', 'wedge', 'cone']);
-function mkPolyhedronEl(doc, shape, dims) {
-  const { verts, tris } = polyGeo(shape, dims);
+function polyhedronFromRows(doc, verts, tris) {
   const el = doc.createElement('Polyhedron');
   const fmt = (rows, dec) => '\n' + rows.map((r, i) =>
     '            ' + r.map(v => dec ? String(Math.round(v)) : (+v.toFixed(4)).toString()).join(', ') +
@@ -2373,6 +2407,22 @@ function mkPolyhedronEl(doc, shape, dims) {
   T.textContent = fmt(tris, true);
   el.append(V, T);
   return el;
+}
+function mkPolyhedronEl(doc, shape, dims) {
+  const { verts, tris } = polyGeo(shape, dims);
+  return polyhedronFromRows(doc, verts, tris);
+}
+// an imported-mesh part: its stored verts scaled per-axis by dims (the part's
+// scale fields), written as vertex/triangle rows
+function mkMeshPolyhedronEl(doc, part) {
+  const [sx = 1, sy = 1, sz = 1] = (part.dims || []).map(v => +v || 1);
+  const verts = [];
+  for (let i = 0; i < part.verts.length; i += 3)
+    verts.push([part.verts[i] * sx, part.verts[i + 1] * sy, part.verts[i + 2] * sz]);
+  const tris = [];
+  for (let i = 0; i + 2 < part.tris.length; i += 3)
+    tris.push([part.tris[i], part.tris[i + 1], part.tris[i + 2]]);
+  return polyhedronFromRows(doc, verts, tris);
 }
 
 // emit a saved component `def` (from the builder) as parts + optional checkpoint,
@@ -2409,6 +2459,8 @@ function buildCustomComponent(doc, ent, name, def, ops) {
     const d = (part.dims || []).map(v => (+v || 0).toFixed(3));
     if (part.shape === 'cyl') e.appendChild(mk('Cylinder', { radius: d[0] || '0.1', height: d[1] || '1' }));
     else if (part.shape === 'sphere') e.appendChild(mk('Sphere', { radius: d[0] || '0.5' }));
+    else if (part.shape === 'mesh' && part.verts)
+      e.appendChild(mkMeshPolyhedronEl(doc, part));
     else if (POLY_SHAPES.has(part.shape))
       e.appendChild(mkPolyhedronEl(doc, part.shape, (part.dims || []).map(v => +v || 0)));
     else e.appendChild(mk('Box', { x: d[0] || '0.5', y: d[1] || '0.5', z: d[2] || '0.5' }));
@@ -3068,10 +3120,17 @@ function buildPreviewGroup(data, doc) {
     const meshSrcs = new Set((el.models || []).filter(m => templates.has(m.model)).map(m => m.src));
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;         // collision shadow of a rendered mesh
+      const mat = previewDocMat(doc, p.material, matCache) || matFor(p.hint);
+      if (p.shape === 'poly' && p.verts) {
+        const mesh = new THREE.Mesh(geoFromVertsTris(p.verts, p.tris), mat);
+        mesh.matrixAutoUpdate = false;
+        mesh.matrix.copy(p.matrix);
+        g.add(mesh);
+        return;
+      }
       const scale = primScale(p);
       if (p.shape === 'cyl' && p.hint === 'pvc') scale[0] = scale[1] = Math.max(p.dims[0], 0.04);
-      const mesh = new THREE.Mesh(GEO_FOR[p.shape] || unitBox,
-        previewDocMat(doc, p.material, matCache) || matFor(p.hint));
+      const mesh = new THREE.Mesh(GEO_FOR[p.shape] || unitBox, mat);
       mesh.matrixAutoUpdate = false;
       mesh.matrix.copy(p.matrix).scale(V.set(scale[0], scale[1], scale[2]));
       g.add(mesh);
@@ -3196,16 +3255,21 @@ const withRef = pass => ({ ...pass, ref: pass.ref
   : defaultRef(pass) });
 const blankComponent = () => ({ label: '', cp: null, parts: [],
   pass: { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5], ref: { pos: [0, 0, 1.25], rot: [0, 0, 0] } } });
-// every shape a builder part can be, with how many dims it carries
-const PART_SHAPES = { box: 3, cyl: 2, sphere: 1, pyramid: 3, wedge: 3, cone: 2 };
-const normShape = s => (s in PART_SHAPES ? s : 'box');
+// every shape a builder part can be, with how many dims it carries. 'mesh' is
+// an imported OBJ: dims are per-axis scale factors and the part carries its own
+// verts/tris (flat x,y,z… / a,b,c… arrays, MRSIM z-up), emitted as an inline
+// <Polyhedron> exactly like pyramid/wedge/cone.
+const PART_SHAPES = { box: 3, cyl: 2, sphere: 1, pyramid: 3, wedge: 3, cone: 2, mesh: 3 };
+const normShape = (s, p) => (s === 'mesh' && !(p?.verts?.length >= 9) ? 'box'
+  : s in PART_SHAPES ? s : 'box');
 const cloneForEdit = c => {
   const d = JSON.parse(JSON.stringify(c)); delete d.shared; delete d.id;
   d.cp = d.cp === 'pass' ? 'pass' : null;
-  d.parts = (d.parts || []).map(p => ({ shape: normShape(p.shape),
+  d.parts = (d.parts || []).map(p => ({ shape: normShape(p.shape, p),
     name: typeof p.name === 'string' ? p.name : '',
     pos: (p.pos || [0, 0, 0]).slice(0, 3), rot: (p.rot || [0, 0, 0]).slice(0, 3),
-    dims: (p.dims || []).slice(0, 3), color: p.color || '#cccccc' }));
+    dims: (p.dims || []).slice(0, 3), color: p.color || '#cccccc',
+    ...(p.verts ? { verts: p.verts, tris: p.tris } : {}) }));
   d.pass = withRef(d.pass || { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5] });
   return d;
 };
@@ -3213,7 +3277,7 @@ const r3 = v => Math.round((+v || 0) * 1000) / 1000;
 // strip runtime fields, round numbers — the canonical stored/exported shape
 function cleanComponent(def, id) {
   const parts = (def.parts || []).map(p => {
-    const shape = normShape(p.shape);
+    const shape = normShape(p.shape, p);
     const out = {
       shape,
       pos: (p.pos || [0, 0, 0]).slice(0, 3).map(r3),
@@ -3221,6 +3285,11 @@ function cleanComponent(def, id) {
       dims: (p.dims || []).slice(0, PART_SHAPES[shape]).map(r3),
       color: /^#[0-9a-fA-F]{6}$/.test(p.color || '') ? p.color.toLowerCase() : '#cccccc',
     };
+    if (shape === 'mesh') {
+      out.verts = p.verts.map(v => Math.round((+v || 0) * 1e4) / 1e4);
+      out.tris = (p.tris || []).map(t => Math.round(+t || 0));
+      if (!out.dims.length) out.dims = [1, 1, 1];
+    }
     const nm = typeof p.name === 'string' ? p.name.trim().slice(0, 24) : '';
     if (nm) out.name = nm;
     return out;
@@ -3244,8 +3313,9 @@ function uniqueComponentId(label) {
 function upsertComponent(stored) {
   const i = CUSTOM_LOCAL.findIndex(c => c.id === stored.id);
   if (i >= 0) CUSTOM_LOCAL[i] = stored; else CUSTOM_LOCAL.push(stored);
-  saveLocalComponents();
+  const ok = saveLocalComponents();
   PV.cache?.delete(stored.id);   // hover-preview thumbnail rebuilds next hover
+  return ok;
 }
 
 // ---- builder preview (own renderer/scene/orbit, separate from the hover one) ----
@@ -3397,18 +3467,19 @@ function renderParts() {
     cyl: [['d0', 'radius (m)'], ['d1', 'height (m)'], null],
     cone: [['d0', 'base radius (m)'], ['d1', 'height (m)'], null],
     sphere: [['d0', 'radius (m)'], null, null],
+    mesh: [['d0', 'x scale'], ['d1', 'y scale'], ['d2', 'z scale']],
   };
   const TAG = { box: 'box', cyl: 'cylinder', sphere: 'sphere',
-    pyramid: 'pyramid', wedge: 'wedge', cone: 'cone' };
+    pyramid: 'pyramid', wedge: 'wedge', cone: 'cone', mesh: 'mesh' };
   host.innerHTML = parts.map((p, i) => {
-    const shape = normShape(p.shape), d = p.dims, pos = p.pos, rot = p.rot;
+    const shape = normShape(p.shape, p), d = p.dims, pos = p.pos, rot = p.rot;
     const size = `<span class="gl">size</span>` + SIZE_FIELDS[shape].map((f, k) => f
       ? `<input data-f="${f[0]}" type="number" step="${f[0] === 'd0' && (shape === 'cyl' || shape === 'cone' || shape === 'sphere') ? 0.05 : 0.1}"
            min="0.01" value="${fv(d[k])}" title="${f[1]}">`
       : `<input type="number" value="" disabled style="opacity:.25" title="n/a">`).join('');
     return `<div class="part" data-i="${i}">
       <div class="ph">
-        <span class="tag">${TAG[shape]}</span>
+        <span class="tag" title="${shape === 'mesh' ? `imported mesh · ${(p.tris || []).length / 3} triangles` : ''}">${TAG[shape]}${shape === 'mesh' ? ` ▲${Math.round((p.tris || []).length / 3)}` : ''}</span>
         <input class="col" type="color" value="${p.color || '#cccccc'}" title="colour">
         <input class="pnm" type="text" maxlength="24" spellcheck="false"
           value="${escapeHtml(p.name || '')}" placeholder="part name (optional)"
@@ -3444,6 +3515,54 @@ function addPart(shape) {
   renderParts(); updateBuilderPreview();
 }
 
+// ---- OBJ import ------------------------------------------------------------
+// Wavefront OBJ -> one 'mesh' part. Only geometry is read (v + f; materials,
+// normals and UVs are ignored — MRSIM colours the whole polyhedron with one
+// material anyway). OBJ is y-up: converted to MRSIM z-up by (x,y,z)->(x,-z,y),
+// a proper rotation, so the CCW winding survives. Faces with 4+ vertices are
+// fan-triangulated; negative indices resolve relative to the vertices so far.
+const OBJ_TRI_LIMIT = 5000;
+function parseObjToMeshPart(text, fileName) {
+  const verts = [], tris = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('v ')) {
+      const [x, y, z] = line.slice(2).trim().split(/\s+/).map(parseFloat);
+      verts.push(x || 0, -(z || 0), y || 0);
+    } else if (line.startsWith('f ')) {
+      const n = verts.length / 3;
+      const ids = line.slice(2).trim().split(/\s+/).map(f => {
+        const i = parseInt(f.split('/')[0], 10);
+        return i < 0 ? n + i : i - 1;
+      }).filter(i => i >= 0 && i < n);
+      for (let k = 2; k < ids.length; k++) tris.push(ids[0], ids[k - 1], ids[k]);
+    }
+  }
+  if (verts.length < 9 || tris.length < 3)
+    throw new Error('no usable geometry (need v and f lines)');
+  if (tris.length / 3 > OBJ_TRI_LIMIT)
+    throw new Error(`${tris.length / 3} triangles — too heavy for a track object (limit ${OBJ_TRI_LIMIT}; decimate it first)`);
+  let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < verts.length; i += 3)
+    for (let a = 0; a < 3; a++) {
+      mn[a] = Math.min(mn[a], verts[i + a]); mx[a] = Math.max(mx[a], verts[i + a]);
+    }
+  const name = (fileName || 'mesh').replace(/\.obj$/i, '').slice(0, 24);
+  return { part: { shape: 'mesh', name, pos: [0, 0, 0], rot: [0, 0, 0],
+      dims: [1, 1, 1], color: '#cccccc', verts, tris },
+    stats: { verts: verts.length / 3, tris: tris.length / 3,
+      size: mx.map((v, a) => +(v - mn[a]).toFixed(2)) } };
+}
+function importObjText(text, fileName) {
+  if (!builderState) return null;
+  const { part, stats } = parseObjToMeshPart(text, fileName);
+  builderState.def.parts.push(part);
+  renderParts(); updateBuilderPreview(); frameBuilderPreview();
+  bFlash(`imported “${part.name}” (beta) — ${stats.tris} tris, ${stats.size.join(' × ')} m ` +
+    `(obj y-up → z-up) · scale/move it like any part ✓`);
+  return stats;
+}
+
 function openBuilder(id) {
   const src = id ? customById(id) : null;
   builderState = { editingId: src ? src.id : null, def: src ? cloneForEdit(src) : blankComponent() };
@@ -3468,10 +3587,11 @@ function saveComponent() {
   if (!builderState.def.parts.length) return bFlash('add at least one part first', true);
   builderState.def.label = label;
   const id = builderState.editingId || uniqueComponentId(label);
-  upsertComponent(cleanComponent(builderState.def, id));
+  const ok = upsertComponent(cleanComponent(builderState.def, id));
   builderState.editingId = id;
   renderPalette(); renderBuilderList(); syncBuilderForm();
-  bFlash('saved — “' + label + '” is now in the palette ✓');
+  bFlash(ok ? 'saved — “' + label + '” is now in the palette ✓'
+    : 'saved for this session, but browser storage is full — “export this” to keep it as a file', !ok);
 }
 function downloadJson(filename, obj) {
   const a = document.createElement('a');
@@ -3523,18 +3643,24 @@ function localMrsim(WmInv, worldThree) {
 // a local mrsim matrix -> builder part {shape,pos,rot,dims}. Residual scale folds
 // into the dimensions (cyl: radius = x/y scale, height = z scale). rot uses the
 // same yaw/pitch/roll (ZXY) convention as the editor panel and quatFromRot.
-function partFromLocal(shape, dims, Lm) {
+function partFromLocal(shape, dims, Lm, prim) {
   const e = Lm.elements;
   const sx = Math.hypot(e[0], e[1], e[2]) || 1;
   const sy = Math.hypot(e[4], e[5], e[6]) || 1;
   const sz = Math.hypot(e[8], e[9], e[10]) || 1;
   const r = eulerFromRot(e, sx, sy, sz);
+  const pos = [e[12], e[13], e[14]].map(r3);
+  const rot = [r.yaw, r.pitch, r.roll].map(r3);
+  // a raw inline polyhedron keeps its actual mesh: matrix scale folds into the
+  // mesh part's per-axis scale dims, the vertex data rides along untouched
+  if (shape === 'poly' && prim?.verts)
+    return { shape: 'mesh', pos, rot, dims: [sx, sy, sz].map(r3),
+      verts: [...prim.verts], tris: [...prim.tris] };
   let d;
   if (shape === 'cyl' || shape === 'cone') d = [(dims[0] || 0) * (sx + sy) / 2, (dims[1] || 0) * sz];
   else if (shape === 'sphere') d = [(dims[0] || 0) * (sx + sy + sz) / 3];
-  else d = [(dims[0] || 0) * sx, (dims[1] || 0) * sy, (dims[2] || 0) * sz]; // box/pyramid/wedge (+ foreign poly -> its bounding box)
-  return { shape: normShape(shape), pos: [e[12], e[13], e[14]].map(r3),
-    rot: [r.yaw, r.pitch, r.roll].map(r3), dims: d.map(r3) };
+  else d = [(dims[0] || 0) * sx, (dims[1] || 0) * sy, (dims[2] || 0) * sz]; // box/pyramid/wedge (+ vertless poly -> its bounding box)
+  return { shape: normShape(shape), pos, rot, dims: d.map(r3) };
 }
 // wrapper world matrix (mrsim space) that defines an element's local origin: its
 // editable placement <Transform>, or — for library-include sub-objects with no
@@ -3574,7 +3700,7 @@ function selectionToComponent(names, primaryName) {
     const el = currentData.elements[ei];
     models += (el.models || []).length;
     (el.prims || []).forEach(p => {
-      const part = partFromLocal(p.shape, p.dims, localMrsim(WmInv, p.matrix));
+      const part = partFromLocal(p.shape, p.dims, localMrsim(WmInv, p.matrix), p);
       part.color = primColorHex(p);
       if (names.length > 1) part.name = name.replace(/^ed/, '');
       def.parts.push(part);
@@ -3641,6 +3767,13 @@ document.getElementById('bAddSphere').onclick = () => addPart('sphere');
 document.getElementById('bAddPyramid').onclick = () => addPart('pyramid');
 document.getElementById('bAddWedge').onclick = () => addPart('wedge');
 document.getElementById('bAddCone').onclick = () => addPart('cone');
+document.getElementById('bAddObj').onclick = () => document.getElementById('bObjFile').click();
+document.getElementById('bObjFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f || !builderState) return;
+  try { importObjText(await f.text(), f.name); }
+  catch (err) { bFlash('OBJ import failed: ' + err.message, true); }
+};
 document.getElementById('bName').addEventListener('input', e => { if (builderState) builderState.def.label = e.target.value; });
 document.getElementById('bCp').addEventListener('change', e => {
   if (!builderState) return;
@@ -3726,6 +3859,8 @@ window.__build = {
     parts: (c.parts || []).length, shared: !!c.shared })),
   get: id => customById(id),
   addPart: shape => { if (builderState) { addPart(shape); return builderState.def.parts.length; } return 0; },
+  importObj: (text, name) => { try { return importObjText(text, name || 'import.obj'); }
+    catch (e) { return 'error: ' + e.message; } },
   // convert a track element -> builder component (without opening the modal)
   fromElement: name => elementToComponent(name),
   // convert a SET of elements -> one merged component (the multi-select copy)
@@ -3919,8 +4054,37 @@ addEventListener('keydown', e => {
     clearSelection(); }
 });
 
+// The credit banner an exported <Simulation> carries. A re-export REPLACES the
+// existing one (and the converter's legacy line) instead of stacking copies, and
+// the name already in the file pre-fills the prompt — so exporting the same
+// track twice is one Enter, not a retype.
+let lastPilot = '';
+
+function stampCredit(doc, pilot) {
+  const root = doc.documentElement;
+  for (const n of [...root.childNodes]) {
+    if (n.nodeType !== Node.COMMENT_NODE || !CREDIT_RE.test(n.nodeValue)) continue;
+    // drop the whitespace that trailed it too, so the indent doesn't drift
+    if (n.nextSibling?.nodeType === Node.TEXT_NODE && !n.nextSibling.nodeValue.trim())
+      n.nextSibling.remove();
+    n.remove();
+  }
+  const text = creditComment(pilot);
+  root.insertBefore(doc.createTextNode('\n  '), root.firstChild);
+  root.insertBefore(doc.createComment(` ${text} `), root.firstChild.nextSibling);
+}
+
 function exportXml() {
   if (!editState) return;
+  const known = [...editState.doc.documentElement.childNodes]
+    .filter(n => n.nodeType === Node.COMMENT_NODE)
+    .map(n => n.nodeValue.match(CREDIT_PILOT_RE)?.[1])
+    .find(Boolean);
+  const pilot = prompt('Pilot name for the credit in the file (optional):',
+    known || lastPilot || '');
+  if (pilot === null) return;            // cancelled — don't export
+  lastPilot = pilot.trim();
+  stampCredit(editState.doc, lastPilot);
   const text = new XMLSerializer().serializeToString(editState.doc);
   const stem = editState.fileName.replace(/\.xml$/i, '');
   const a = document.createElement('a');

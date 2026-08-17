@@ -36,6 +36,7 @@ import * as THREE from 'three';
 import { Z_AXIS, toMrsim, fromMrsim, mrsimQuat, fmt, attrsFromQuat, rotAttrs, rotQuatForDir } from './space.js';
 import { VD_BLOCKS, MACRO_DEFS, pickGate } from './mapping.js';
 import { normalizeVdTrack } from './vd-normalize.js';
+import { creditComment } from './credit.js';
 
 // VD scenes that carry no props of their own (no scenery warning needed)
 const EMPTY_VD_SCENES = new Set([16, 17, 42, 43]);
@@ -75,6 +76,7 @@ export function emitMrsim(normal, opts = {}) {
   const humanLines = opts.humanLines || [];
   const { crossings, scenery, layout, isCircuit } = normal;
   const warnings = [...normal.warnings];
+  const pilotCredit = creditComment(opts.pilotName);
 
   // Where do the supplied human racing lines actually cross this element?
   // Returns, in the placed sensor's own frame, the mean crossing (side = along
@@ -1015,7 +1017,7 @@ export function emitMrsim(normal, opts = {}) {
   ].join('\n');
 
   const xml = `<Simulation>
-  <!-- Converted from VelociDrone by track-viewer -->
+  <!-- ${pilotCredit} -->
   <Include file="/Data/Simulations/Multirotor/Locations/${location}.xml"/>
   <Include file="/Data/Simulations/Multirotor/DroneTrackInstanceGroups.xml"/>
 
