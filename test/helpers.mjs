@@ -27,6 +27,9 @@ export const CATALOG = {
     336: ['DefaultNetBlack', 'Barriers', 0],
     90: ['DefaultStartGrid', 'Barriers', 0],
     2219: ['BlockWhite', 'Barriers', 0],
+    171: ['DefaultNeonRingR', 'Neon', 1],
+    178: ['DefaultNeonCornerR', 'Neon', 0],
+    342: ['NeonStripRed', 'Neon', 0],
   },
 };
 export const DIMS = {
@@ -38,6 +41,10 @@ export const DIMS = {
   275: [-1.52, 0, -0.02, 1.52, 1.52, 0.03],
   // a 3-D structure that still matches /hurdle/i (KDRAHurdle's real bounds)
   729: [-1.78, 0, -1.74, 1.78, 2.98, 1.74],
+  // neon: the ring and corner stand on the floor (y from 0); NeonStrip is a
+  // runtime mesh with no bundled bounds at all, exactly like the nets
+  171: [-1.42, 0, -0.29, 1.42, 3.21, 0.29],
+  178: [0, 0, -0.29, 1.15, 2.46, 0.29],
 };
 
 export function loadFixture(name) {

@@ -41,6 +41,31 @@
   #bar button.diagchip.warn:hover { border-color: #ffb27a; }
   #bar button.diagchip.on { background: #1c2230; }
 
+  /* ---- environment panel ---- */
+  /* a popover under its toolbar button rather than more toolbar controls: the
+     bar is already at capacity on a 1366-wide laptop */
+  #envPanel { position: fixed; top: 46px; left: 10px; width: 268px; z-index: 6;
+    background: #12151dee; border: 1px solid #262c3a; border-radius: 8px;
+    padding: 10px 12px; backdrop-filter: blur(4px); }
+  #envPanel.hidden { display: none; }
+  #envPanel h3 { font-size: 13px; margin: 0 0 8px; color: #fff; font-weight: 600; }
+  #envPanel .envRow { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  #envPanel .envRow label { flex: 0 0 52px; color: #dfe3ea; }
+  #envPanel .envHint { flex: 1 1 auto; min-width: 0; color: #8a93a6; font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; }
+  #envPanel select { flex: 1 1 auto; min-width: 0; background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 5px; padding: 4px 6px; font: inherit; cursor: pointer; }
+  #envPanel select:hover { border-color: #4a83ff; }
+  #envPanel input.swatch { flex: 0 0 auto; width: 30px; height: 26px; padding: 2px;
+    background: #1a1e28; border: 1px solid #2b3242; border-radius: 5px; cursor: pointer; }
+  #envPanel input.swatch:hover { border-color: #4a83ff; }
+  #envPanel input.swatch::-webkit-color-swatch-wrapper { padding: 0; }
+  #envPanel input.swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
+  #envPanel input.swatch::-moz-color-swatch { border: none; border-radius: 3px; }
+  #envPanel .envReset { width: 100%; margin-top: 3px; background: #1a1e28; color: #dfe3ea;
+    border: 1px solid #2b3242; border-radius: 5px; padding: 5px 9px; font: inherit; cursor: pointer; }
+  #envPanel .envReset:hover { border-color: #4a83ff; }
+
   /* ---- diagnostics panel ---- */
   #diag { position: fixed; top: 46px; right: 10px; width: 380px; z-index: 5;
     max-height: calc(100vh - 58px); overflow: auto;
@@ -65,9 +90,13 @@
   #diag .start { color: #ff6b6b; }
   #diag details summary { cursor: pointer; color: #8a93a6; }
   #err { color: #ff8a7a; padding: 4px 0; white-space: pre-wrap; }
-  #legend { position: fixed; bottom: 8px; left: 10px; z-index: 5; color: #6a7488; }
-  #ctrlLegend { position: fixed; bottom: 24px; left: 10px; z-index: 5; color: #6a7488; }
-  #ctrlLegend b { color: #9aa4b8; font-weight: 600; }
+  /* the corner hints float straight over the scene, so they need their own
+     backing now that the sky can be any colour the user likes */
+  #legend, #ctrlLegend { position: fixed; left: 10px; z-index: 5; color: #8994ab;
+    background: #0d0f14bb; border-radius: 4px; padding: 1px 5px; backdrop-filter: blur(2px); }
+  #legend { bottom: 8px; }
+  #ctrlLegend { bottom: 26px; }
+  #ctrlLegend b { color: #b6c0d4; font-weight: 600; }
 
   /* ---- edit panel ---- */
   #editPanel { position: fixed; top: 46px; left: 10px; width: 268px; z-index: 5;
@@ -262,6 +291,10 @@
   #builder .part .ph .rm { background: none; border: none; color: #8a93a6; cursor: pointer;
     font: inherit; padding: 0 3px; }
   #builder .part .ph .rm:hover { color: #ff8a7a; }
+  #builder .part .ph .glow { background: #1c2230; border: 1px solid #2b3242; border-radius: 4px;
+    color: #6a7180; cursor: pointer; font: inherit; line-height: 1; padding: 2px 5px; flex: 0 0 auto; }
+  #builder .part .ph .glow.on { color: #ffd76a; border-color: #7a6320; background: #2a2413;
+    text-shadow: 0 0 6px #ffd76a; }
   #builder .part .grid3 { display: grid; grid-template-columns: 14px 1fr 1fr 1fr; gap: 3px 5px;
     align-items: center; }
   #builder .part .grid3 .gl { color: #8a93a6; font-size: 10.5px; }
@@ -297,6 +330,7 @@
   <button id="btnTop" title="snap the camera directly overhead">top</button>
   <button id="btnProj" title="perspective — click for orthographic / isometric">perspective</button>
   <select id="ctrlScheme" title="camera control scheme — matches popular 3D/CAD tools"></select>
+  <button id="btnEnv" title="environment — grid, sky and ground">environment</button>
   <button id="btnCp" class="on">checkpoints</button>
   <button id="btnEdit">✎ edit</button>
   <button id="btnUndo" class="hist" title="undo (Ctrl-Z)" disabled>↶</button>
@@ -307,6 +341,31 @@
   <span class="status" id="status">…</span>
 </div>
 <div id="diag" class="hidden"></div>
+<div id="envPanel" class="hidden">
+  <h3>environment</h3>
+  <div class="envRow">
+    <label for="gridSize">grid</label>
+    <select id="gridSize" title="ground-grid cell size — the ruler you place against">
+      <option value="10">10 m</option>
+      <option value="5">5 m</option>
+      <option value="2">2 m</option>
+      <option value="1">1 m</option>
+      <option value="0">off</option>
+    </select>
+    <input id="gridColor" class="swatch" type="color" value="#2a3446" title="grid line colour">
+  </div>
+  <div class="envRow">
+    <label for="skyColor">sky</label>
+    <span class="envHint">background &amp; distance haze</span>
+    <input id="skyColor" class="swatch" type="color" value="#0d0f14" title="sky colour">
+  </div>
+  <div class="envRow">
+    <label for="groundColor">ground</label>
+    <span class="envHint">the floor plane at z = 0</span>
+    <input id="groundColor" class="swatch" type="color" value="#151922" title="ground colour">
+  </div>
+  <button id="envReset" class="envReset" title="back to the editor's default look">↺ reset to defaults</button>
+</div>
 <div id="editPanel">
   <h2 id="edTitle">nothing selected</h2>
   <div class="modes">
@@ -323,6 +382,8 @@
       <option value="0.5">0.5 m</option>
       <option value="1">1 m</option>
       <option value="2">2 m</option>
+      <option value="5">5 m</option>
+      <option value="10">10 m</option>
     </select>
     <select id="snapRot" title="rotation snap — gizmo rotation lands on this increment">
       <option value="0">rot: off</option>
@@ -520,6 +581,9 @@ import { parseMrsim } from './mrsim.js';
 // the export credit — a tiny dependency-free module, so stamping a credit never
 // has to pull in the (lazily loaded) VelociDrone converter
 import { creditComment, CREDIT_RE, CREDIT_PILOT_RE } from './convert/credit.js';
+// LED / neon shapes + the emissive material, shared with the VelociDrone
+// converter so a placed neon ring and a converted one are the same object
+import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './convert/neon.js';
 
 // ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
 // Any file that parses as <Simulation>. Add to this list or use ?track=<path>
@@ -543,6 +607,7 @@ renderer.shadowMap.enabled = true;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+// both recoloured by the environment panel (applyEnv) — the fog tracks the sky
 scene.background = new THREE.Color('#0d0f14');
 scene.fog = new THREE.Fog('#0d0f14', 90, 320);
 
@@ -644,14 +709,104 @@ sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120, near: 1, far: 300 });
 scene.add(sun);
 
-// ground grid at z=0 (MRSIM tracks sit on the ground plane)
-const grid = new THREE.GridHelper(400, 80, '#2a3446', '#1a2130');
-grid.position.y = 0;
-scene.add(grid);
+// ---- environment: grid, sky and ground ------------------------------------
+// The look of the world you build in is the user's, not the editor's. The grid
+// is a ruler you eyeball spacing against, so its cell size matters; and the
+// three colours that read well over an empty dark world are the wrong ones over
+// a loaded terrain mesh, or on a projector, or for anyone who simply wants a
+// light room. All of it persists, and `↺ reset` puts the defaults back.
+//
+// The grid also defines the plane objects get dropped onto, and that stays true
+// with the grid switched off, so the drop height lives in `gridY`, not in the
+// helper.
+const ENV_DEFAULTS = { cell: 5, grid: '#2a3446', sky: '#0d0f14', ground: '#151922' };
+const ENV_CELLS = [10, 5, 2, 1, 0];            // the #gridSize options; 0 = off
+const ENV_KEY = 'mrsim.env';
+const env = { ...ENV_DEFAULTS };
+const GRID_EXTENT = 400;                       // metres across, at every cell size
+const GRID_MAJOR = 5;                          // every 5th line is drawn brighter
+let grid = null;                               // THREE.GridHelper | null (off)
+let gridY = 0;                                 // ground level the grid sits at
+// major lines are the same hue, lifted towards white so the cell size reads at
+// a glance; minor lines sit below the chosen colour so the grid stays quiet
+const gridShade = (hex, f) => new THREE.Color(hex)
+  .lerp(new THREE.Color(f > 0 ? '#ffffff' : '#000000'), Math.abs(f)).getStyle();
+function buildGrid() {
+  if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); grid = null; }
+  if (!env.cell) return;
+  const divisions = Math.round(GRID_EXTENT / env.cell);
+  grid = new THREE.GridHelper(GRID_EXTENT, divisions,
+    gridShade(env.grid, 0.45), gridShade(env.grid, -0.25));
+  // GridHelper only highlights its two centre lines; colour every GRID_MAJOR-th
+  // line too, so a fine grid still shows the coarse marks. Its geometry pushes
+  // four vertices per step i (the x-line pair then the z-line pair), all one
+  // colour, so one setXYZ run per step recolours both lines of that step.
+  const col = grid.geometry.attributes.color;
+  const major = new THREE.Color(gridShade(env.grid, 0.15));
+  for (let i = 0; i <= divisions; i++) {
+    const step = i - divisions / 2;
+    if (step === 0 || step % GRID_MAJOR !== 0) continue;
+    for (let v = i * 4; v < i * 4 + 4; v++) col.setXYZ(v, major.r, major.g, major.b);
+  }
+  col.needsUpdate = true;
+  grid.material.transparent = true; grid.material.opacity = 0.9;
+  grid.position.y = gridY;
+  scene.add(grid);
+}
+function setGridLevel(y) { gridY = y; if (grid) grid.position.y = y; }
+
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000),
-  new THREE.MeshStandardMaterial({ color: '#151922', roughness: 1 }));
+  new THREE.MeshStandardMaterial({ color: ENV_DEFAULTS.ground, roughness: 1 }));
 ground.rotation.x = -Math.PI / 2; ground.position.y = -0.01; ground.receiveShadow = true;
 scene.add(ground);
+
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+function applyEnv() {
+  // the fog is the sky seen through distance — keeping them one colour is what
+  // makes far objects fade out instead of turning into a grey band
+  scene.background.set(env.sky);
+  scene.fog.color.set(env.sky);
+  ground.material.color.set(env.ground);
+  buildGrid();
+  const el = id => document.getElementById(id);
+  el('gridSize').value = String(env.cell);
+  el('gridColor').value = env.grid;
+  el('skyColor').value = env.sky;
+  el('groundColor').value = env.ground;
+}
+function setEnv(patch) {
+  Object.assign(env, patch);
+  try { localStorage.setItem(ENV_KEY, JSON.stringify(env)); } catch {}
+  applyEnv();
+}
+function resetEnv() {
+  Object.assign(env, ENV_DEFAULTS);
+  try { localStorage.removeItem(ENV_KEY); } catch {}
+  applyEnv();
+}
+{
+  try {
+    const saved = JSON.parse(localStorage.getItem(ENV_KEY) || '{}');
+    // validate each field: a hand-edited or stale entry must not leave the
+    // editor with an invisible ground or a NaN-sized grid
+    if (ENV_CELLS.includes(+saved.cell)) env.cell = +saved.cell;
+    for (const k of ['grid', 'sky', 'ground'])
+      if (HEX_RE.test(saved[k] || '')) env[k] = saved[k];
+  } catch {}
+  document.getElementById('gridSize').onchange = e => setEnv({ cell: +e.target.value || 0 });
+  document.getElementById('gridColor').oninput = e => setEnv({ grid: e.target.value });
+  document.getElementById('skyColor').oninput = e => setEnv({ sky: e.target.value });
+  document.getElementById('groundColor').oninput = e => setEnv({ ground: e.target.value });
+  document.getElementById('envReset').onclick = resetEnv;
+  const envBtn = document.getElementById('btnEnv'), envPanel = document.getElementById('envPanel');
+  envBtn.onclick = () => {
+    const open = envPanel.classList.toggle('hidden');
+    envBtn.classList.toggle('on', !open);
+  };
+  applyEnv();
+}
+window.__env = { get: () => ({ ...env, gridY }), set: setEnv, reset: resetEnv,
+  defaults: () => ({ ...ENV_DEFAULTS }) };
 scene.add(new THREE.AxesHelper(3));   // origin marker: +x red, +y(up) green, +z blue
 
 const trackGroup = new THREE.Group();  scene.add(trackGroup);
@@ -764,6 +919,30 @@ const MRMAT = {
   Deco:      pbr(.55, .55, .55, .6, 0),   // launch stands, canopy, misc meshes
 };
 
+// A doc-local <Material> as a three material. Two definitions matter here:
+// <PBR> (matte) and <PBREmissive> (the game's LED/neon shader — the drone's own
+// RaceLEDs use it via DroneRenderingMaterials.xml "LEDLighting"). Its `emissive`
+// uniform is HDR: MRSIM feeds values above 1 to a bloom pass, three wants a
+// 0..1 colour plus an intensity, so split the vector into hue and headroom.
+function materialFromDef(def) {
+  if (!def) return null;
+  const body = def.getElementsByTagName('PBREmissive')[0] || def.getElementsByTagName('PBR')[0];
+  const bc = def.getElementsByTagName('baseColor')[0];
+  const em = def.getElementsByTagName('emissive')[0];
+  if (!bc && !em) return null;               // textured/instancing material — no flat colour
+  const n = (el, a, d) => { const v = el?.getAttribute(a); return v == null || v === '' ? d : parseFloat(v); };
+  const mat = pbr(n(bc, 'x', .05), n(bc, 'y', .05), n(bc, 'z', .05),
+    n(body?.getElementsByTagName('roughness')[0], 'value', .5),
+    n(body?.getElementsByTagName('metallic')[0], 'value', 0));
+  if (em) {
+    const e = [n(em, 'x', 0), n(em, 'y', 0), n(em, 'z', 0)];
+    const peak = Math.max(...e, 1e-6);
+    mat.emissive = lin(...e.map(v => v / Math.max(1, peak)));
+    mat.emissiveIntensity = Math.min(1.5, Math.max(0.25, peak / GLOW_HDR));
+  }
+  return mat;
+}
+
 // atlas textures, loaded once (Data/Simulations/Multirotor/GatePaint/*)
 const texCache = new Map();
 function atlasTex(file) {
@@ -791,6 +970,9 @@ const PART_MAT = {
   '7x7Mat': { Panel:{ tex:'7x7Mat.png' }, PVC:'PVC' },
   'Champs25Gate': { LEDGate:'GateLED', Gate:'GateSide' },
   'Champs25Pole': { Sleeve:'GateLED', Stalk:'FlagStalk' },
+  // the drone's own arm LED (RaceLEDs.xml): a 4 cm PCB whose LED strip is lit
+  // by DroneRenderingMaterials.xml's PBREmissive "LEDLighting"
+  'RaceLEDs': { PCB:'FlagPole', LEDs:'GateLED' },
 };
 
 async function preloadModels(names) {
@@ -954,15 +1136,7 @@ async function build(data, keepCamera = false) {
     if (docMatCache.has(name)) return docMatCache.get(name);
     const def = [...(editState?.doc?.getElementsByTagName('Material') || [])]
       .find(m => m.getAttribute('name') === name);
-    const bc = def && def.getElementsByTagName('baseColor')[0];
-    let mat = null;
-    if (bc) {
-      const pbrEl = def.getElementsByTagName('PBR')[0];
-      const n = (el, a, d) => { const v = el?.getAttribute(a); return v == null || v === '' ? d : parseFloat(v); };
-      mat = pbr(n(bc, 'x', .5), n(bc, 'y', .5), n(bc, 'z', .5),
-        n(pbrEl?.getElementsByTagName('roughness')[0], 'value', .5),
-        n(pbrEl?.getElementsByTagName('metallic')[0], 'value', 0));
-    }
+    const mat = materialFromDef(def);
     docMatCache.set(name, mat);
     return mat;
   };
@@ -1092,7 +1266,7 @@ async function build(data, keepCamera = false) {
 // (same Z-up->Y-up basis as the elements). Falls back to a plane at groundY.
 async function loadTerrain(location, groundY) {
   clearGroup(terrainGroup);
-  grid.position.y = groundY;
+  setGridLevel(groundY);
   ground.position.y = groundY - 0.01;
   ground.visible = true;
   const key = (location || '').replace(/\s+/g, '');
@@ -1155,7 +1329,7 @@ function refreshDiagChip(data) {
   const n = (data?.issues?.length || 0) + orphans + noStart;
   diagChip.classList.toggle('warn', !!n);
   diagChip.classList.toggle('ok', !n);
-  diagChip.textContent = n ? `⚠ ${n} track issue${n > 1 ? 's' : ''}` : '✓ track valid';
+  diagChip.textContent = n ? `! ${n} track issue${n > 1 ? 's' : ''}` : '✓ track valid';
   const bits = [];
   if (data?.issues?.length) bits.push(`${data.issues.length} parser issue(s)`);
   if (orphans) bits.push(`${orphans} checkpoint(s) with no element`);
@@ -1168,7 +1342,7 @@ function refreshDiagChip(data) {
 // rather than leaving the previous track's "✓ track valid" showing
 function diagChipError(label, detail) {
   diagChip.classList.add('warn'); diagChip.classList.remove('ok');
-  diagChip.textContent = '⚠ ' + label;
+  diagChip.textContent = '! ' + label;
   diagChip.title = detail + ' — click for details';
 }
 
@@ -1198,7 +1372,7 @@ function renderDiag(data, extra) {
     `</section>` +
 
     (issues.length
-      ? `<section><div class="issue">⚠ ${issues.length} parser issue(s)</div>` +
+      ? `<section><div class="issue">! ${issues.length} parser issue(s)</div>` +
           issues.map(i => `<div class="issue">· ${escapeHtml(i)}</div>`).join('') + `</section>`
       : `<section><div class="ok">✓ no parser issues (all includes/macros/checkpoints resolved)</div></section>`) +
 
@@ -1213,7 +1387,7 @@ function renderDiag(data, extra) {
       `<table><tr><th>#</th><th>name</th><th>pos x,y,z</th><th>dir</th></tr>` +
       data.seq.map(s =>
         `<tr><td class="${s.seqNum === 1 ? 'start' : 'num'}">${s.seqNum}</td>` +
-        `<td>${escapeHtml(s.name)}${s.elemIndex < 0 ? ' <span class="issue">⚠no-elem</span>' : ''}</td>` +
+        `<td>${escapeHtml(s.name)}${s.elemIndex < 0 ? ' <span class="issue">no-elem</span>' : ''}</td>` +
         `<td>${num3(s.pos.x)}, ${num3(s.pos.y)}, ${num3(s.pos.z)}</td>` +
         `<td>${num3(s.dir.x)}, ${num3(s.dir.y)}, ${num3(s.dir.z)}</td></tr>`
       ).join('') + `</table></details></section>`;
@@ -1923,28 +2097,42 @@ async function doRebuildFromDoc() {
 // EdColor_<HEX> material (created on demand). Scope: this item / all of the
 // same type / all items. The chosen sRGB colour is stored as a LINEAR baseColor
 // so it shows the same in the editor (see docMat) and in-game.
-const srgbToLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-const hexToLinear = hex => {
-  const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255].map(srgbToLinear);
-};
-function ensureColorMaterial(hex, ops) {
-  const name = 'EdColor_' + hex.slice(1).toUpperCase();
+// hexToLinear / GLOW_HDR come from convert/neon.js: MRSIM's own drone LEDs
+// (RaceLEDs.model, painted with DroneRenderingMaterials.xml's "LEDLighting")
+// are a PBREmissive material — a near-black baseColor plus an HDR `emissive`
+// uniform whose values run past 1 so the bloom pass catches them, and glowing
+// editor objects use exactly that.
+function ensureColorMaterial(hex, ops, glow = false) {
+  const name = glow ? glowName(hex) : 'EdColor_' + hex.slice(1).toUpperCase();
   const doc = editState.doc;
   if ([...doc.getElementsByTagName('Material')].some(m => m.getAttribute('name') === name)) return name;
   const [r, g, b] = hexToLinear(hex);
   const mat = doc.createElement('Material'); mat.setAttribute('name', name);
-  const pbrEl = doc.createElement('PBR');
-  const bc = doc.createElement('baseColor');
-  bc.setAttribute('x', r.toFixed(4)); bc.setAttribute('y', g.toFixed(4)); bc.setAttribute('z', b.toFixed(4));
-  const ro = doc.createElement('roughness'); ro.setAttribute('value', '.6');
+  const pbrEl = doc.createElement(glow ? 'PBREmissive' : 'PBR');
+  const vec = (tag, x, y, z) => { const e = doc.createElement(tag);
+    e.setAttribute('x', x.toFixed(4)); e.setAttribute('y', y.toFixed(4)); e.setAttribute('z', z.toFixed(4)); return e; };
+  // an unlit neon tube is dark plastic, not white — the colour is all in the glow
+  const bc = glow ? vec('baseColor', r * .1, g * .1, b * .1) : vec('baseColor', r, g, b);
+  const ro = doc.createElement('roughness'); ro.setAttribute('value', glow ? '.2' : '.6');
   const me = doc.createElement('metallic'); me.setAttribute('value', '0');
-  pbrEl.append(bc, ro, me); mat.appendChild(pbrEl);
+  pbrEl.append(bc, ro, me);
+  if (glow) pbrEl.appendChild(vec('emissive', r * GLOW_HDR, g * GLOW_HDR, b * GLOW_HDR));
+  mat.appendChild(pbrEl);
   const root = rootSim();
   const includes = [...root.children].filter(c => c.tagName === 'Include');
   root.insertBefore(mat, includes.length ? includes[includes.length - 1].nextSibling : root.firstChild);
   ops.push({ type: 'insert', node: mat });
   return name;
+}
+// does this material name refer to a glowing material in the current doc?
+// (recolouring a neon object must keep it neon rather than flattening it to
+// matte plastic, so the swatch follows whatever the part already is)
+function isGlowMaterial(name) {
+  if (!name) return false;
+  if (/^EdGlow_/.test(name)) return true;
+  const def = [...(editState?.doc?.getElementsByTagName('Material') || [])]
+    .find(m => m.getAttribute('name') === name);
+  return !!def?.getElementsByTagName('emissive')[0];
 }
 // unique wrapper Transforms of every editable object
 function itemTransforms() {
@@ -1975,9 +2163,12 @@ function applyColor(scope) {
     .flatMap(tr => [...tr.getElementsByTagName('MeshRendererComponent')]);
   if (!mrcs.length) return;   // nothing renderable (e.g. only bare sensors)
   const ops = [];
-  const matName = ensureColorMaterial(document.getElementById('edColor').value, ops);
+  const hex = document.getElementById('edColor').value;
+  const names = {};   // matte / glow variants, each created only if something uses it
   let changed = 0;
   for (const mrc of mrcs) {
+    const glow = isGlowMaterial(mrc.getAttribute('material'));
+    const matName = names[glow] ??= ensureColorMaterial(hex, ops, glow);
     if (mrc.getAttribute('material') === matName) continue;
     ops.push(attrsOp(mrc));
     mrc.setAttribute('material', matName);
@@ -2183,6 +2374,32 @@ const TRACK_OBJECTS = [
 ];
 
 // ---------------------------------------------------------------------------
+// LED / NEON OBJECTS — the drone's own light, as track furniture.
+// MRSIM ships no light-emitting placeable, only a light-emitting MATERIAL (the
+// PBREmissive the drone's RaceLEDs use), so these are tube runs of ordinary
+// cylinders painted with it. Sizes are VelociDrone's neon family, which is what
+// people are actually trying to rebuild: ring 2.84 x 3.21, squareM 2.8 x 3.14,
+// triangleM 2.84 x 3.18 — every one of them a `w`-wide silhouette lifted so its
+// top lands at `h`. Nothing here is solid: it is light, and a hoop's collision
+// hull would be a wall across the thing you fly through. Colour is the standard
+// recolour swatch (it keeps the glow), so one entry per shape covers every
+// colour VD has.
+// ---------------------------------------------------------------------------
+const NEON_OBJECTS = [
+  { id: 'ledRing', label: 'neon ring 2.8 m', cp: null, neon: ['ring', { w: 2.84, h: 2.84, cz: 1.79 }] },
+  { id: 'ledSquare', label: 'neon square 2.8 m', cp: null, neon: ['square', { w: 2.8, h: 2.8, cz: 1.74 }] },
+  { id: 'ledTri', label: 'neon triangle 2.8 m', cp: null, neon: ['triangle', { w: 2.84, h: 2.84, cz: 1.76 }] },
+  { id: 'ledArch', label: 'neon arch 2.8 m', cp: null, neon: ['semicircle', { w: 2.84, h: 5.68 }] },
+  { id: 'ledCorner', label: 'neon corner', cp: null, neon: ['corner', { w: 1.15, h: 2.46, cz: 1.23 }] },
+  { id: 'ledBar', label: 'LED bar 4 m', cp: null, neon: ['strip', { w: 4, h: 0.12, d: 0.06 }] },
+  // the raceable one: the ring plus a full-aperture trigger, so a neon hoop can
+  // BE the checkpoint instead of needing a pane placed inside it
+  { id: 'ledGate', label: 'neon ring + checkpoint', cp: 'pass',
+    neon: ['ring', { w: 2.84, h: 2.84, cz: 1.79 }],
+    pass: { pos: [0, 0, 1.79], dims: [2.72, 0.3, 2.72], ref: { pos: [0, 0, 1.79], rot: [0, 0, 0] } } },
+].map(d => ({ ...d, parts: neonParts(d.neon[0], { ...d.neon[1], color: NEON_DEFAULT_HEX }) }));
+
+// ---------------------------------------------------------------------------
 // CUSTOM COMPONENTS — user-built track objects. A component is a small entity
 // subtree (the same shape buildCustomGate emits): a list of primitive `parts`
 // (box/cylinder with an offset, rotation, size and colour) plus an optional
@@ -2231,7 +2448,7 @@ function customDefs() {
 function allPalette() {
   const custom = customDefs();
   const seen = new Set(custom.map(c => c.id));
-  return [...PALETTE, ...TRACK_OBJECTS.filter(d => !seen.has(d.id)), ...custom];
+  return [...PALETTE, ...[...TRACK_OBJECTS, ...NEON_OBJECTS].filter(d => !seen.has(d.id)), ...custom];
 }
 
 // ---- DOM building blocks ---------------------------------------------------
@@ -2462,10 +2679,11 @@ function buildCustomComponent(doc, ent, name, def, ops) {
     for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== '') e.setAttribute(k, attrs[k]); return e; };
   const usedSuffixes = new Set();
   (def.parts || []).forEach((part, i) => {
-    // a named material (the converter's own) or a plain colour swatch
+    // a named material (the converter's own), a glowing LED/neon colour, or a
+    // plain colour swatch
     let material;
     if (part.material) { ensureMaterial(part.material, ops); material = part.material; }
-    else material = ensureColorMaterial(part.color || '#c8c8c8', ops);
+    else material = ensureColorMaterial(part.color || '#c8c8c8', ops, !!part.glow);
     // `suffix` lets a built-in track object keep the converter's own part
     // names (_postL/_banner/_pole/_cloth). That is not cosmetic: the start-
     // gate machinery finds a gate's banner by material OR by a name ending
@@ -2688,7 +2906,7 @@ function groundHit(e) {
   raycaster.setFromCamera(pointer, camera);
   const hits = raycaster.intersectObjects([terrainGroup, ground], true);
   if (hits.length) return hits[0].point;
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -grid.position.y);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -gridY);
   const p = new THREE.Vector3();
   return raycaster.ray.intersectPlane(plane, p) ? p : null;
 }
@@ -3024,12 +3242,24 @@ function renderPalette() {
   const track = TRACK_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
   if (track.length) {
     const div = document.createElement('div');
-    div.className = 'palDivide'; div.textContent = 'track objects (VelociDrone)';
+    div.className = 'palDivide'; div.textContent = 'track objects (VD)';
     pal.appendChild(div);
     track.forEach(def => {
       const b = mkBtn(def);
       b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
-        ' · what the VelociDrone converter emits';
+        ' · what the VD converter emits';
+      pal.appendChild(b);
+    });
+  }
+  const neon = NEON_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
+  if (neon.length) {
+    const div = document.createElement('div');
+    div.className = 'palDivide'; div.textContent = 'LED / neon';
+    pal.appendChild(div);
+    neon.forEach(def => {
+      const b = mkBtn(def);
+      b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
+        ' · glows, never solid · recolour with the swatch';
       pal.appendChild(b);
     });
   }
@@ -3046,7 +3276,7 @@ function renderPalette() {
       pal.appendChild(b);
     });
   }
-  if (palFilter && !builtin.length && !track.length && !custom.length) {
+  if (palFilter && !builtin.length && !track.length && !neon.length && !custom.length) {
     const none = document.createElement('div');
     none.className = 'palNone';
     none.textContent = `no objects match “${palFilter}”`;
@@ -3128,15 +3358,7 @@ function previewDocMat(doc, name, cache) {
   if (!name) return null;
   if (cache.has(name)) return cache.get(name);
   const def = [...doc.getElementsByTagName('Material')].find(m => m.getAttribute('name') === name);
-  const bc = def && def.getElementsByTagName('baseColor')[0];
-  let mat = null;
-  if (bc) {
-    const p = def.getElementsByTagName('PBR')[0];
-    const n = (el, a, d) => { const v = el?.getAttribute(a); return v == null || v === '' ? d : parseFloat(v); };
-    mat = pbr(n(bc, 'x', .5), n(bc, 'y', .5), n(bc, 'z', .5),
-      n(p?.getElementsByTagName('roughness')[0], 'value', .5),
-      n(p?.getElementsByTagName('metallic')[0], 'value', 0));
-  }
+  const mat = materialFromDef(def);
   cache.set(name, mat); return mat;
 }
 
@@ -3298,6 +3520,7 @@ const cloneForEdit = c => {
     name: typeof p.name === 'string' ? p.name : '',
     pos: (p.pos || [0, 0, 0]).slice(0, 3), rot: (p.rot || [0, 0, 0]).slice(0, 3),
     dims: (p.dims || []).slice(0, 3), color: p.color || '#cccccc',
+    ...(p.glow ? { glow: true, solid: false } : p.solid === false ? { solid: false } : {}),
     ...(p.verts ? { verts: p.verts, tris: p.tris } : {}) }));
   d.pass = withRef(d.pass || { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5] });
   return d;
@@ -3314,6 +3537,8 @@ function cleanComponent(def, id) {
       dims: (p.dims || []).slice(0, PART_SHAPES[shape]).map(r3),
       color: /^#[0-9a-fA-F]{6}$/.test(p.color || '') ? p.color.toLowerCase() : '#cccccc',
     };
+    if (p.glow) out.glow = true;
+    if (p.glow || p.solid === false) out.solid = false;   // light, not structure
     if (shape === 'mesh') {
       out.verts = p.verts.map(v => Math.round((+v || 0) * 1e4) / 1e4);
       out.tris = (p.tris || []).map(t => Math.round(+t || 0));
@@ -3510,6 +3735,7 @@ function renderParts() {
       <div class="ph">
         <span class="tag" title="${shape === 'mesh' ? `imported mesh · ${(p.tris || []).length / 3} triangles` : ''}">${TAG[shape]}${shape === 'mesh' ? ` ▲${Math.round((p.tris || []).length / 3)}` : ''}</span>
         <input class="col" type="color" value="${p.color || '#cccccc'}" title="colour">
+        <button class="glow${p.glow ? ' on' : ''}" title="LED / neon: light this part up instead of shading it (never a collider)">◉</button>
         <input class="pnm" type="text" maxlength="24" spellcheck="false"
           value="${escapeHtml(p.name || '')}" placeholder="part name (optional)"
           title="names this part's entity in the exported XML">
@@ -3839,9 +4065,18 @@ document.getElementById('bParts').addEventListener('input', e => {
   updateBuilderPreview();
 });
 document.getElementById('bParts').addEventListener('click', e => {
-  if (!builderState || !e.target.classList.contains('rm')) return;
+  if (!builderState) return;
   const row = e.target.closest('.part'); if (!row) return;
-  builderState.def.parts.splice(+row.dataset.i, 1);
+  if (e.target.classList.contains('rm')) {
+    builderState.def.parts.splice(+row.dataset.i, 1);
+  } else if (e.target.classList.contains('glow')) {
+    // a glowing part is a light source, not structure: MRSIM would collide
+    // against the polyhedron's hull, so a neon ring you fly through has to
+    // stop being solid the moment it lights up
+    const part = builderState.def.parts[+row.dataset.i]; if (!part) return;
+    part.glow = !part.glow;
+    part.solid = part.glow ? false : undefined;
+  } else return;
   renderParts(); updateBuilderPreview();
 });
 document.getElementById('bSave').onclick = saveComponent;
@@ -4249,7 +4484,7 @@ document.getElementById('file').onchange = async e => {
   syncTrackSel(-1);
   const text = await f.text();
   if (/\.(trk|json)$/i.test(f.name)) {
-    statusEl.textContent = 'converting VelociDrone track…';
+    statusEl.textContent = 'converting VD track…';
     try {
       const { xml, warnings, name } = await convertVdText(text, f.name);
       await loadFromText(xml, name + '-MRSIM.xml');

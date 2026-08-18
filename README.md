@@ -37,7 +37,7 @@ official 2D layout poster), **2022 Mission Foods Australian Drone Nationals**,
 - **Open track** — view any VelociDrone `.trk` track file or MRSIM `.xml`
   track (header button or drag-and-drop it onto the page). Files are decoded
   entirely in the browser; nothing is uploaded anywhere.
-- **🌐 Browse** — search VelociDrone's ~2000 official public tracks and view
+- **Browse** — search VelociDrone's ~2000 official public tracks and view
   any of them with one click (catalogue format documented by
   [bolagnaise/vdrone-tracks](https://github.com/bolagnaise/vdrone-tracks);
   the AES-encrypted list is decoded client-side, downloads come straight
@@ -47,7 +47,7 @@ official 2D layout poster), **2022 Mission Foods Australian Drone Nationals**,
   in-game) or VelociDrone → MRSIM `.xml`. The environment selector next to
   the button picks the target scene (Empty Scene Day/Night… for VD; Empty
   Grass World / Baylands Park / Hardesty BMX for MRSIM).
-- **🛠 Editor** — the **FPV Track Editor**, a full 3D MRSIM track editor (opens
+- **Editor** — the **FPV Track Editor**, a full 3D MRSIM track editor (opens
   `mrsim-test.html`): place any MRSIM object from a palette, edit the lap /
   checkpoint order, move-rotate-scale with a gizmo, and import a VelociDrone
   `.trk`/`.json` or MRSIM `.xml` to edit and re-export. See
@@ -100,7 +100,7 @@ have one:
   serve.py allows, and nothing is logged.
 
 The button appears for tracks whose online leaderboard id is known (any track
-opened via **🌐 Browse**, plus the bundled AU NATS Quali).
+opened via **Browse**, plus the bundled AU NATS Quali).
 `protected_track_value` is 1 for official tracks, 2 for user tracks.
 
 ### Offline (bundled / captured)
@@ -205,7 +205,7 @@ overlay then makes the viewer prefer them on your own machine only. See
 
 ## FPV Track Editor
 
-The **🛠 Editor** button (top-right of the viewer) opens `mrsim-test.html`, the
+The **Editor** button (top-right of the viewer) opens `mrsim-test.html`, the
 **FPV Track Editor** — a standalone 3D MRSIM track editor. It renders gates,
 flags, mat and terrain from the real decoded MRSIM meshes (falling back to
 collision primitives), and while it is MRSIM-native it can import either sim's
@@ -219,13 +219,24 @@ tracks:
   several). A translucent **3D ghost of the actual object** follows the cursor
   while placing, so you see exactly what you're dropping. Hover a palette entry
   for a live 3D thumbnail of the object.
-- **Track objects (VelociDrone)** — a second palette section with the objects
+- **Track objects (VD)** — a second palette section with the objects
   the converter emits, which MRSIM's own library has no equivalent for: the
   true-size 3.2 m VD race gate and start/finish gate, the 4 m feather flag
   with its one-sided pole-side pass, the MGP hurdle panel, upright and dive
   checkpoint panes, net panels and stretch blocks. They carry the converter's
   own material names, so one dropped next to a converted object matches it —
   which is what you want when hand-fixing a conversion.
+- **LED / neon** — a third palette section of glowing objects: neon ring,
+  square, triangle, arch, corner, LED bar, and a *neon ring + checkpoint* that
+  races like a gate. MRSIM ships no light-emitting placeable, only a
+  light-emitting **material** — the one the drone's own arm LEDs use
+  (`RaceLEDs.xml` → `DroneRenderingMaterials.xml` `LEDLighting`, a `PBREmissive`
+  with an HDR `emissive` uniform). These objects are tube runs of ordinary
+  cylinders painted with exactly that, so they glow in-game. They are never
+  colliders (a hoop's collision hull would be a wall across the opening), and
+  the **colour** picker recolours them while keeping the glow. The same shapes
+  are what a converted VelociDrone neon object becomes — see
+  [`convert/neon.js`](convert/neon.js).
 - **＋ Build / manage objects** — the object builder (bottom of the palette)
   lets you compose your **own** track object from box / cylinder parts — each
   with a size, offset, rotation and colour — plus an optional fly-through
@@ -242,6 +253,12 @@ tracks:
 - **View** — toggle **perspective / orthographic / isometric** projection and
   pick a **camera control scheme** (Orbit, Blender, Fusion / CAD or Maya) so
   navigation matches whichever 3D tool you're used to; the choice is remembered.
+- **Environment** — the look of the world you build in: **grid** cell size
+  (10 / 5 / 2 / 1 m, or off) and line colour, **sky** colour (the background and
+  the distance haze, which track it together) and **ground** colour, plus
+  **↺ reset to defaults**. Every 5th grid line is drawn brighter so the coarse
+  marks read at a glance, and the whole setting is remembered. Position snap
+  runs from 0.1 m to 10 m, so snapping can match the grid you see.
 - **Lap panel** — the ordered checkpoint list from the track's
   `<CheckpointList>`, with reorder (▲▼), remove (✕), add-selected (+ lap) and a
   circuit toggle, written straight back into the scene.
@@ -292,6 +309,7 @@ driven by what defines the race — the ordered checkpoint crossings
 | building blocks (all 13 colours) | coloured `<Box>` entities, exact size + orientation |
 | MGP hurdles | grey panel `<Box>` at the exact scaled size and full orientation (rolled slats stay rolled) |
 | decorative flags | `Flag.xml` (+ riser to the scaled height) |
+| neon (rings, squares, triangles, decagons, semicircles, corners, angles, back bars, strips, cone collars) | glowing tube runs on a `PBREmissive` material — the drone's own LED shader — at the prefab's true size and colour; render-only, never a collider. A neon ring in the *sequence* keeps its shape and takes its own opening as the checkpoint trigger instead of becoming a white gate frame. |
 | blocks | ← pipe cube PVC structure |
 
 MRSIM→VD: every checkpoint-list entry becomes a VD sequence gate — repeat
@@ -411,6 +429,7 @@ for example) are the point — not re-hosting anyone's assets.
 | `components.json` | Repo-shared custom objects for the editor's object builder |
 | `convert.js` | VelociDrone ⇄ MRSIM track converter (façade over `convert/`) |
 | `convert/*.js` | Converter modules: coordinate spaces, VD classify/normalise, mapping, XML emit, MRSIM→VD, validate |
+| `convert/neon.js` | LED / neon shapes + the `PBREmissive` material, shared by the editor palette and the converter |
 | `convert-cli.mjs` | Node CLI: `.trk`/`.json` → validated MRSIM XML |
 | `test/` | Converter test suite (`npm test`, node:test) |
 | `ghostfetch.js` | Live leaderboard/flight fetch + ghost decoding (zlib + MS-NRBF) |

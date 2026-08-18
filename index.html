@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>VelociDrone Track Viewer</title>
+<title>VD Track Viewer</title>
 <style>
   :root {
     --green: #128a4d;
@@ -284,7 +284,11 @@
     #header { padding: 6px 10px; gap: 6px 8px; }
     #header h1 { font-size: 13px; max-width: 56vw; }
     #header .sub { display: none; }
-    #header .btxt { display: none; }            /* icon-only buttons */
+    /* the header buttons are text-labelled, so a small screen shrinks the
+       labels and lets the row wrap rather than hiding them (it used to drop
+       the text and leave a bare icon, which is no longer there to fall back on) */
+    #header button { font-size: 11px; }
+    #header .btxt { white-space: nowrap; }
     #trackSelect { flex: 1 1 130px; min-width: 0; margin-left: 0;
       padding: 8px 6px; font-size: 12px; }
     #btnTrk, #btnConvert, #btnDownload, #btnBrowse, #btnTheme { padding: 8px 10px; }
@@ -311,19 +315,19 @@
 
 <div id="header">
   <div>
-    <h1 id="trackName">VelociDrone Track Viewer</h1>
+    <h1 id="trackName">VD Track Viewer</h1>
     <div class="sub" id="trackSub">Loading…</div>
   </div>
   <select id="trackSelect"></select>
-  <button id="btnBrowse" title="Search and view official VelociDrone tracks (community index)">🌐<span class="btxt"> Browse</span></button>
-  <button id="btnTrk" title="View a VelociDrone .trk or MRSIM .xml track file">📂<span class="btxt"> Open track</span></button>
-  <button id="btnDownload" title="Download the displayed track as a VelociDrone .trk file" style="display:none">⬇<span class="btxt"> Download .trk</span></button>
+  <button id="btnBrowse" title="Search and view official VD tracks (community index)"><span class="btxt">Browse</span></button>
+  <button id="btnTrk" title="View a VD .trk or MRSIM .xml track file"><span class="btxt">Open track</span></button>
+  <button id="btnDownload" title="Download the displayed track as a VD .trk file" style="display:none"><span class="btxt">Download .trk</span></button>
   <!-- converter kept in the DOM (still reachable via window.convertCurrent) but
        hidden from the header — flip these back to show it again -->
   <select id="convEnv" title="Environment for the converted track" style="display:none"></select>
-  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VelociDrone ⇄ MRSIM)" style="display:none">⇄<span class="btxt"> Convert</span></button>
-  <button id="btnEditor" title="FPV Track Editor — place MRSIM gates and checkpoints, edit the lap, import VelociDrone or MRSIM tracks" onclick="location.href='mrsim-test.html'">🛠<span class="btxt"> Editor</span></button>
-  <button id="btnTheme" title="Toggle dark mode">🌙</button>
+  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VD ⇄ MRSIM)" style="display:none">⇄<span class="btxt"> Convert</span></button>
+  <button id="btnEditor" title="FPV Track Editor — place MRSIM gates and checkpoints, edit the lap, import VD or MRSIM tracks" onclick="location.href='mrsim-test.html'"><span class="btxt">Editor</span></button>
+  <button id="btnTheme" title="Toggle dark mode">dark</button>
   <input type="file" id="trkFile" accept=".trk,.xml" hidden>
 </div>
 
@@ -360,14 +364,14 @@
   <div id="linesTools" style="display:none">
     <div class="sect">Human lines</div>
     <input id="proxyInput" type="url" placeholder="Proxy URL — deploy proxy-worker.js (README)"
-      title="Fetching a flight needs a CORS proxy: VelociDrone's getFlight reply blocks cross-origin reads. Deploy proxy-worker.js to Cloudflare Workers (free) and paste its URL here."
+      title="Fetching a flight needs a CORS proxy: VD's getFlight reply blocks cross-origin reads. Deploy proxy-worker.js to Cloudflare Workers (free) and paste its URL here."
       autocomplete="off" style="display:none">
     <div class="btnrow">
       <button class="act" id="btnFetchWr">⤓ WR line</button>
       <button class="act" id="btnBoard">☰ Leaderboard</button>
     </div>
     <div class="btnrow">
-      <button class="act" id="btnImportGhost">📁 Import .ghost</button>
+      <button class="act" id="btnImportGhost">Import .ghost</button>
     </div>
     <input id="ghostImport" type="file" accept=".ghost,.bin,.b64" style="display:none">
     <div id="boardBox" style="display:none">
@@ -418,7 +422,7 @@
 <div id="help">
   <b>Drag</b> rotate · <b>Scroll</b> zoom · <b>Right-drag</b> pan<br>
   <b>Click</b> any object to inspect it<br>
-  <b>Drop</b> a VelociDrone .trk or MRSIM .xml anywhere
+  <b>Drop</b> a VD .trk or MRSIM .xml anywhere
 </div>
 
 <div id="convReport" class="card">
@@ -427,7 +431,7 @@
 </div>
 
 <div id="browser" class="card">
-  <h2><span>Official VelociDrone tracks</span><button id="brClose" title="Close (Esc)">×</button></h2>
+  <h2><span>Official VD tracks</span><button id="brClose" title="Close (Esc)">×</button></h2>
   <div id="brBar">
     <input id="brSearch" type="search" placeholder="Search tracks or sceneries…">
     <select id="brSort">
