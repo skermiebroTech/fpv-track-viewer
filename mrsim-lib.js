@@ -1047,6 +1047,16 @@ export const MRSIM_LIB = {
     </Entity>
 </Simulation>
 `,
+  '/Data/Simulations/Multirotor/RaceLEDs.xml': `<Simulation>
+    <Include file="/Data/Simulations/Multirotor/DroneRenderingMaterials.xml"/>
+
+    <Entity name="RaceLEDs">
+        <WorldFromEntityComponent/>
+        <ParentFromEntityComponent/>
+        <BinaryModelRenderer file="RaceLEDs.model" assignDefaultMaterials="true"/>
+    </Entity>
+</Simulation>
+`,
   '/Data/Simulations/Multirotor/Gates/PoleGates.xml': `<Simulation>
     <Macro name="PaddedPoleNoTape">
         <Entity>

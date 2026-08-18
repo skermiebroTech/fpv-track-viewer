@@ -36,6 +36,10 @@ LIB_FILES = [
     "Flag.xml", "Flag180.xml", "FlagPassRight.xml", "FlagPassLeft.xml",
     "HalfPlanePassageRight.xml", "HalfPlanePassageLeft.xml",
     "DroneTrackInstanceGroups.xml",
+    # the drone's own arm LED: a BinaryModelRenderer whose default material
+    # (DroneRenderingMaterials.xml "LEDLighting") is PBREmissive — the one
+    # light-emitting thing the game ships that a track can <Include> directly
+    "RaceLEDs.xml",
     "Gates/PoleGates.xml", "Gates/Champs25Gate.xml", "Gates/Champs25Pole.xml",
     "LaunchStands/MetalLaunchStand.xml",
     "LaunchStands/ChampionshipLaunchStand.xml",

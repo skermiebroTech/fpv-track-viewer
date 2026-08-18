@@ -35,6 +35,8 @@
 import * as THREE from 'three';
 import { Z_AXIS, toMrsim, fromMrsim, mrsimQuat, fmt, attrsFromQuat, rotAttrs, rotQuatForDir } from './space.js';
 import { VD_BLOCKS, MACRO_DEFS, pickGate } from './mapping.js';
+import { neonEntitiesXml, neonFit, neonShapeOf, neonHexOf, glowMaterialXml,
+  NEON_TUBE } from './neon.js';
 import { normalizeVdTrack } from './vd-normalize.js';
 import { creditComment } from './credit.js';
 
@@ -233,6 +235,7 @@ export function emitMrsim(normal, opts = {}) {
   let offSize = 0, offSizeExample = '', sunkGates = 0;
   let usedHurdle = false, usedLeg = false, usedNet = false, usedRiser = false;
   let usedGateFrame = false, usedStartBanner = false, usedFlagParts = false;
+  const usedGlow = new Set();   // neon colours that need an emissive material
   let first = null;   // {pos three, dir three} of the first crossing (start area)
 
   // An upright window pane across the lap — what an invisible marker you fly
@@ -663,9 +666,54 @@ export function emitMrsim(normal, opts = {}) {
       // MRSIM frames on most gates. Small gates (<=2.55 m) keep the game's
       // 5x5 model; everything bigger becomes a TRUE-SIZE frame whose
       // collision sits exactly where VD's does.
-      const small = c.gateWidth <= 2.55;
+      // a neon hoop raced through stays a neon hoop: standing a solid white
+      // gate frame in its place (what every neon gate used to convert to) loses
+      // both the look and the real opening, which is the ring's own inner
+      // circle rather than a 3 m rectangle
+      const neon = /neon/i.test(c.prefabName || '') ? neonShapeOf(c.prefabName) : null;
+      const small = !neon && c.gateWidth <= 2.55;
       let refWorld, half;
-      if (small) {
+      if (neon) {
+        const hex = neonHexOf(c.prefabName);
+        const fit = neonFit(opts.boundsFor?.(c.prefab), [sx, sy, c.scale[2] ?? 1], neon);
+        // The hoop keeps the size and the vertical placement VD's own mesh has
+        // (its `cz` says whether the prefab is modelled from its feet or around
+        // its middle), so the opening — the centre of the outline, not a gate's
+        // mid-height — lands where the drone actually flies.
+        const refH = fit.cz;
+        const apW = Math.max(1, fit.w - 2 * NEON_TUBE);
+        const apH = Math.max(1, fit.h - 2 * NEON_TUBE);
+        half = fit.w / 2;
+        usedGlow.add(hex);
+        parts.push(meta(`neon-${neon}`, nm),
+          `    <Transform x="${fmt(pmg.x)}" y="${fmt(pmg.y)}" z="${fmt(pmg.z)}"${rotAttrs(dm)}>
+      <Entity name="${nm}">
+${neonEntitiesXml(neon, nm, { w: fit.w, h: fit.h, cz: fit.cz, d: fit.d, plane: 'xz', uOff: 0, color: hex })}
+        <Entity name="${nm}_pass">
+          <WorldFromEntityComponent z="${fmt(refH)}"/>
+          <Box x="${fmt(apW)}" y=".3" z="${fmt(apH)}"/>
+          <StaticContact contactMaterial="-1"/>
+          <Entity name="CheckpointReference">
+            <WorldFromEntityComponent z="${fmt(refH)}"/>
+          </Entity>
+          <Checkpoint/>
+        </Entity>
+      </Entity>
+    </Transform>`);
+        cpNames.push(`${nm}_pass`);
+        refWorld = pg.clone().add(fromMrsim(
+          new THREE.Vector3(0, 0, refH).applyQuaternion(rotQuatForDir(dm))));
+        emitted.push({
+          name: `${nm}_pass`, kind: 'gate', form: `neon-${neon}`, vdBadge: c.vdBadge, sf: isSF,
+          sfCustom: isSF, refH,
+          expectPos: refWorld, expectDir: dir.clone(),
+          sensor: { w: apW, h: apH, d: 0.3 },
+        });
+        if (isSF) {
+          warnings.push('the VD start element is a neon ring — it converts as a ' +
+            'neon checkpoint, so the track has no red start/finish banner');
+        }
+      } else if (small) {
         const gp = pickGate(c.gateWidth, isSF);
         half = gp.half;
         if (isSF) {
@@ -765,8 +813,10 @@ export function emitMrsim(normal, opts = {}) {
         });
       }
       // an elevated gate (raised / tower gate) stands on legs in VD — add a
-      // vertical support post under each side down to the ground so it isn't floating
-      if (pg.y > 0.6) {
+      // vertical support post under each side down to the ground so it isn't
+      // floating. Neon is exempt: it hangs by design, and grey posts under a
+      // glowing hoop read as scaffolding VD never had.
+      if (pg.y > 0.6 && !neon) {
         usedLeg = true;
         const A = Math.atan2(dm.x, dm.y);
         const wax = new THREE.Vector3(Math.cos(A), 0, Math.sin(A));   // gate width axis
@@ -806,7 +856,7 @@ export function emitMrsim(normal, opts = {}) {
   // ---- scenery: blocks become boxes, hurdles panels, flags flags, nets
   // dark panels (in VD the dive-gate towers and hurdles are scenery; the lap
   // itself only references invisible checkpoints placed at them)
-  let nBlock = 0, nHurdle = 0, nDeco = 0, nNet = 0, nEvicted = 0;
+  let nBlock = 0, nHurdle = 0, nDeco = 0, nNet = 0, nEvicted = 0, nNeon = 0;
   const skipped = new Map();
   const usedBlocks = new Set();
   // VD gates are often dressed with decoration blocks sized for the taller
@@ -951,6 +1001,28 @@ export function emitMrsim(normal, opts = {}) {
         </Entity>
       </Entity>
     </Transform>`);
+    } else if (b.map.type === 'neon') {
+      // A neon piece is light, not structure: tube runs painted with the
+      // emissive material and NO collider (VD's neon is brushable, and a
+      // collision hull across a ring you fly through would be a wall).
+      // NeonStrip* is a runtime mesh with no bundled bounds — like VD's nets,
+      // its scale IS its size in metres, so it becomes a glowing slab.
+      const nm = `neon${++nNeon}`;
+      const strip = b.map.shape === 'strip';
+      // a strip is a stretchable unit cube like VD's colour blocks — its scale
+      // IS its size in metres, and builders flatten one axis to nothing, which
+      // MRSIM would treat as degenerate geometry
+      const thick = v => Math.max(0.04, v);
+      const fit = strip
+        ? { w: thick(sx), h: thick(sy), d: thick(sz), cz: thick(sy) / 2, plane: 'xz', uOff: 0 }
+        : neonFit(opts.boundsFor?.(b.prefab), [sx, sy, sz], b.map.shape);
+      usedGlow.add(b.map.color);
+      parts.push(
+        `    <Transform ${at}${attrsFromQuat(mrsimQuat(q))}>
+      <Entity name="${nm}">
+${neonEntitiesXml(b.map.shape, nm, { ...fit, color: b.map.color })}
+      </Entity>
+    </Transform>`);
     } else {
       const key = b.prefabName || `prefab ${b.prefab}`;
       skipped.set(key, (skipped.get(key) || 0) + 1);
@@ -1014,6 +1086,10 @@ export function emitMrsim(normal, opts = {}) {
     ...(usedGateFrame ? [pbr('GatePostMaterial', [.93, .93, .9], '.4'),
       pbr('GateBannerMaterial', [.09, .13, .38], '.5')] : []),
     ...(usedStartBanner ? [pbr('GateStartBannerMaterial', [.55, .05, .05], '.4')] : []),
+    // one emissive material per neon colour in use — same PBREmissive shape as
+    // the game's own LEDLighting, so a neon run lights up instead of reading as
+    // grey plastic (see convert/neon.js)
+    ...[...usedGlow].sort().map(hex => glowMaterialXml(hex)),
   ].join('\n');
 
   const xml = `<Simulation>
@@ -1058,7 +1134,7 @@ ${cpNames.map(n => `              "${n}"`).join(',\n')}
       gates: nGate, dives: nDive, flags: nFlag, checkpoints: nCheck,
       merged: normal.merged, tools: normal.tools, offSize,
       sourceScenery: scenery.length,
-      blocks: nBlock, nets: nNet, hurdles: nHurdle, decoFlags: nDeco,
+      blocks: nBlock, nets: nNet, hurdles: nHurdle, decoFlags: nDeco, neon: nNeon,
       evicted: nEvicted,
       skipped: [...skipped.entries()].map(([n, count]) => ({ name: n, count })),
     },

@@ -181,7 +181,7 @@ const btnTheme = document.getElementById('btnTheme');
 function setTheme(dark, save) {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   if (save) localStorage.setItem('vd_theme', dark ? 'dark' : 'light');
-  btnTheme.textContent = dark ? '☀️' : '🌙';
+  btnTheme.textContent = dark ? 'light' : 'dark';
   btnTheme.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
   applySceneTheme(dark);
 }
@@ -1480,6 +1480,10 @@ function buildTrackMrsim(data) {
     if (MATS[hint]) return MATS[hint];
     const blk = hint.match(/^blk:(\w+)$/);
     if (blk) return (MATS[hint] = mkMat(BLOCK_HEX[blk[1]] || '#9a9a9a', 0.15));
+    // LED / neon runs carry their colour in the material name; the poster look
+    // wants them lit, like the VelociDrone side's neon gates
+    const glow = hint.match(/^glow:([0-9a-f]{6})$/);
+    if (glow) return (MATS[hint] = mkMat(`#${glow[1]}`, 0.95, { roughness: 0.35 }));
     return MATS.dark;
   };
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
@@ -2464,7 +2468,7 @@ function loadTrack(file) {
 // MRSIM .xml (scene graph, decoded in mrsim.js)
 // ---------------------------------------------------------------------------
 const uploads = [];
-function registerUpload(data, icon = '📂') {
+function registerUpload(data, icon = 'file') {
   const idx = uploads.push(data) - 1;
   const opt = document.createElement('option');
   opt.value = `upload:${idx}`;
@@ -2496,7 +2500,7 @@ const btnDownload = document.getElementById('btnDownload');
 
 function downloadTrkFor(data) {
   if (!data) throw new Error('no track loaded');
-  if (data.format === 'mrsim') throw new Error('not a VelociDrone track');
+  if (data.format === 'mrsim') throw new Error('not a VD track');
   const name = data.meta?.name || 'track';
   const { meta, ...json } = data;
   return {
@@ -2597,8 +2601,9 @@ function showConvReport(res) {   // uses the shared esc() HTML escaper
     rows.push('<div class="cvGrid">' +
       `<b>${k.crossings}</b><span>checkpoints (${k.gates} gates, ${k.dives} dive/climb, ` +
       `${k.flags} flags, ${k.checkpoints} sensors)${k.merged ? ` — ${k.merged} duplicate(s) merged` : ''}</span>` +
-      `<b>${k.blocks + k.nets + k.hurdles + k.decoFlags}</b><span>of ${k.sourceScenery} scenery objects ` +
-      `(${k.blocks} blocks, ${k.nets} nets, ${k.hurdles} hurdles, ${k.decoFlags} flags)</span>` +
+      `<b>${k.blocks + k.nets + k.hurdles + k.decoFlags + (k.neon || 0)}</b><span>of ${k.sourceScenery} scenery objects ` +
+      `(${k.blocks} blocks, ${k.nets} nets, ${k.hurdles} hurdles, ${k.decoFlags} flags` +
+      `${k.neon ? `, ${k.neon} neon` : ''})</span>` +
       `<b>${res.summary.location}</b><span>${res.summary.isCircuit ? 'circuit' : 'sprint'}` +
       `${res.summary.groundRaise > 0.005 ? ` · raised ${res.summary.groundRaise.toFixed(2)} m onto the floor` : ''}</span>` +
       '</div>');
@@ -2607,7 +2612,7 @@ function showConvReport(res) {   // uses the shared esc() HTML escaper
     rows.push('<div class="cvGrid">' +
       `<b>${res.counts.checkpoints}</b><span>sequence checkpoints</span>` +
       `<b>${res.counts.scenery}</b><span>scenery objects</span></div>`);
-    rows.push('<div class="cvNote">VelociDrone imports are checked by the game on load ' +
+    rows.push('<div class="cvNote">VD imports are checked by the game on load ' +
       '(insert via the track editor\'s Import option).</div>');
   }
   if (res.warnings.length) {
@@ -2847,7 +2852,7 @@ function brRow(t) {
       data.meta.onlineId = t.id;          // catalogue track_id -> enables Fetch WR
       data.meta.protectedValue = 1;       // official (catalogue) tracks
       browserEl.classList.remove('open');
-      return registerUpload(data, '🌐');
+      return registerUpload(data, 'web');
     }, e => `Could not load “${t.name}”: ${e.message}`)
       .finally(() => { br.busy = false; brStatus.textContent = ''; });
   });

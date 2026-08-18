@@ -126,7 +126,7 @@ try {
     (k.merged ? `, ${k.merged} duplicate(s) merged` : '') +
     (k.tools ? `, ${k.tools} editor tool(s) dropped` : ''));
   log(`  scenery: ${k.blocks} blocks, ${k.nets} nets, ${k.hurdles} hurdles, ` +
-    `${k.decoFlags} flags; skipped: ` +
+    `${k.decoFlags} flags, ${k.neon} neon; skipped: ` +
     (k.skipped.length ? k.skipped.map(s => `${s.count}× ${s.name}`).join(', ') : 'none'));
   log(`  world: ${summary.location}, ${summary.isCircuit ? 'circuit' : 'sprint'}` +
     (summary.groundRaise ? `, raised ${summary.groundRaise.toFixed(2)} m onto the floor` : ''));

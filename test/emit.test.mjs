@@ -311,3 +311,57 @@ test('location option is respected', () => {
   const { xml } = convert(fixture(), { location: 'BaylandsPark' });
   assert.match(xml, /Locations\/BaylandsPark\.xml/);
 });
+
+// ---- LED / neon -----------------------------------------------------------
+// VelociDrone's neon family used to convert to nothing (decorations were
+// skipped) or to a plain white gate frame (rings in the sequence). Both lost
+// the whole point of the object, which is that it glows.
+const withNeon = () => {
+  const data = fixture();
+  data.barriers.push(
+    { prefab: 178, trans: { pos: [1000, 0, 1000], rot: [1000, 0, 0, 0], scale: [100, 100, 100] } },
+    { prefab: 342, trans: { pos: [1100, 0, 1000], rot: [1000, 0, 0, 0], scale: [800, 20, 0] } });
+  return data;
+};
+
+test('neon scenery glows and is never a collider', () => {
+  const { xml, summary, warnings } = convert(withNeon());
+  assert.equal(summary.counts.neon, 2);
+  // the emissive material is the game's own PBREmissive, in the XML
+  // child-element form (the JSON5 block form renders as nothing at all)
+  assert.match(xml, /<Material name="EdGlow_E63C3C">\s*<PBREmissive>/);
+  assert.match(xml, /<emissive x="[\d.]+" y="[\d.]+" z="[\d.]+"\/>/);
+  const corner = xml.match(/<Entity name="neon1">[\s\S]*?<\/Entity>\s*<\/Transform>/)[0];
+  assert.ok(!/StaticContact/.test(corner), 'neon is light, not structure');
+  assert.match(corner, /<MeshRendererComponent material="EdGlow_E63C3C"/);
+  assert.ok(!warnings.some(w => /skipped.*Neon/.test(w)), 'no neon is skipped any more');
+});
+
+test('a neon strip keeps its stretched size and never collapses to nothing', () => {
+  // no bundled bounds: like VD's nets its scale IS its size in metres, and
+  // builders flatten one axis to zero, which MRSIM cannot render
+  const { xml } = convert(withNeon());
+  const strip = xml.match(/<Entity name="neon2">[\s\S]*?<\/Entity>\s*<\/Transform>/)[0];
+  const box = strip.match(/<Box x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/);
+  assert.deepEqual(box.slice(1).map(Number), [8, 0.04, 0.2]);
+});
+
+test('a neon ring raced through stays a ring, with the opening as its trigger', () => {
+  const data = withNeon();
+  data.gates.push({ prefab: 171,
+    trans: { pos: [5500, 0, 8800], rot: [1000, 0, 0, 0], scale: [100, 100, 100] }, gate: 13 });
+  const { xml, summary } = convert(data);
+  const ring = xml.match(/<Entity name="trkGate\d+">(?:(?!<\/Transform>)[\s\S])*EdGlow[\s\S]*?<\/Transform>/)[0];
+  assert.ok(!/GatePostMaterial|GateBannerMaterial/.test(ring), 'no white gate frame');
+  // the sensor fills the ring's own opening, centred on the ring (2.84 m wide,
+  // 3.21 m tall prefab -> centre 1.605 up), not at a gate's mid-height
+  const pass = ring.match(/<Entity name="trkGate\d+_pass">\s*<WorldFromEntityComponent z="([\d.]+)"\/>\s*<Box x="([\d.]+)" y="\.3" z="([\d.]+)"/);
+  assert.ok(Math.abs(+pass[1] - 1.605) < 0.01, `ring centre ${pass[1]}`);
+  assert.ok(+pass[2] > 2.6 && +pass[2] < 2.85, `opening width ${pass[2]}`);
+  // and it is the sensor child that goes in the lap list, not the wrapper
+  const last = summary.emitted.at(-1);
+  assert.match(last.name, /_pass$/);
+  assert.equal(last.form, 'neon-ring');
+  // a hanging hoop gets no scaffolding legs
+  assert.ok(!/GateLegMaterial/.test(ring));
+});

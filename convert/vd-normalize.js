@@ -26,7 +26,7 @@ import { mapScenery } from './mapping.js';
 
 export function normalizeVdTrack(data, { classify, prefabName = () => '', gateWidthFor = () => 3.2,
   humanLines = [] } = {}) {
-  if (!Array.isArray(data?.gates)) throw new Error('not a VelociDrone track: no gates array');
+  if (!Array.isArray(data?.gates)) throw new Error('not a VD track: no gates array');
   const seq = [...data.gates].sort((a, b) => a.gate - b.gate);
   if (!seq.length) throw new Error('track has no gates to convert');
   const warnings = [];
@@ -136,7 +136,7 @@ export function normalizeVdTrack(data, { classify, prefabName = () => '', gateWi
   const nMerged = crossings.length - merged.length;
   if (nMerged) {
     warnings.push(`merged ${nMerged} duplicate checkpoint(s) stacked on the same spot ` +
-      '(VelociDrone fires them in a single pass)');
+      '(VD fires them in a single pass)');
   }
   crossings = merged;
 

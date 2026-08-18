@@ -14,6 +14,7 @@
 //   * Invisible prefabs (88/2231/2232) have no bundled prefab at all (runtime
 //     built); their exported mesh bounds are editor markers, not triggers.
 // ===========================================================================
+import { neonShapeOf, neonHexOf } from './neon.js';
 
 // VD's stretchable building blocks -> plain MRSIM boxes with the same colour
 export const VD_BLOCKS = {
@@ -76,10 +77,16 @@ export function pickGate(widthM, isStartFinish) {
 }
 
 // how a VD barrier prefab converts: a colour block, a hurdle panel, a deco
-// flag, or nothing MRSIM can represent
+// flag, a glowing neon run, or nothing MRSIM can represent
 export function mapScenery(prefabId, prefabName) {
   if (VD_BLOCKS[prefabId]) return { type: 'block', color: VD_BLOCKS[prefabId] };
   if (/hurdle/i.test(prefabName)) return { type: 'hurdle' };
+  // VD's whole neon family (rings, squares, triangles, decagons, corners,
+  // angles, back bars, strips, cone collars) — glowing tube outlines, which
+  // MRSIM can do with the PBREmissive material its own drone LEDs use. Checked
+  // before /flag/ so nothing in the family is mistaken for a feather flag.
+  if (/neon/i.test(prefabName))
+    return { type: 'neon', shape: neonShapeOf(prefabName), color: neonHexOf(prefabName) };
   if (/flag/i.test(prefabName)) return { type: 'flag' };
   // VD nets are runtime meshes with unit-cube sizing (scale = metres):
   // approximate as solid dark panels with the same footprint and collisions

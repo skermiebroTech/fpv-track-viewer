@@ -103,6 +103,9 @@ function matHint(shape, dims, material, tags) {
     // converted VelociDrone blocks (emitted by convert.js)
     const blk = material.match(/^Block(\w+?)Material$/);
     if (blk) return `blk:${blk[1]}`;
+    // LED / neon: an emissive material named for its own colour (convert/neon.js)
+    const glow = material.match(/^EdGlow_([0-9A-Fa-f]{6})$/);
+    if (glow) return `glow:${glow[1].toLowerCase()}`;
   }
   const src = tags.join(' ');
   if (shape === 'box') {

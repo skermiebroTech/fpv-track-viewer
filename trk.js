@@ -129,7 +129,7 @@ export function decryptTrk(fileText, key = TRK_KEY) {
   try {
     bytes = Uint8Array.from(atob(fileText.replace(/\s+/g, '')), ch => ch.charCodeAt(0));
   } catch {
-    throw new Error('not base64 data — is this really a VelociDrone .trk file?');
+    throw new Error('not base64 data — is this really a VD .trk file?');
   }
   if (!bytes.length || bytes.length % 16) {
     throw new Error('cipher length is not a multiple of the AES block size');
