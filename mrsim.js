@@ -374,6 +374,44 @@ function walkInclude(node, ctx, st) {
   }, st);
 }
 
+// The element names an <Include> contributes to the scene — the top-level named
+// entities of the library file, recursing through the library's own includes.
+// Everything a track places through a named <Entity> is findable in the track
+// document, but a bare include (the launch mat and launch stand a converted or
+// blank track drops straight under <Entity name="Track">) names its entity only
+// inside the library file. The editor uses this to map such a name back to the
+// <Include> that placed it, so the placement is still selectable and movable.
+export function includeEntityNames(file, src = '/track.xml', depth = 0) {
+  const path = file.startsWith('/') ? file : dirname(src) + file;
+  const out = [];
+  if (depth > 8 || /\/Locations\//.test(path) ||
+      /Materials\.xml$|\/Foliage\/|Sound/.test(path)) return out;
+  const xml = MRSIM_LIB[path];
+  if (!xml) return out;
+  let doc = libDocs.get(path);
+  if (!doc) {
+    doc = parseXml(xml, path);
+    libDocs.set(path, doc);
+  }
+  // mirrors walkEntity: the OUTERMOST named entity owns the element, and
+  // render-instance templates are mesh definitions rather than scenery
+  const walk = el => {
+    for (const c of el.children) {
+      if (c.tagName === 'Entity') {
+        if (directChild(c, 'RenderInstanceGroup')) continue;
+        const n = c.getAttribute('name');
+        if (n) out.push(n); else walk(c);
+      } else if (c.tagName === 'Include') {
+        out.push(...includeEntityNames(c.getAttribute('file') || '', path, depth + 1));
+      } else if (c.tagName === 'Transform' || c.tagName === 'ForEachTransform') {
+        walk(c);
+      }
+    }
+  };
+  walk(doc.documentElement);
+  return out;
+}
+
 function parseCpList(node, st) {
   const raw = node.textContent;
   try {

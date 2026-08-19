@@ -1,27 +1,77 @@
 <meta charset="utf-8">
 <title>FPV Track Editor</title>
 <style>
-  :root { color-scheme: dark; }
+  /* ---- design tokens -------------------------------------------------------
+     One place for every colour, radius and timing in the editor. The UI floats
+     over a 3D scene whose sky the user can set to anything, so panels have to
+     read as chrome at any backdrop: opaque-ish surfaces, a real shadow, and
+     accents that stay legible against both a black world and a white one.
+     Two accents carry meaning and are never decorative — blue is "the app",
+     green is "you are editing" (edit mode, the edit panel, armed placement). */
+  :root {
+    color-scheme: dark;
+    --bg: #0d0f14;              /* page + scene backdrop */
+    --surface: #141824;         /* floating panels */
+    --surface-2: #1c202c;       /* controls on a panel */
+    --surface-3: #232837;       /* control hover / inset chips */
+    --line: #2b3242;            /* panel edges */
+    --line-2: #333c50;          /* control edges */
+    --line-3: #232838;          /* dividers inside a panel */
+    --text: #e3e7ef;
+    --dim: #949db1;             /* labels, secondary text */
+    --faint: #6f7889;           /* hints, disabled */
+    --accent: #5a8dff;          /* primary: app actions, focus */
+    --accent-bg: #24406e;
+    --edit: #86c452;            /* edit mode */
+    --edit-text: #bfe589;
+    --edit-bg: #2c5020;
+    --danger: #ff6b6b;
+    --danger-text: #ff8a7a;
+    --warn: #ffb27a;
+    --ok: #6bd08a;
+    --glow: #ffd76a;
+    --r-sm: 5px;
+    --r: 7px;
+    --r-lg: 10px;
+    --shadow: 0 12px 34px #00000073, 0 2px 8px #0000004d;
+    --t: 110ms ease;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden;
     font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    background: #0d0f14; color: #dfe3ea; }
+    background: var(--bg); color: var(--text); }
   #app { position: fixed; inset: 0; }
   canvas { display: block; }
+  /* one keyboard-focus treatment for the whole tool (the panels are dense, and
+     a browser default outline disappears against the dark surfaces) */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* shared control skin: everything clickable animates the same way */
+  button, select, input, label.file { transition: background var(--t),
+    border-color var(--t), color var(--t), box-shadow var(--t); }
+  /* Number fields here are typed or dragged on the gizmo, never clicked up and
+     down one step at a time, and the panels put three of them on a 272px row —
+     the spinners were eating ~14px each of the digits. */
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
 
   /* ---- controls bar ---- */
   #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 5;
-    display: flex; gap: 8px; align-items: center; padding: 8px 10px;
-    background: linear-gradient(#0d0f14ee, #0d0f1490); backdrop-filter: blur(3px); }
+    display: flex; gap: 7px; align-items: center; padding: 7px 10px;
+    background: linear-gradient(#0d0f14f2, #0d0f14cc);
+    border-bottom: 1px solid var(--line-3); backdrop-filter: blur(6px); }
   #bar select, #bar button, #bar label.file {
-    background: #1a1e28; color: #dfe3ea; border: 1px solid #2b3242;
-    border-radius: 5px; padding: 5px 9px; font: inherit; cursor: pointer; }
-  #bar button:hover, #bar label.file:hover, #bar select:hover { border-color: #4a83ff; }
-  #bar button.on { background: #24406e; border-color: #4a83ff; }
-  #bar button:disabled { opacity: .35; cursor: default; }
-  #bar button:disabled:hover { border-color: #2b3242; }
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); padding: 5px 9px; font: inherit; cursor: pointer; }
+  #bar button:hover, #bar label.file:hover, #bar select:hover {
+    background: var(--surface-3); border-color: var(--accent); }
+  #bar button:active { background: var(--bg); }
+  #bar button.on { background: var(--accent-bg); border-color: var(--accent); color: #fff; }
+  #bar button:disabled { opacity: .3; cursor: default; }
+  #bar button:disabled:hover { background: var(--surface-2); border-color: var(--line-2); }
   #bar button.hist { padding: 4px 9px; font-size: 15px; line-height: 1.1; }
-  #bar .title { font-weight: 600; color: #fff; margin-right: 4px; }
+  #bar .title { font-weight: 600; color: #fff; margin-right: 4px; letter-spacing: .01em; }
   /* the bar is at capacity on a 1366-wide laptop: pin every control to its
      natural width so labels never wrap onto a second line, and let the track
      name and the status text be the only things that give way */
@@ -29,186 +79,240 @@
   #bar select { min-width: 0; }
   #bar #track { flex: 0 1 auto; min-width: 90px; text-overflow: ellipsis; }
   #bar .spacer { flex: 1 1 auto; min-width: 0; }
-  #bar .status { flex: 0 1 auto; min-width: 0; color: #8a93a6;
+  #bar .status { flex: 0 1 auto; min-width: 0; color: var(--dim);
     overflow: hidden; text-overflow: ellipsis; }
   #file { display: none; }
 
   /* diagnostics is a validity chip that opens the panel, not a panel that is
      always open — the count is filled in by refreshDiagChip() after each load */
-  #bar button.diagchip.ok { color: #6bd08a; border-color: #2f4a37; }
-  #bar button.diagchip.ok:hover { border-color: #6bd08a; }
-  #bar button.diagchip.warn { color: #ffb27a; border-color: #5a3f28; }
-  #bar button.diagchip.warn:hover { border-color: #ffb27a; }
-  #bar button.diagchip.on { background: #1c2230; }
+  #bar button.diagchip.ok { color: var(--ok); border-color: #2f4a37; }
+  #bar button.diagchip.ok:hover { border-color: var(--ok); background: #1a2a20; }
+  #bar button.diagchip.warn { color: var(--warn); border-color: #5a3f28; }
+  #bar button.diagchip.warn:hover { border-color: var(--warn); background: #2a2118; }
+  #bar button.diagchip.on { background: var(--surface-3); }
+
+  /* every floating panel shares one surface, so they read as one system and a
+     change of depth or blur happens in a single place */
+  #envPanel, #diag, #editPanel {
+    position: fixed; top: 44px; z-index: 5;
+    background: var(--surface);   /* fallback before color-mix */
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: 11px 13px; backdrop-filter: blur(10px); box-shadow: var(--shadow); }
 
   /* ---- environment panel ---- */
   /* a popover under its toolbar button rather than more toolbar controls: the
      bar is already at capacity on a 1366-wide laptop */
-  #envPanel { position: fixed; top: 46px; left: 10px; width: 268px; z-index: 6;
-    background: #12151dee; border: 1px solid #262c3a; border-radius: 8px;
-    padding: 10px 12px; backdrop-filter: blur(4px); }
+  #envPanel { left: 10px; width: 268px; z-index: 6; }
   #envPanel.hidden { display: none; }
-  #envPanel h3 { font-size: 13px; margin: 0 0 8px; color: #fff; font-weight: 600; }
-  #envPanel .envRow { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
-  #envPanel .envRow label { flex: 0 0 52px; color: #dfe3ea; }
-  #envPanel .envHint { flex: 1 1 auto; min-width: 0; color: #8a93a6; font-size: 11px;
+  #envPanel h3 { font-size: 11px; margin: 0 0 9px; color: var(--dim); font-weight: 500;
+    text-transform: uppercase; letter-spacing: .07em; }
+  #envPanel .envRow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  #envPanel .envRow label { flex: 0 0 52px; color: var(--text); }
+  #envPanel .envHint { flex: 1 1 auto; min-width: 0; color: var(--faint); font-size: 11px;
     overflow: hidden; text-overflow: ellipsis; }
-  #envPanel select { flex: 1 1 auto; min-width: 0; background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 5px; padding: 4px 6px; font: inherit; cursor: pointer; }
-  #envPanel select:hover { border-color: #4a83ff; }
-  #envPanel input.swatch { flex: 0 0 auto; width: 30px; height: 26px; padding: 2px;
-    background: #1a1e28; border: 1px solid #2b3242; border-radius: 5px; cursor: pointer; }
-  #envPanel input.swatch:hover { border-color: #4a83ff; }
+  #envPanel select { flex: 1 1 auto; min-width: 0; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 4px 6px;
+    font: inherit; cursor: pointer; }
+  #envPanel select:hover { background: var(--surface-3); border-color: var(--accent); }
+  #envPanel input.swatch { flex: 0 0 auto; width: 32px; height: 27px; padding: 2px;
+    background: var(--surface-2); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); cursor: pointer; }
+  #envPanel input.swatch:hover { border-color: var(--accent); }
   #envPanel input.swatch::-webkit-color-swatch-wrapper { padding: 0; }
   #envPanel input.swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
   #envPanel input.swatch::-moz-color-swatch { border: none; border-radius: 3px; }
-  #envPanel .envReset { width: 100%; margin-top: 3px; background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 5px; padding: 5px 9px; font: inherit; cursor: pointer; }
-  #envPanel .envReset:hover { border-color: #4a83ff; }
+  #envPanel .envReset { width: 100%; margin-top: 4px; background: var(--surface-2);
+    color: var(--dim); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    padding: 6px 9px; font: inherit; cursor: pointer; }
+  #envPanel .envReset:hover { background: var(--surface-3); border-color: var(--accent);
+    color: var(--text); }
 
   /* ---- diagnostics panel ---- */
-  #diag { position: fixed; top: 46px; right: 10px; width: 380px; z-index: 5;
-    max-height: calc(100vh - 58px); overflow: auto;
-    background: #12151dee; border: 1px solid #262c3a; border-radius: 8px;
-    padding: 10px 12px; backdrop-filter: blur(4px); }
+  #diag { right: 10px; width: 380px; max-height: calc(100vh - 56px); overflow: auto; }
   #diag.hidden { display: none; }
-  #diag h1 { font-size: 15px; margin: 0 0 2px; color: #fff; }
-  #diag .sub { color: #8a93a6; margin-bottom: 8px; }
-  #diag section { border-top: 1px solid #222836; padding: 7px 0; }
+  #diag h1 { font-size: 14px; margin: 0 0 2px; color: #fff; }
+  #diag .sub { color: var(--dim); margin-bottom: 9px; }
+  #diag section { border-top: 1px solid var(--line-3); padding: 8px 0; }
   #diag section:first-of-type { border-top: none; }
-  #diag .k { color: #8a93a6; }
+  #diag .k { color: var(--dim); }
   #diag .row { display: flex; justify-content: space-between; gap: 8px; }
-  #diag .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
-  #diag .chip { background: #1c2230; border: 1px solid #2b3242; border-radius: 4px;
-    padding: 2px 7px; }
-  #diag .issue { color: #ff8a7a; }
-  #diag .ok { color: #6bd08a; }
+  #diag .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+  #diag .chip { background: var(--surface-3); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); padding: 2px 7px; }
+  #diag .issue { color: var(--danger-text); }
+  #diag .ok { color: var(--ok); }
   #diag table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-  #diag td, #diag th { text-align: left; padding: 1px 4px 1px 0; white-space: nowrap; }
-  #diag th { color: #8a93a6; font-weight: 500; }
-  #diag .num { color: #4a83ff; }
-  #diag .start { color: #ff6b6b; }
-  #diag details summary { cursor: pointer; color: #8a93a6; }
-  #err { color: #ff8a7a; padding: 4px 0; white-space: pre-wrap; }
+  #diag td, #diag th { text-align: left; padding: 2px 4px 2px 0; white-space: nowrap; }
+  #diag th { color: var(--dim); font-weight: 500; }
+  #diag .num { color: var(--accent); }
+  #diag .start { color: var(--danger); }
+  #diag details summary { cursor: pointer; color: var(--dim); }
+  #diag details summary:hover { color: var(--text); }
+  #err { color: var(--danger-text); padding: 4px 0; white-space: pre-wrap; }
   /* the corner hints float straight over the scene, so they need their own
      backing now that the sky can be any colour the user likes */
-  #legend, #ctrlLegend { position: fixed; left: 10px; z-index: 5; color: #8994ab;
-    background: #0d0f14bb; border-radius: 4px; padding: 1px 5px; backdrop-filter: blur(2px); }
+  #legend, #ctrlLegend { position: fixed; left: 10px; z-index: 5; color: var(--dim);
+    background: #0d0f14bb; border-radius: var(--r-sm); padding: 2px 6px;
+    backdrop-filter: blur(3px); }
   #legend { bottom: 8px; }
-  #ctrlLegend { bottom: 26px; }
-  #ctrlLegend b { color: #b6c0d4; font-weight: 600; }
+  #ctrlLegend { bottom: 28px; }
+  #ctrlLegend b { color: #c3ccdd; font-weight: 600; }
 
   /* ---- edit panel ---- */
-  #editPanel { position: fixed; top: 46px; left: 10px; width: 268px; z-index: 5;
-    max-height: calc(100vh - 58px); overflow: auto;
-    background: #12151dee; border: 1px solid #3a4a2a; border-radius: 8px;
-    padding: 10px 12px; backdrop-filter: blur(4px); display: none; }
+  /* green edge and green section headings: the panel itself says "edit mode is
+     on", so the mode is never something you have to remember */
+  #editPanel { left: 10px; width: 272px; max-height: calc(100vh - 56px);
+    overflow: auto; border-color: #3f5330; display: none; }
   #editPanel.show { display: block; }
-  #editPanel h3 { font-size: 12px; margin: 10px 0 4px; color: #b7e07a;
-    border-top: 1px solid #222836; padding-top: 8px; }
+  #editPanel h3, #editPanel details.edSect > summary {
+    font-size: 10.5px; margin: 12px 0 6px; color: var(--edit-text); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .07em;
+    border-top: 1px solid var(--line-3); padding-top: 9px; }
   #editPanel details.edSect { margin: 0; }
-  #editPanel details.edSect > summary { font-size: 12px; margin: 10px 0 4px; color: #b7e07a;
-    border-top: 1px solid #222836; padding-top: 8px; cursor: pointer; }
-  #editPanel details.edSect > summary:hover { color: #cdea9a; }
-  #editPanel details.edSect > summary span { color: #8a93a6; font-weight: 400; }
-  #editPanel .pal { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-  #editPanel .pal button { background: #1a1e28; color: #dfe3ea; text-align: left;
-    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 6px;
-    font: inherit; font-size: 11px; cursor: pointer; }
-  #editPanel .pal button:hover { border-color: #7ab648; }
-  #editPanel .pal button.arm { background: #2a4a1e; border-color: #7ab648; }
-  #editPanel .lapRow { display: flex; align-items: center; gap: 4px; padding: 1px 0;
-    font-size: 11.5px; border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
-  #editPanel .lapRow .grip { color: #4a5468; cursor: grab; flex: 0 0 auto;
+  #editPanel details.edSect > summary { cursor: pointer; }
+  #editPanel details.edSect > summary:hover { color: #d6f0ad; }
+  #editPanel details.edSect > summary span { color: var(--faint); font-weight: 400;
+    text-transform: none; letter-spacing: 0; }
+  #editPanel .pal { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  #editPanel .pal button { background: var(--surface-2); color: var(--text); text-align: left;
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 7px;
+    font: inherit; font-size: 11px; line-height: 1.3; cursor: pointer; }
+  #editPanel .pal button:hover { background: var(--surface-3); border-color: var(--edit); }
+  #editPanel .pal button.arm { background: var(--edit-bg); border-color: var(--edit);
+    color: #fff; box-shadow: 0 0 0 1px var(--edit) inset; }
+  #editPanel .lapRow { display: flex; align-items: center; gap: 5px; padding: 2px 3px;
+    border-radius: var(--r-sm); font-size: 11.5px;
+    border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
+  #editPanel .lapRow:hover { background: #ffffff08; }
+  #editPanel .lapRow .grip { color: #56607a; cursor: grab; flex: 0 0 auto;
     font-size: 10px; letter-spacing: -1px; user-select: none; }
-  #editPanel .lapRow .grip:hover { color: #b7e07a; }
+  #editPanel .lapRow .grip:hover { color: var(--edit-text); }
   #editPanel .lapRow.dragging { opacity: .35; }
-  #editPanel .lapRow.dropBefore { border-top-color: #7ab648; }
-  #editPanel .lapRow.dropAfter { border-bottom-color: #7ab648; }
+  #editPanel .lapRow.dropBefore { border-top-color: var(--edit); }
+  #editPanel .lapRow.dropAfter { border-bottom-color: var(--edit); }
   #editPanel .lapRow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; cursor: pointer; }
   #editPanel .lapRow .nm:hover { color: #fff; }
-  #editPanel .lapRow.sel .nm { color: #b7e07a; }
-  #editPanel .lapRow button { background: none; border: none; color: #8a93a6;
+  #editPanel .lapRow.sel { background: #86c4521f; }
+  #editPanel .lapRow.sel .nm { color: var(--edit-text); }
+  #editPanel .lapRow button { background: none; border: none; color: var(--faint);
     cursor: pointer; padding: 0 2px; font: inherit; }
   #editPanel .lapRow button:hover { color: #fff; }
-  #editPanel .btnRow { display: flex; gap: 5px; margin-top: 6px; }
-  #editPanel .btnRow button { flex: 1; background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 0; font: inherit;
+  #editPanel .btnRow { display: flex; gap: 5px; margin-top: 7px; }
+  #editPanel .btnRow button { flex: 1; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 0; font: inherit;
     font-size: 11.5px; cursor: pointer; }
-  #editPanel .btnRow button:hover { border-color: #4a83ff; }
-  #editPanel .btnRow button.danger:hover { border-color: #ff6b6b; color: #ff8a7a; }
-  #editPanel .btnRow button.on { background: #4a1e1e; border-color: #ff6b6b; color: #ff9a8a; }
-  #editPanel .btnRow button:disabled { opacity: .5; cursor: default; border-color: #2b3242; }
-  #editPanel .lapCk { display: flex; align-items: center; gap: 6px; margin-top: 5px;
-    color: #8a93a6; font-size: 11.5px; }
-  #editPanel h2 { font-size: 13px; margin: 0 0 6px; color: #b7e07a; }
-  #editPanel .hint { color: #8a93a6; font-size: 11px; margin-top: 6px; }
-  #editPanel .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-  #editPanel label { width: 44px; color: #8a93a6; }
-  #editPanel input { flex: 1; width: 60px; background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 6px; font: inherit; }
-  #editPanel input:focus { border-color: #4a83ff; outline: none; }
-  #editPanel .locked { color: #ff8a7a; }
-  #editPanel .modes { display: flex; gap: 5px; margin: 6px 0; }
-  #editPanel .modes button { flex: 1; background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 0; font: inherit; cursor: pointer; }
-  #editPanel .modes button.on { background: #2a4a1e; border-color: #7ab648; }
-  #bar button.edit-on { background: #2a4a1e; border-color: #7ab648; }
+  #editPanel .btnRow button:hover { background: var(--surface-3); border-color: var(--accent); }
+  #editPanel .btnRow button.danger:hover { background: #2e1a1a;
+    border-color: var(--danger); color: var(--danger-text); }
+  #editPanel .btnRow button.on { background: #4a1e1e; border-color: var(--danger); color: #ff9a8a; }
+  #editPanel .btnRow button:disabled { opacity: .4; cursor: default;
+    background: var(--surface-2); border-color: var(--line-2); }
+  #editPanel .lapCk { display: flex; align-items: center; gap: 6px; margin-top: 6px;
+    color: var(--dim); font-size: 11.5px; }
+  #editPanel h2 { font-size: 13px; margin: 0 0 8px; color: var(--edit-text);
+    overflow: hidden; text-overflow: ellipsis; }
+  /* a sub-heading INSIDE a section (the checkpoint-ref block): blue, because it
+     edits the checkpoint rather than the object, and no top rule so it reads as
+     a child of the transform fields above it */
+  #editPanel h3.sub { color: var(--accent); border-top: 1px solid var(--line-3);
+    margin: 12px 0 3px; }
+  #editPanel .subhint { color: var(--faint); font-size: 10.5px; margin: 0 0 6px;
+    line-height: 1.45; }
+  #editPanel .hint { color: var(--faint); font-size: 11px; margin-top: 7px; line-height: 1.5; }
+  #editPanel .hint.flush { margin: 0; }
+  /* a ruled group of related controls (start/finish, colour) */
+  #editPanel .edGroup { border-top: 1px solid var(--line-3); margin-top: 10px; padding-top: 9px; }
+  #editPanel input.swatch { flex: 0 0 auto; width: 46px; height: 26px; padding: 2px;
+    background: var(--surface-2); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); cursor: pointer; }
+  #editPanel input.swatch:hover { border-color: var(--accent); }
+  #editPanel input.swatch::-webkit-color-swatch-wrapper { padding: 0; }
+  #editPanel input.swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
+  #editPanel input.swatch::-moz-color-swatch { border: none; border-radius: 3px; }
+  #editPanel .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  /* the label column has to hold "w x h x d" and "ref y/p/r" on ONE line: let
+     them wrap and the inputs beside them stop lining up down the panel */
+  #editPanel label { flex: 0 0 58px; width: 58px; color: var(--dim);
+    font-size: 11px; white-space: nowrap; }
+  #editPanel .row input { min-width: 0; }
+  #editPanel input { flex: 1; width: 60px; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 4px 7px; font: inherit; }
+  #editPanel input:hover { border-color: #46516b; }
+  #editPanel input:focus { border-color: var(--accent); outline: none;
+    box-shadow: 0 0 0 2px #5a8dff33; }
+  #editPanel .locked { color: var(--danger-text); }
+  #editPanel .modes { display: flex; gap: 5px; margin: 8px 0; }
+  #editPanel .modes button { flex: 1; background: var(--surface-2); color: var(--dim);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 0;
+    font: inherit; cursor: pointer; }
+  #editPanel .modes button:hover { background: var(--surface-3); color: var(--text); }
+  #editPanel .modes button.on { background: var(--edit-bg); border-color: var(--edit);
+    color: #fff; }
+  #bar button.edit-on { background: var(--edit-bg); border-color: var(--edit); color: #fff; }
+  #bar button.edit-on:hover { background: #35601f; border-color: var(--edit-text); }
 
   /* ---- snapping row ---- */
-  #editPanel .snap { display: flex; align-items: center; gap: 5px; margin: 5px 0 2px;
-    font-size: 11px; color: #8a93a6; }
+  #editPanel .snap { display: flex; align-items: center; gap: 5px; margin: 7px 0 2px;
+    font-size: 11px; color: var(--dim); }
   #editPanel .snap > span { flex: 0 0 auto; }
-  #editPanel .snap select { flex: 1; min-width: 0; background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 4px; padding: 2px 4px;
+  #editPanel .snap select { flex: 1; min-width: 0; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 3px 4px;
     font: inherit; font-size: 11px; cursor: pointer; }
-  #editPanel .snap select:hover { border-color: #7ab648; }
-  #editPanel .snap select.act { border-color: #7ab648; color: #b7e07a; }
+  #editPanel .snap select:hover { background: var(--surface-3); border-color: var(--edit); }
+  #editPanel .snap select.act { border-color: var(--edit); color: var(--edit-text); }
 
   /* ---- palette search ---- */
-  #palSearchRow { display: flex; gap: 4px; margin: 2px 0 6px; }
-  #palSearch { flex: 1; min-width: 0; background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 4px; padding: 3px 6px;
+  #palSearchRow { display: flex; gap: 5px; margin: 2px 0 7px; }
+  #palSearch { flex: 1; min-width: 0; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 4px 7px;
     font: inherit; font-size: 11px; }
-  #palSearch:focus { border-color: #7ab648; outline: none; }
-  #palSearchRow button { background: #1a1e28; color: #8a93a6; border: 1px solid #2b3242;
-    border-radius: 4px; padding: 0 7px; font: inherit; font-size: 11px; cursor: pointer; }
-  #palSearchRow button:hover { border-color: #7ab648; color: #dfe3ea; }
-  #editPanel .palNone { grid-column: 1 / -1; color: #8a93a6; font-size: 11px; padding: 5px 2px; }
+  #palSearch:focus { border-color: var(--edit); outline: none;
+    box-shadow: 0 0 0 2px #86c45233; }
+  #palSearchRow button { background: var(--surface-2); color: var(--dim);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 0 8px;
+    font: inherit; font-size: 11px; cursor: pointer; }
+  #palSearchRow button:hover { background: var(--surface-3); border-color: var(--edit);
+    color: var(--text); }
+  #editPanel .palNone { grid-column: 1 / -1; color: var(--faint); font-size: 11px; padding: 6px 2px; }
 
   /* ---- palette hover preview ---- */
   #palPreview { position: fixed; z-index: 8; width: 312px; display: none;
-    background: #12151df2; border: 1px solid #3a4a2a; border-radius: 8px;
-    padding: 6px; box-shadow: 0 8px 28px #000a; backdrop-filter: blur(4px);
+    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    border: 1px solid #3f5330; border-radius: var(--r-lg);
+    padding: 6px; box-shadow: var(--shadow); backdrop-filter: blur(10px);
     pointer-events: none; }
   #palPreview.show { display: block; }
   #palPreview canvas { display: block; width: 300px; height: 230px;
-    border-radius: 5px; background: #0d0f14; }
-  #palPreview .cap { margin-top: 5px; color: #b7e07a; font-size: 11px;
+    border-radius: var(--r); background: var(--bg); }
+  #palPreview .cap { margin-top: 6px; color: var(--edit-text); font-size: 11px;
     text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #palPreview.empty canvas { opacity: .3; }
-  #palPreview.empty .cap::after { content: ' · no mesh'; color: #8a93a6; }
+  #palPreview.empty .cap::after { content: ' · no mesh'; color: var(--faint); }
 
   /* ---- palette custom section ---- */
-  #editPanel .pal button.custom { border-color: #3a4a2a; }
-  #editPanel .pal button.custom:hover { border-color: #b7e07a; }
+  #editPanel .pal button.custom { border-color: #3f5330; }
+  #editPanel .pal button.custom:hover { border-color: var(--edit-text); }
   #editPanel .palDivide { grid-column: 1 / -1; display: flex; align-items: center;
-    gap: 6px; color: #8a93a6; font-size: 10.5px; margin: 4px 0 1px; }
+    gap: 7px; color: var(--faint); font-size: 10px; margin: 8px 0 2px;
+    text-transform: uppercase; letter-spacing: .07em; }
   #editPanel .palDivide::before, #editPanel .palDivide::after {
-    content: ''; flex: 1; height: 1px; background: #262c3a; }
-  #editPanel .palBuild { grid-column: 1 / -1; background: #24406e !important;
-    border-color: #4a83ff !important; text-align: center !important; font-weight: 600; }
+    content: ''; flex: 1; height: 1px; background: var(--line-3); }
+  #editPanel .palBuild { grid-column: 1 / -1; background: var(--accent-bg) !important;
+    border-color: var(--accent) !important; text-align: center !important; font-weight: 600;
+    color: #fff !important; padding: 6px 7px !important; margin-top: 4px; }
   #editPanel .palBuild:hover { background: #2c4d85 !important; }
 
   /* ---- object builder modal ---- */
   #builder { position: fixed; inset: 0; z-index: 20; display: none;
-    background: #05070bcc; backdrop-filter: blur(2px); }
+    background: #05070bd9; backdrop-filter: blur(4px); }
   #builder.show { display: flex; align-items: center; justify-content: center; }
   #builder .sheet { width: min(1080px, 96vw); height: min(760px, 94vh);
     display: grid; grid-template-columns: 190px 1fr 1fr; grid-template-rows: auto 1fr auto;
-    gap: 0; background: #12151d; border: 1px solid #2b3242; border-radius: 10px;
-    overflow: auto; box-shadow: 0 24px 80px #000a; }
+    gap: 0; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-lg); overflow: auto; box-shadow: 0 28px 90px #000000b3; }
   /* The middle row is `1fr`, i.e. minmax(auto, 1fr): its automatic minimum is
      the content's min-content height unless the item is a scroll container.
      A long parts list therefore blows the row past the sheet the moment
@@ -219,12 +323,14 @@
      a last resort so no control is ever stranded off-screen. */
   #builder .bList, #builder .bForm, #builder .bPrev { min-height: 0; min-width: 0; }
   #builder .bHead { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; border-bottom: 1px solid #222836; }
+    padding: 12px 16px; border-bottom: 1px solid var(--line-3); }
   #builder .bHead h2 { font-size: 15px; margin: 0; color: #fff; }
-  #builder .bHead .sub { color: #8a93a6; }
-  #builder .bHead .x { margin-left: auto; background: #1a1e28; border: 1px solid #2b3242;
-    color: #dfe3ea; border-radius: 5px; padding: 4px 10px; cursor: pointer; font: inherit; }
-  #builder .bHead .x:hover { border-color: #ff6b6b; color: #ff8a7a; }
+  #builder .bHead .sub { color: var(--dim); }
+  #builder .bHead .x { margin-left: auto; background: var(--surface-2);
+    border: 1px solid var(--line-2); color: var(--text); border-radius: var(--r-sm);
+    padding: 5px 11px; cursor: pointer; font: inherit; }
+  #builder .bHead .x:hover { background: #2e1a1a; border-color: var(--danger);
+    color: var(--danger-text); }
   /* Explicit scroll bars on every panel that can outgrow its box. Styling
      ::-webkit-scrollbar also opts these elements out of the overlay
      (fade-out-when-idle) scroll bars some Chromium builds — Opera GX among
@@ -238,87 +344,104 @@
   #editPanel::-webkit-scrollbar-track, #diag::-webkit-scrollbar-track { background: #0f1219; }
   #builder .bList::-webkit-scrollbar-thumb, #builder .bForm::-webkit-scrollbar-thumb,
   #editPanel::-webkit-scrollbar-thumb, #diag::-webkit-scrollbar-thumb {
-    background: #3a4358; border-radius: 6px; border: 2px solid #0f1219; }
+    background: #3d4761; border-radius: 6px; border: 2px solid #0f1219; }
   #builder .bList::-webkit-scrollbar-thumb:hover, #builder .bForm::-webkit-scrollbar-thumb:hover,
   #editPanel::-webkit-scrollbar-thumb:hover, #diag::-webkit-scrollbar-thumb:hover {
-    background: #4f5a75; }
-  #builder .bList { grid-row: 2 / 3; border-right: 1px solid #222836; overflow: auto; padding: 8px; }
-  #builder .bList h3 { font-size: 11px; color: #8a93a6; margin: 4px 0 6px; font-weight: 500;
-    text-transform: uppercase; letter-spacing: .05em; }
-  #builder .bList button { display: block; width: 100%; text-align: left; margin-bottom: 4px;
-    background: #1a1e28; color: #dfe3ea; border: 1px solid #2b3242; border-radius: 5px;
-    padding: 5px 8px; font: inherit; font-size: 11.5px; cursor: pointer; }
-  #builder .bList button:hover { border-color: #7ab648; }
-  #builder .bList button.on { background: #2a4a1e; border-color: #7ab648; }
-  #builder .bList button.new { border-style: dashed; color: #b7e07a; }
-  #builder .bList .shared { color: #6a7488; font-size: 10px; float: right; }
+    background: #566180; }
+  #builder .bList { grid-row: 2 / 3; border-right: 1px solid var(--line-3);
+    overflow: auto; padding: 9px; }
+  #builder .bList h3 { font-size: 10.5px; color: var(--dim); margin: 5px 0 7px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: .07em; }
+  #builder .bList button { display: block; width: 100%; text-align: left; margin-bottom: 5px;
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); padding: 6px 9px; font: inherit; font-size: 11.5px; cursor: pointer; }
+  #builder .bList button:hover { background: var(--surface-3); border-color: var(--edit); }
+  #builder .bList button.on { background: var(--edit-bg); border-color: var(--edit); color: #fff; }
+  #builder .bList button.new { border-style: dashed; color: var(--edit-text); }
+  #builder .bList .shared { color: var(--faint); font-size: 10px; float: right; }
   /* scrollbar-gutter keeps the 12px reserved whether or not the list is long
      enough to scroll, so the form fields don't jump sideways as parts are added */
   #builder .bForm { grid-row: 2 / 3; overflow: auto; scrollbar-gutter: stable;
-    padding: 12px 14px; }
-  #builder .bPrev { grid-row: 2 / 3; position: relative; background: #0d0f14;
-    border-left: 1px solid #222836; }
+    padding: 13px 15px; }
+  #builder .bPrev { grid-row: 2 / 3; position: relative; background: var(--bg);
+    border-left: 1px solid var(--line-3); }
   #builder .bPrev canvas { display: block; width: 100%; height: 100%; }
-  #builder .bPrev .pvHint { position: absolute; left: 10px; bottom: 8px; color: #6a7488;
+  #builder .bPrev .pvHint { position: absolute; left: 10px; bottom: 8px; color: var(--faint);
     font-size: 10.5px; pointer-events: none; }
   #builder .bFoot { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center;
-    padding: 10px 14px; border-top: 1px solid #222836; }
-  #builder .bFoot button { background: #1a1e28; color: #dfe3ea; border: 1px solid #2b3242;
-    border-radius: 5px; padding: 6px 12px; font: inherit; cursor: pointer; }
-  #builder .bFoot button:hover { border-color: #4a83ff; }
-  #builder .bFoot button.primary { background: #2a4a1e; border-color: #7ab648; color: #dff3c8; }
-  #builder .bFoot button.primary:hover { border-color: #b7e07a; }
-  #builder .bFoot button.danger:hover { border-color: #ff6b6b; color: #ff8a7a; }
+    padding: 11px 16px; border-top: 1px solid var(--line-3); }
+  #builder .bFoot button { background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 7px 13px;
+    font: inherit; cursor: pointer; }
+  #builder .bFoot button:hover { background: var(--surface-3); border-color: var(--accent); }
+  #builder .bFoot button.primary { background: var(--edit-bg); border-color: var(--edit);
+    color: #eaf7dc; font-weight: 600; }
+  #builder .bFoot button.primary:hover { background: #35601f; border-color: var(--edit-text); }
+  #builder .bFoot button.danger:hover { background: #2e1a1a; border-color: var(--danger);
+    color: var(--danger-text); }
   #builder .bFoot .spacer { flex: 1; }
-  #builder .bFoot .saveMsg { color: #7ab648; font-size: 11.5px; }
-  #builder .fRow { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-  #builder .fRow > label { width: 76px; color: #8a93a6; flex: 0 0 auto; }
-  #builder input[type=text], #builder input[type=number] { background: #1a1e28; color: #dfe3ea;
-    border: 1px solid #2b3242; border-radius: 4px; padding: 4px 6px; font: inherit; width: 100%; }
-  #builder input:focus { border-color: #4a83ff; outline: none; }
-  #builder .parts { border-top: 1px solid #222836; margin-top: 10px; padding-top: 8px; }
-  #builder .parts h3 { font-size: 12px; color: #b7e07a; margin: 0 0 6px; }
-  #builder .part { border: 1px solid #262c3a; border-radius: 6px; padding: 7px 8px; margin-bottom: 7px;
-    background: #141821; }
-  #builder .part.sel { border-color: #7ab648; }
-  #builder .part .ph { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-  #builder .part .ph .tag { background: #1c2230; border: 1px solid #2b3242; border-radius: 4px;
-    padding: 1px 6px; font-size: 10.5px; color: #9aa4b8; }
-  #builder .part .ph input[type=color] { width: 24px; height: 20px; padding: 0; border: 1px solid #2b3242;
-    border-radius: 4px; background: none; cursor: pointer; flex: 0 0 auto; }
+  #builder .bFoot .saveMsg { color: var(--edit); font-size: 11.5px; }
+  #builder .fRow { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+  #builder .fRow > label { width: 76px; color: var(--dim); flex: 0 0 auto; }
+  #builder input[type=text], #builder input[type=number] { background: var(--surface-2);
+    color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    padding: 5px 7px; font: inherit; width: 100%; }
+  #builder input:hover { border-color: #46516b; }
+  #builder input:focus { border-color: var(--accent); outline: none;
+    box-shadow: 0 0 0 2px #5a8dff33; }
+  #builder .parts { border-top: 1px solid var(--line-3); margin-top: 12px; padding-top: 10px; }
+  #builder .parts h3 { font-size: 10.5px; color: var(--edit-text); margin: 0 0 8px;
+    text-transform: uppercase; letter-spacing: .07em; }
+  #builder .part { border: 1px solid var(--line); border-radius: var(--r); padding: 8px 9px;
+    margin-bottom: 8px; background: #191d29; }
+  #builder .part:hover { border-color: #38415a; }
+  #builder .part.sel { border-color: var(--edit); box-shadow: 0 0 0 1px var(--edit); }
+  #builder .part .ph { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  #builder .part .ph .tag { background: var(--surface-3); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); padding: 2px 7px; font-size: 10.5px; color: #a7b0c4; }
+  #builder .part .ph input[type=color] { width: 26px; height: 22px; padding: 0;
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); background: none;
+    cursor: pointer; flex: 0 0 auto; }
+  #builder .part .ph input[type=color]:hover { border-color: var(--accent); }
   #builder .part .ph input.pnm { flex: 1; min-width: 0; width: auto;
-    padding: 2px 6px; font-size: 11px; }
-  #builder .part .ph .rm { background: none; border: none; color: #8a93a6; cursor: pointer;
+    padding: 3px 7px; font-size: 11px; }
+  #builder .part .ph .rm { background: none; border: none; color: var(--faint); cursor: pointer;
     font: inherit; padding: 0 3px; }
-  #builder .part .ph .rm:hover { color: #ff8a7a; }
-  #builder .part .ph .glow { background: #1c2230; border: 1px solid #2b3242; border-radius: 4px;
-    color: #6a7180; cursor: pointer; font: inherit; line-height: 1; padding: 2px 5px; flex: 0 0 auto; }
-  #builder .part .ph .glow.on { color: #ffd76a; border-color: #7a6320; background: #2a2413;
-    text-shadow: 0 0 6px #ffd76a; }
-  #builder .part .grid3 { display: grid; grid-template-columns: 14px 1fr 1fr 1fr; gap: 3px 5px;
+  #builder .part .ph .rm:hover { color: var(--danger-text); }
+  #builder .part .ph .glow { background: var(--surface-3); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); color: var(--faint); cursor: pointer; font: inherit;
+    line-height: 1; padding: 3px 6px; flex: 0 0 auto; }
+  #builder .part .ph .glow:hover { color: var(--glow); border-color: #6a5720; }
+  #builder .part .ph .glow.on { color: var(--glow); border-color: #7a6320; background: #2a2413;
+    text-shadow: 0 0 7px var(--glow); }
+  /* the label column has to fit "size" — at 14px it was clipping to "siz" */
+  #builder .part .grid3 { display: grid; grid-template-columns: 30px 1fr 1fr 1fr; gap: 4px 6px;
     align-items: center; }
-  #builder .part .grid3 .gl { color: #8a93a6; font-size: 10.5px; }
-  #builder .part .grid3 input { padding: 2px 4px; font-size: 11px; }
-  #builder .addRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  #builder .addRow button { flex: 1 0 30%; background: #1a1e28; color: #dfe3ea; border: 1px dashed #3a4358;
-    border-radius: 5px; padding: 5px 0; font: inherit; font-size: 11.5px; cursor: pointer; }
-  #builder .addRow button:hover { border-color: #7ab648; color: #b7e07a; }
-  #builder .cpRow { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; color: #8a93a6; }
+  #builder .part .grid3 .gl { color: var(--faint); font-size: 10.5px; }
+  #builder .part .grid3 input { padding: 3px 5px; font-size: 11px; }
+  #builder .addRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  #builder .addRow button { flex: 1 0 30%; background: var(--surface-2); color: var(--dim);
+    border: 1px dashed #414b64; border-radius: var(--r-sm); padding: 6px 0;
+    font: inherit; font-size: 11.5px; cursor: pointer; }
+  #builder .addRow button:hover { background: var(--surface-3); border-color: var(--edit);
+    color: var(--edit-text); }
+  #builder .cpRow { display: flex; align-items: center; gap: 6px; margin: 10px 0 4px;
+    color: var(--dim); }
   #builder .bImport { display: none; }
 
   /* ---- first-run notice (shown once, then remembered in localStorage) ---- */
   #notice { position: fixed; inset: 0; z-index: 30; display: none;
-    background: #05070bcc; backdrop-filter: blur(2px); }
+    background: #05070bd9; backdrop-filter: blur(4px); }
   #notice.show { display: flex; align-items: center; justify-content: center; }
-  #notice .sheet { width: min(440px, 92vw); background: #12151d;
-    border: 1px solid #2b3242; border-radius: 10px; padding: 18px 20px 16px;
-    box-shadow: 0 24px 80px #000a; }
+  #notice .sheet { width: min(440px, 92vw); background: var(--surface);
+    border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px 20px 16px;
+    box-shadow: 0 28px 90px #000000b3; }
   #notice h2 { font-size: 15px; margin: 0 0 8px; color: #fff; }
-  #notice p { margin: 0 0 14px; color: #dfe3ea; }
-  #notice button { display: block; margin-left: auto; background: #24406e;
-    border: 1px solid #4a83ff; color: #dfe3ea; border-radius: 5px;
-    padding: 5px 14px; font: inherit; cursor: pointer; }
-  #notice button:hover { background: #2b4c82; }
+  #notice p { margin: 0 0 14px; color: var(--text); line-height: 1.55; }
+  #notice button { display: block; margin-left: auto; background: var(--accent-bg);
+    border: 1px solid var(--accent); color: #fff; border-radius: var(--r-sm);
+    padding: 6px 15px; font: inherit; cursor: pointer; font-weight: 600; }
+  #notice button:hover { background: #2c4d85; }
 </style>
 
 <div id="app"></div>
@@ -402,17 +525,18 @@
   <div class="row"><label>roll °</label><input id="edRoll" type="number" step="1"></div>
   <div class="row"><label>scale</label><input id="edS" type="number" step="0.05" min="0.2" max="5"></div>
   <div class="row" id="edWHRow" style="display:none">
-    <label>w × h × d</label><input id="edW" type="number" step="0.1" min="0.5">
-    <input id="edH" type="number" step="0.1" min="0.5">
-    <input id="edD" type="number" step="0.1" min="0.05"></div>
-  <div id="edRefRow" style="display:none;border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
-    <div class="row"><label style="color:#4a83ff">checkpoint ref</label>
-      <span style="color:#8a93a6;font-size:11px">ring + crossing arrow only</span></div>
-    <div class="row"><label>ref pos</label>
+    <label title="width × height × depth, metres">size</label>
+    <input id="edW" type="number" step="0.1" min="0.5" title="width (m)">
+    <input id="edH" type="number" step="0.1" min="0.5" title="height (m)">
+    <input id="edD" type="number" step="0.1" min="0.05" title="depth (m)"></div>
+  <div id="edRefRow" style="display:none">
+    <h3 class="sub">checkpoint ref</h3>
+    <div class="subhint">the ring and its crossing arrow only — the object stays put</div>
+    <div class="row"><label>position</label>
       <input id="edRefX" type="number" step="0.1" title="ref x">
       <input id="edRefY" type="number" step="0.1" title="ref y">
       <input id="edRefZ" type="number" step="0.1" title="ref z (up)"></div>
-    <div class="row"><label>ref y/p/r °</label>
+    <div class="row"><label title="yaw / pitch / roll, degrees">rotation</label>
       <input id="edRefYaw" type="number" step="1" title="ref yaw">
       <input id="edRefPitch" type="number" step="1" title="ref pitch">
       <input id="edRefRoll" type="number" step="1" title="ref roll"></div>
@@ -424,14 +548,14 @@
   </div>
   <div class="btnRow"><button id="edToBuilder"
     title="copy the selected object's shapes (and checkpoint) into the object builder as a new, reusable custom object — with a multi-selection, all selected objects merge into one">＋ copy to object builder</button></div>
-  <div id="edStartRow" style="display:none;border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
+  <div id="edStartRow" class="edGroup" style="display:none">
     <div class="btnRow"><button id="edSetStart">★ set as start / finish</button></div>
-    <div class="hint" id="edStartTip" style="margin-top:4px">the red-banner gate the lap starts &amp; finishes at</div>
+    <div class="hint" id="edStartTip">the red-banner gate the lap starts &amp; finishes at</div>
   </div>
-  <div id="edColorRow" style="border-top:1px solid #2a3446;margin-top:6px;padding-top:6px">
+  <div id="edColorRow" class="edGroup">
     <div class="row"><label>colour</label>
-      <input id="edColor" type="color" value="#e67300" style="width:44px;height:24px;padding:0;flex:0 0 auto">
-      <span class="hint" id="edColorTip" style="margin:0">recolour by material</span></div>
+      <input id="edColor" class="swatch" type="color" value="#e67300" title="colour to apply">
+      <span class="hint flush" id="edColorTip">recolour by material</span></div>
     <div class="btnRow">
       <button id="edColThis">this item</button>
       <button id="edColType">all <span id="edColTypeName">type</span></button>
@@ -577,7 +701,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { parseMrsim } from './mrsim.js';
+import { parseMrsim, includeEntityNames } from './mrsim.js';
 // the export credit — a tiny dependency-free module, so stamping a credit never
 // has to pull in the (lazily loaded) VelociDrone converter
 import { creditComment, CREDIT_RE, CREDIT_PILOT_RE } from './convert/credit.js';
@@ -1525,7 +1649,29 @@ function localMatrixDom(el) {
   return m;
 }
 
-// element name -> {trEl, A (mrsim-space ancestor matrix), yawOnly, reason}
+// A library <Include> dropped straight into the track with no <Entity name=…>
+// around it — how the converter and the blank-track template place the launch
+// mat and launch stand (the start block). The entity it produces is named
+// inside the library file, so it never matches a doc entity; map those names to
+// the include itself and the usual "nearest wrapper <Transform>" rule below
+// makes the placement editable like any other object.
+function bareIncludeIndex(doc) {
+  const map = new Map();
+  for (const inc of doc.getElementsByTagName('Include')) {
+    let named = false;
+    for (let a = inc.parentElement; a && a.tagName !== 'Simulation'; a = a.parentElement) {
+      const n = a.tagName === 'Entity' ? a.getAttribute('name') : null;
+      if (n && n !== 'Track') { named = true; break; }   // that entity owns it
+    }
+    if (named) continue;
+    for (const n of includeEntityNames(inc.getAttribute('file') || ''))
+      map.set(n, map.has(n) ? 'dup' : inc);
+  }
+  return map;
+}
+
+// element name -> {trEl, A (mrsim-space ancestor matrix), yawOnly, viaInclude,
+// autoGroup, reason}
 function buildEditIndex(data) {
   const doc = editState.doc;
   const index = editState.index;
@@ -1537,9 +1683,20 @@ function buildEditIndex(data) {
     if (!n) continue;
     byName.set(n, byName.has(n) ? 'dup' : e);
   }
+  const bare = bareIncludeIndex(doc);
   data.elements.forEach(el => {
-    const ent = byName.get(el.name);
-    if (!ent) { index.set(el.name, { reason: 'defined inside a library include' }); return; }
+    let ent = byName.get(el.name);
+    let viaInclude = false;
+    if (!ent) {
+      // no entity of that name in the track — a bare include may have placed it
+      const inc = bare.get(el.name);
+      if (!inc) { index.set(el.name, { reason: 'defined inside a library include' }); return; }
+      // several bare includes of the same library file: the elements all carry
+      // one name, so there is nothing to tell them apart by
+      if (inc === 'dup') { index.set(el.name, { reason: 'several includes place this name' }); return; }
+      ent = inc;
+      viaInclude = true;
+    }
     if (ent === 'dup') { index.set(el.name, { reason: 'duplicate entity name' }); return; }
     // nearest ancestor <Transform> = the placement we edit
     let tr = ent.parentElement;
@@ -1560,8 +1717,26 @@ function buildEditIndex(data) {
     const A = new THREE.Matrix4();
     for (let i = chain.length - 1; i >= 0; i--) A.multiply(chain[i]);
     const yawOnly = !parseFloat(tr.getAttribute('rx') || 0) && !parseFloat(tr.getAttribute('ry') || 0);
-    index.set(el.name, { trEl: tr, A, yawOnly });
+    index.set(el.name, { trEl: tr, A, yawOnly, viaInclude });
   });
+  // Bare includes sharing a parent are one placement: the mat and the stand are
+  // the start block, not two props that happen to sit together. Give them an
+  // implicit group so a plain click grabs the whole pad and it drags as a unit —
+  // Ctrl-click still picks one out of it. Ids use an `inc` prefix so they can
+  // never collide with a user's `g<n>` groups.
+  const byParent = new Map();
+  for (const [name, rec] of index) {
+    if (!rec.viaInclude) continue;
+    const p = rec.trEl.parentElement;
+    if (!byParent.has(p)) byParent.set(p, []);
+    byParent.get(p).push(name);
+  }
+  let gi = 0;
+  for (const names of byParent.values()) {
+    if (names.length < 2) continue;
+    const gid = 'inc' + (++gi);
+    for (const n of names) index.get(n).autoGroup = gid;
+  }
 }
 
 // ---- gizmo + selection ----
@@ -1926,9 +2101,11 @@ function commitEdit() {
   // snapshot each element's target world BEFORE writing any DOM (commitOne
   // mutates transforms as it goes)
   const jobs = [];
+  const written = new Set();   // two bare includes can share one wrapper — write it once
   for (const name of editUi.selection) {
     const r = editState?.index.get(name);
-    if (!r || !r.trEl) continue;
+    if (!r || !r.trEl || written.has(r.trEl)) continue;
+    written.add(r.trEl);
     const rest = currentWorldThree(r);
     jobs.push({ name, rest, world: new THREE.Matrix4().multiplyMatrices(delta, rest) });
   }
@@ -2146,6 +2323,11 @@ function itemTransforms() {
 function typeOfTransform(tr) {
   const ent = [...tr.children].find(c => c.tagName === 'Entity');
   const n = ent?.getAttribute('name') || '';
+  if (!n) {
+    // bare library include (the launch mat/stand): its file stem is the type
+    const file = [...tr.children].find(c => c.tagName === 'Include')?.getAttribute('file');
+    if (file) return file.split('/').pop().replace(/\.xml$/i, '');
+  }
   return n.replace(/\d.*$/, '') || 'item';
 }
 function colorTargets(scope) {
@@ -2940,8 +3122,11 @@ function deleteSelected() {
   const lap = lapNames();
   const kept = lap.filter(n => !gone.has(n) && !gone.has(n.split('.')[0]));
   if (kept.length !== lap.length) writeLap(kept, lapIsCircuit(), ops);
+  const cut = new Set();       // two bare includes can share one wrapper
   for (const n of names) {
     const tr = editState.index.get(n).trEl;
+    if (cut.has(tr)) continue;
+    cut.add(tr);
     ops.push({ type: 'remove', node: tr, parent: tr.parentNode, next: tr.nextSibling });
     tr.parentNode.removeChild(tr);
   }
@@ -2965,8 +3150,11 @@ function setSelectionSet(names, primary) {
 // and so does our parser), it is undo-able like any attribute edit, and a plain
 // click on any member selects the whole group. Ctrl-click still toggles single
 // objects, so members can be cherry-picked out of a group selection.
+// `autoGroup` is the implicit variant buildEditIndex hands the start block —
+// no attribute, nothing written to the file, same click behaviour.
 function groupIdOf(name) {
-  return editState?.index.get(name)?.trEl?.getAttribute('edGroup') || null;
+  const rec = editState?.index.get(name);
+  return rec?.trEl?.getAttribute('edGroup') || rec?.autoGroup || null;
 }
 function groupMembers(gid) {
   if (!gid || !currentData) return [];
@@ -3029,8 +3217,10 @@ function duplicateOne(name, ops, gidMap = new Map()) {
   if (!rec?.trEl) return null;
   const clone = rec.trEl.cloneNode(true);
   // duplicated group members form their OWN group, not the source's — one fresh
-  // id per source group per duplicate batch keeps a duplicated pair grouped
-  const srcGid = clone.getAttribute('edGroup');
+  // id per source group per duplicate batch keeps a duplicated pair grouped.
+  // Read it off the record, not the clone: the start block's group is implicit,
+  // and the copy is a named placement that has to carry a real attribute.
+  const srcGid = groupIdOf(name);
   if (srcGid) {
     if (!gidMap.has(srcGid)) {
       const used = new Set(currentData.elements.map(e => groupIdOf(e.name)).filter(Boolean));
@@ -3055,6 +3245,18 @@ function duplicateOne(name, ops, gidMap = new Map()) {
     }
   };
   walk(clone);
+  // A bare library include carries no name of its own, so the copy would land
+  // as a second "7x7Mat" and both would drop out of the index as duplicates.
+  // Wrap it in a fresh named <Entity> — the same shape buildPlacement emits, so
+  // the copy is an ordinary placement from here on.
+  if (rec.viaInclude && !renames.size) {
+    const ent = editState.doc.createElement('Entity');
+    const nn = uniqueName(name.replace(/\d+$/, '') || 'item');
+    ent.setAttribute('name', nn);
+    while (clone.firstChild) ent.appendChild(clone.firstChild);
+    clone.appendChild(ent);
+    renames.set(name, nn);
+  }
   // fix _pass children to follow their renamed parent
   const walk2 = el => {
     for (const c of [...(el.children || [])]) {
