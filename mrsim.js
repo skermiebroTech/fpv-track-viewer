@@ -169,14 +169,25 @@ function walkChildren(el, ctx, st) {
 
 function walkNode(node, ctx, st) {
   switch (node.tagName) {
-    case 'Transform':
-      walkChildren(node, { ...ctx, m: ctx.m.clone().multiply(localMatrix(node)) }, st);
+    // A <Transform> can carry components itself, not just child entities —
+    // DiveGate.xml and MultiGPChampTrack2023 both hang a <StaticContact>
+    // straight off one. Walking only the children dropped those on the floor,
+    // which is why the deco dive frame rendered as nothing at all. Same
+    // both-calls treatment the <Instance> case below already uses; the two
+    // functions handle disjoint tag sets, so nothing is processed twice.
+    case 'Transform': {
+      const c2 = { ...ctx, m: ctx.m.clone().multiply(localMatrix(node)) };
+      processComponents(node, c2, st);
+      walkChildren(node, c2, st);
       break;
+    }
     case 'ForEachTransform': {
       const count = Math.min(num(node, 'count', 1), 512);
       let m = ctx.m.clone();
       for (let i = 0; i < count; i++) {
-        walkChildren(node, { ...ctx, m: m.clone() }, st);
+        const c2 = { ...ctx, m: m.clone() };
+        processComponents(node, c2, st);
+        walkChildren(node, c2, st);
         m.multiply(localMatrix(node));
       }
       break;
@@ -228,6 +239,20 @@ function walkEntity(node, ctx, st) {
   walkChildren(node, c2, st);
 }
 
+// One collision/render primitive. Shared because MRSIM writes these in two
+// places: beside the <StaticContact> (the common form) and nested inside it.
+// Returns null for anything that is not a drawable prim — notably <Terrain>,
+// a heightfield collider off a .model that BinaryModelRenderer already draws.
+function primShape(c) {
+  switch (c.tagName) {
+    case 'Box': return { shape: 'box', dims: [num(c, 'x'), num(c, 'y'), num(c, 'z')] };
+    case 'Cylinder': return { shape: 'cyl', dims: [num(c, 'radius'), num(c, 'height')] };
+    case 'Sphere': return { shape: 'sphere', dims: [num(c, 'radius')] };
+    case 'Polyhedron': return parseInlinePolyhedron(c);
+    default: return null;
+  }
+}
+
 // handle the leaf components attached to one entity (shapes, renderers,
 // checkpoints); child <Entity>/<Transform>s are handled by the walker
 function processComponents(node, ctx, st) {
@@ -237,25 +262,38 @@ function processComponents(node, ctx, st) {
   let contact = null, material = null, hasCheckpoint = false;
   for (const c of node.children) {
     switch (c.tagName) {
-      case 'Box':
-        shapes.push({ shape: 'box', dims: [num(c, 'x'), num(c, 'y'), num(c, 'z')] });
-        break;
-      case 'Cylinder':
-        shapes.push({ shape: 'cyl', dims: [num(c, 'radius'), num(c, 'height')] });
-        break;
-      case 'Sphere':
-        shapes.push({ shape: 'sphere', dims: [num(c, 'radius')] });
-        break;
-      case 'Polyhedron': {
-        const p = parseInlinePolyhedron(c);
+      case 'Box': case 'Cylinder': case 'Sphere': case 'Polyhedron': {
+        const p = primShape(c);
         if (p) shapes.push(p);
         break;
       }
-      // the 2026-08-20 game update renamed this attribute from contactMaterial;
-      // tracks exported before then still carry the old spelling
-      case 'StaticContact':
-        contact = c.getAttribute('material') ?? c.getAttribute('contactMaterial');
+      // Contact material: `material` since the 2026-08-20 game update, the old
+      // `contactMaterial` in tracks exported before it, or a <ContactMaterial>
+      // child in the nested form below.
+      //
+      // That nested form puts the collider INSIDE the component rather than
+      // beside it, and names its render material there too:
+      //   <StaticContact material="TrackPart">
+      //     <Geometry><Box x="3" y=".3" z=".01"/></Geometry>
+      //     <StandardRendering material="GateTopMaterial"/>
+      //   </StaticContact>
+      // Used by DiveGate.xml, MultiGPChampTrack2023 and the two Locations.
+      case 'StaticContact': {
+        contact = c.getAttribute('material')
+          ?? c.getAttribute('contactMaterial')
+          ?? directChild(c, 'ContactMaterial')?.getAttribute('name')
+          ?? null;
+        const geo = directChild(c, 'Geometry');
+        if (!geo) break;
+        // carried per shape: the entity-level `material` belongs to a sibling
+        // MeshRendererComponent and must not be applied to these
+        const mat = directChild(c, 'StandardRendering')?.getAttribute('material') ?? null;
+        for (const g of geo.children) {
+          const p = primShape(g);
+          if (p) shapes.push(mat ? { ...p, mat } : p);
+        }
         break;
+      }
       case 'MeshRendererComponent': material = c.getAttribute('material'); break;
       case 'BinaryModelRenderer': models.push(c.getAttribute('file')); break;
       case 'RenderInstance': instRefs.push(c.getAttribute('group')); break;
@@ -275,14 +313,16 @@ function processComponents(node, ctx, st) {
   if (contact === '-1') {
     // sensor volume (checkpoint trigger) — invisible in-game, but kept so an
     // editor can show and manipulate the actual trigger extent
-    for (const s of shapes) elem?.sensors.push({ ...s, m: ctx.m.clone(), src: ctx.src });
+    for (const { mat, ...s } of shapes) elem?.sensors.push({ ...s, m: ctx.m.clone(), src: ctx.src });
   } else if (!tplHasShapes) {
     for (const s of shapes) {
       if (!elem) { note(st, 'shape outside any entity'); continue; }
+      const { mat, ...shape } = s;
+      const mm = mat ?? material;
       elem.prims.push({
-        ...s, m: ctx.m.clone(), hint: matHint(s.shape, s.dims, material, ctx.tags),
-        material, src: ctx.src,   // the render material NAME, for exact-colour lookup
-        solid: contact != null,   // render-only shapes carry no StaticContact
+        ...shape, m: ctx.m.clone(), hint: matHint(shape.shape, shape.dims, mm, ctx.tags),
+        material: mm, src: ctx.src,   // the render material NAME, for exact-colour lookup
+        solid: contact != null,       // render-only shapes carry no StaticContact
       });
     }
   }
