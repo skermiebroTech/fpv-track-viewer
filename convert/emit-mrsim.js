@@ -257,7 +257,7 @@ export function emitMrsim(normal, opts = {}) {
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent z="${fmt(cU)}"/>
           <Box x="${fmt(W)}" y="${fmt(PANE_D)}" z="${fmt(H)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent z="${fmt(refY)}"/>
           </Entity>
@@ -330,7 +330,7 @@ export function emitMrsim(normal, opts = {}) {
       const flagPart = `<Entity name="${nm}_pole">
           <WorldFromEntityComponent z="${fmt(flagH / 2)}"/>
           <Cylinder radius=".045" height="${fmt(flagH)}"/>
-          <StaticContact contactMaterial="TrackPart"/>
+          <StaticContact material="TrackPart"/>
           <MeshRendererComponent material="FlagRiserMaterial" subdivisions="10"/>
         </Entity>
         <Entity name="${nm}_cloth">
@@ -345,7 +345,7 @@ export function emitMrsim(normal, opts = {}) {
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent x="${fmt(b.cx)}" z="${fmt(b.cz - clampD)}"/>
           <Box x="${fmt(b.bw)}" y=".01" z="${fmt(b.bh)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent x="${fmt(b.refS)}" z="${fmt(b.refU - clampD)}"/>
           </Entity>
@@ -412,7 +412,7 @@ export function emitMrsim(normal, opts = {}) {
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent/>
           <Box x="${fmt(S)}" y="${fmt(S)}" z="${fmt(T)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent rx="1" angle="${down ? '-1.570796' : '1.570796'}"/>
           </Entity>
@@ -445,7 +445,7 @@ export function emitMrsim(normal, opts = {}) {
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent/>
           <Box x="${fmt(W)}" y=".01" z="${fmt(H)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent/>
           </Entity>
@@ -533,7 +533,7 @@ export function emitMrsim(normal, opts = {}) {
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent/>
           <Box x="${fmt(S)}" y="${fmt(S)}" z="${fmt(T)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent rx="1" angle="${down ? '-1.570796' : '1.570796'}"/>
           </Entity>
@@ -582,7 +582,7 @@ export function emitMrsim(normal, opts = {}) {
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent x="${fmt(b.cx)}" z="${fmt(b.cz)}"/>
           <Box x="${fmt(b.bw)}" y=".01" z="${fmt(b.bh)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent x="${fmt(b.cx + b.refX)}" z="${fmt(b.cz + b.refZ)}"/>
           </Entity>
@@ -611,7 +611,7 @@ export function emitMrsim(normal, opts = {}) {
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent/>
           <Box x="${fmt(geoW)}" y=".01" z="${fmt(geo)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent/>
           </Entity>
@@ -692,7 +692,7 @@ ${neonEntitiesXml(neon, nm, { w: fit.w, h: fit.h, cz: fit.cz, d: fit.d, plane: '
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent z="${fmt(refH)}"/>
           <Box x="${fmt(apW)}" y=".3" z="${fmt(apH)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent z="${fmt(refH)}"/>
           </Entity>
@@ -762,25 +762,25 @@ ${neonEntitiesXml(neon, nm, { w: fit.w, h: fit.h, cz: fit.cz, d: fit.d, plane: '
         <Entity name="${nm}_postL">
           <WorldFromEntityComponent x="${fmt(-apW / 2 - 0.06)}" z="${fmt((apH + 0.15) / 2)}"/>
           <Cylinder radius=".06" height="${fmt(apH + 0.15)}"/>
-          <StaticContact contactMaterial="TrackPart"/>
+          <StaticContact material="TrackPart"/>
           <MeshRendererComponent material="GatePostMaterial" subdivisions="10"/>
         </Entity>
         <Entity name="${nm}_postR">
           <WorldFromEntityComponent x="${fmt(apW / 2 + 0.06)}" z="${fmt((apH + 0.15) / 2)}"/>
           <Cylinder radius=".06" height="${fmt(apH + 0.15)}"/>
-          <StaticContact contactMaterial="TrackPart"/>
+          <StaticContact material="TrackPart"/>
           <MeshRendererComponent material="GatePostMaterial" subdivisions="10"/>
         </Entity>
         <Entity name="${nm}_banner">
           <WorldFromEntityComponent z="${fmt(apH + 0.075)}"/>
           <Box x="${fmt(apW + 0.24)}" y=".04" z=".15"/>
-          <StaticContact contactMaterial="TrackPart"/>
+          <StaticContact material="TrackPart"/>
           <MeshRendererComponent material="${isSF ? 'GateStartBannerMaterial' : 'GateBannerMaterial'}" subdivisions="1"/>
         </Entity>
         <Entity name="${nm}_pass">
           <WorldFromEntityComponent z="${fmt(apH / 2)}"/>
           <Box x="${fmt(bw)}" y=".3" z="${fmt(bh)}"/>
-          <StaticContact contactMaterial="-1"/>
+          <StaticContact material="-1"/>
           <Entity name="CheckpointReference">
             <WorldFromEntityComponent z="${fmt(apH / 2)}"/>
           </Entity>
@@ -921,7 +921,7 @@ ${neonEntitiesXml(neon, nm, { w: fit.w, h: fit.h, cz: fit.cz, d: fit.d, plane: '
       <Entity name="${nm}">
         <WorldFromEntityComponent z="${fmt(sy / 2)}"/>
         <Box x="${fmt(sx)}" y="${fmt(sz)}" z="${fmt(sy)}"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="Block${b.map.color[0]}Material" subdivisions="1"/>
       </Entity>
     </Transform>`);
@@ -935,7 +935,7 @@ ${neonEntitiesXml(neon, nm, { w: fit.w, h: fit.h, cz: fit.cz, d: fit.d, plane: '
       <Entity name="${nm}">
         <WorldFromEntityComponent z="${fmt(sy / 2)}"/>
         <Box x="${fmt(sx)}" y="${fmt(sz)}" z="${fmt(sy)}"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="NetPanelMaterial" subdivisions="1"/>
       </Entity>
     </Transform>`);
@@ -965,7 +965,7 @@ ${neonEntitiesXml(neon, nm, { w: fit.w, h: fit.h, cz: fit.cz, d: fit.d, plane: '
       <Entity name="${nm}">
         <WorldFromEntityComponent z="${fmt(h / 2)}"/>
         <Box x="${fmt(w)}" y=".02" z="${fmt(h)}"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="HurdlePanelMaterial" subdivisions="1"/>
       </Entity>
     </Transform>`);
@@ -991,7 +991,7 @@ ${neonEntitiesXml(neon, nm, { w: fit.w, h: fit.h, cz: fit.cz, d: fit.d, plane: '
         <Entity name="${nm}_pole">
           <WorldFromEntityComponent z="${fmt(flagH / 2)}"/>
           <Cylinder radius=".045" height="${fmt(flagH)}"/>
-          <StaticContact contactMaterial="TrackPart"/>
+          <StaticContact material="TrackPart"/>
           <MeshRendererComponent material="FlagRiserMaterial" subdivisions="10"/>
         </Entity>
         <Entity name="${nm}_cloth">

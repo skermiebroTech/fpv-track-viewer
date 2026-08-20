@@ -98,16 +98,18 @@ export function validateMrsim(xml, { summary, normal, humanLines } = {}) {
   // ---- sensor volumes -------------------------------------------------------
   // bare sensors are emitted as <Entity name="…_pass"> with a direct Box —
   // find each and check its size (macro gates carry their own lib geometry).
-  // The Box must be a non-solid trigger (contactMaterial="-1") or the
-  // "sensor" is a collision wall the drone smashes into.
-  const sensRe = /<Entity name="([^"]*_pass)">\s*<WorldFromEntityComponent[^>]*\/>\s*<Box x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>\s*(<StaticContact contactMaterial="([^"]*)"\/>)?/g;
+  // The Box must be a non-solid trigger (material="-1") or the
+  // "sensor" is a collision wall the drone smashes into. The game renamed this
+  // attribute from contactMaterial on 2026-08-20; accept either spelling so
+  // tracks exported before then still validate.
+  const sensRe = /<Entity name="([^"]*_pass)">\s*<WorldFromEntityComponent[^>]*\/>\s*<Box x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>\s*(<StaticContact (?:contactM|m)aterial="([^"]*)"\/>)?/g;
   const sensors = new Map();
   while ((m2 = sensRe.exec(xml))) {
     const dims = [m2[2], m2[3], m2[4]].map(parseFloat);
     sensors.set(m2[1], dims);
     if (m2[6] !== '-1') {
       errors.push(`sensor ${m2[1]} is not a trigger volume ` +
-        `(contactMaterial=${m2[6] === undefined ? 'missing' : `"${m2[6]}"`})`);
+        `(material=${m2[6] === undefined ? 'missing' : `"${m2[6]}"`})`);
     }
     if (dims.some(d => !Number.isFinite(d) || d < SENSOR_MIN)) {
       errors.push(`sensor ${m2[1]} has a degenerate dimension (${m2[2]},${m2[3]},${m2[4]})`);

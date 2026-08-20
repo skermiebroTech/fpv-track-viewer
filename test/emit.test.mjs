@@ -136,7 +136,7 @@ test('parseMrsim resolves the ring against the checkpoint entity parent, not its
           <Entity name="gate_pass">
             <WorldFromEntityComponent z="2"/>
             <Box x="2" y=".3" z="2"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
             <Entity name="CheckpointReference"><WorldFromEntityComponent z="1.4"/></Entity>
             <Checkpoint/>
           </Entity>

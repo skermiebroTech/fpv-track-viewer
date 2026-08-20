@@ -82,10 +82,14 @@ export function creditComment(pilotName) {
     : "created with 9dtr's track editor";
 }
 
+// The converter's pre-credit header, left in every track exported before the
+// credit banner existed. Matched on its own so a load can DETECT one and report
+// that it upgraded it, rather than only swapping it silently on the way out.
+export const LEGACY_CREDIT_RE = /Converted from VelociDrone by track-viewer/;
+
 // Recognises a credit already in a file, so a re-export REPLACES it instead of
-// stacking copies. Also matches the converter's pre-credit legacy line, which
-// gets upgraded on the way through.
-export const CREDIT_RE = /9dtr's track editor|Converted from VelociDrone by track-viewer/;
+// stacking copies. Built from the legacy pattern so the two cannot drift.
+export const CREDIT_RE = new RegExp(`9dtr's track editor|${LEGACY_CREDIT_RE.source}`);
 
 // Pulls the pilot back out of an existing credit, to pre-fill the export prompt.
 export const CREDIT_PILOT_RE = /created by (.+?) using 9dtr's track editor/;

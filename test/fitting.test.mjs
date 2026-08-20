@@ -96,8 +96,8 @@ test('an MRSIM sprint converts back to a VD sprint, not a circuit', () => {
 
 test('validator rejects a sensor that lost its trigger material', () => {
   const { xml, summary, normal } = convert(loadFixture('synthetic-track.json'));
-  const bad = xml.replace('<StaticContact contactMaterial="-1"/>',
-    '<StaticContact contactMaterial="TrackPart"/>');
+  const bad = xml.replace('<StaticContact material="-1"/>',
+    '<StaticContact material="TrackPart"/>');
   const v = validateMrsim(bad, { summary, normal });
   assert.equal(v.ok, false);
   assert.ok(v.errors.some(e => /not a trigger volume/.test(e)));
