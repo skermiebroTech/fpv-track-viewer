@@ -180,6 +180,11 @@
     border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 7px;
     font: inherit; font-size: 11px; line-height: 1.3; cursor: pointer; }
   #editPanel .pal button:hover { background: var(--surface-3); border-color: var(--edit); }
+  #editPanel button.palAll { width: 100%; margin-top: 6px; background: var(--surface-2);
+    color: var(--dim); border: 1px dashed var(--line-2); border-radius: var(--r-sm);
+    padding: 5px 0; font: inherit; font-size: 11.5px; cursor: pointer; }
+  #editPanel button.palAll:hover { background: var(--surface-3); border-color: var(--edit);
+    color: var(--edit-text); }
   #editPanel .pal button.arm { background: var(--edit-bg); border-color: var(--edit);
     color: #fff; box-shadow: 0 0 0 1px var(--edit) inset; }
   #editPanel .lapRow { display: flex; align-items: center; gap: 5px; padding: 2px 3px;
@@ -603,6 +608,10 @@
       <button id="palClear" title="clear search">✕</button>
     </div>
     <div class="pal" id="palette"></div>
+    <button id="palAll" class="palAll"
+      title="place one of every object in a labelled grid — a single undo step">
+      add one of every object (test grid)
+    </button>
   </details>
 
   <details class="edSect" id="edLapSect" open>
@@ -2366,17 +2375,18 @@ function refreshHistoryButtons() {
 // makes rapid input (double-clicking ↶, holding Ctrl-Z) safe. Failures keep the
 // chain alive; each caller still gets its own rejection.
 let rebuildChain = Promise.resolve();
-function rebuildFromDoc() {
-  const next = rebuildChain.then(doRebuildFromDoc, doRebuildFromDoc);
+function rebuildFromDoc(opts = {}) {
+  const run = () => doRebuildFromDoc(opts);
+  const next = rebuildChain.then(run, run);
   rebuildChain = next.catch(() => {});
   return next;
 }
 
-async function doRebuildFromDoc() {
+async function doRebuildFromDoc(opts = {}) {
   const savedSelection = [...editUi.selection];
   const text = new XMLSerializer().serializeToString(editState.doc);
   await loadFromText(text, editState.fileName,
-    { reuseDoc: true, keepCamera: true, keepSelection: editUi.selectedName });
+    { reuseDoc: true, keepCamera: !opts.refit, keepSelection: editUi.selectedName });
   // loadFromText re-selects the primary as a single selection — restore the
   // rest of a multi-selection (names survive rebuilds; drop any that vanished)
   if (savedSelection.length > 1) {
@@ -3228,6 +3238,39 @@ function placeAt(def, p3) {
   return rebuildFromDoc().then(() => selectElementByName(name));
 }
 
+// ---- test grid -------------------------------------------------------------
+// Drops one of every palette entry into a grid. The point is coverage: it is
+// the quickest way to see that each object still builds, renders and — for the
+// ones that carry a checkpoint — still registers, in the editor and in the game
+// after an export. Everything goes in as ONE undo step, and the doc is rebuilt
+// once at the end rather than per object, so 48 placements cost one reparse.
+const TEST_GRID_STEP = 20;      // metres; clears the widest object (7x16 hurdle)
+
+function placeAllPalette() {
+  if (!editState) return Promise.resolve('no track loaded');
+  const defs = allPalette();
+  const cols = Math.ceil(Math.sqrt(defs.length));
+  const ops = [];
+  const lap = lapNames();
+  const placed = [];
+  defs.forEach((def, i) => {
+    // buildPlacement inserts as it goes, so uniqueName sees the ones before it
+    const name = uniqueName('ed' + def.id[0].toUpperCase() + def.id.slice(1));
+    buildPlacement(def, name,
+      (i % cols) * TEST_GRID_STEP, -Math.floor(i / cols) * TEST_GRID_STEP, 0, ops);
+    placed.push(name);
+    if (def.cp) lap.push(def.cp === 'pass' ? name + '_pass' : name);
+  });
+  // one lap write for the whole batch, not one per gate
+  writeLap(lap, lapIsCircuit(), ops);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  return rebuildFromDoc({ refit: true }).then(() => {
+    clearSelection();
+    return placed;
+  });
+}
+
 function deleteSelected() {
   const names = editUi.selection.filter(n => editState?.index.get(n)?.trEl);
   if (!names.length) return;
@@ -3626,6 +3669,23 @@ palSearchEl.addEventListener('keydown', e => {
 });
 document.getElementById('palClear').onclick = () => {
   palSearchEl.value = ''; palFilter = ''; renderPalette(); palSearchEl.focus();
+};
+
+// Dropping 48 objects onto a track that already has some is a big enough change
+// to be worth a question — on an empty one it is just the feature working, so
+// do not ask. Either way it undoes in a single step.
+const palAllBtn = document.getElementById('palAll');
+palAllBtn.onclick = async () => {
+  const existing = currentData?.elements?.length || 0;
+  if (existing && !confirm(
+      `This track already has ${existing} element(s).\n\n` +
+      `Add one of every object (${allPalette().length}) in a test grid beside them?\n\n` +
+      'It undoes in a single step (Ctrl-Z).')) return;
+  palAllBtn.disabled = true;
+  try {
+    const placed = await placeAllPalette();
+    statusEl.textContent = `placed ${placed.length} test objects`;
+  } finally { palAllBtn.disabled = false; }
 };
 
 loadLocalComponents();
@@ -4728,6 +4788,7 @@ window.__edit = {
   _proxy: proxy, _commit: commitEdit,   // test hooks for the gizmo-drag path
   // editor feature hooks
   palette: () => allPalette().map(p => p.id),
+  placeAll: () => placeAllPalette(),
   place: (pid, mx, my, mz = 0) => {     // place at MRSIM coords, returns name
     const def = allPalette().find(p => p.id === pid);
     if (!def) return 'unknown palette id';
