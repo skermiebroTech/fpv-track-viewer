@@ -142,6 +142,7 @@
     border-radius: var(--r-sm); padding: 2px 7px; }
   #diag .issue { color: var(--danger-text); }
   #diag .ok { color: var(--ok); }
+  #diag .warn { color: var(--warn); }
   #diag table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
   #diag td, #diag th { text-align: left; padding: 2px 4px 2px 0; white-space: nowrap; }
   #diag th { color: var(--dim); font-weight: 500; }
@@ -429,6 +430,25 @@
     color: var(--dim); }
   #builder .bImport { display: none; }
 
+  /* ---- legacy-format migration banner ---- */
+  #migrate { position: fixed; top: 44px; left: 50%; transform: translateX(-50%);
+    z-index: 6; display: none; width: min(580px, calc(100vw - 20px));
+    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    border: 1px solid #5a3f28; border-left: 3px solid var(--warn);
+    border-radius: var(--r-lg); padding: 11px 13px;
+    backdrop-filter: blur(10px); box-shadow: var(--shadow); }
+  #migrate.show { display: flex; gap: 11px; align-items: flex-start; }
+  #migrate .body { flex: 1; }
+  #migrate h2 { font-size: 13px; margin: 0 0 3px; color: var(--warn); }
+  #migrate p { margin: 0; color: var(--dim); line-height: 1.5; }
+  #migrate b { color: var(--text); font-weight: 600; }
+  #migrate button { flex: none; background: var(--surface-2); color: var(--dim);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    padding: 4px 9px; font: inherit; cursor: pointer; }
+  #migrate button:hover { background: var(--surface-3); border-color: var(--warn);
+    color: var(--text); }
+
   /* ---- first-run notice (shown once, then remembered in localStorage) ---- */
   #notice { position: fixed; inset: 0; z-index: 30; display: none;
     background: #05070bd9; backdrop-filter: blur(4px); }
@@ -464,6 +484,13 @@
   <span class="status" id="status">…</span>
 </div>
 <div id="diag" class="hidden"></div>
+<div id="migrate">
+  <div class="body">
+    <h2>Track updated for the current MRSIM</h2>
+    <p id="migrateText"></p>
+  </div>
+  <button id="migrateOk" title="hide this notice">dismiss</button>
+</div>
 <div id="envPanel" class="hidden">
   <h3>environment</h3>
   <div class="envRow">
@@ -704,7 +731,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { parseMrsim, includeEntityNames } from './mrsim.js';
 // the export credit — a tiny dependency-free module, so stamping a credit never
 // has to pull in the (lazily loaded) VelociDrone converter
-import { creditComment, CREDIT_RE, CREDIT_PILOT_RE } from './convert/credit.js';
+import { creditComment, CREDIT_RE, CREDIT_PILOT_RE, LEGACY_CREDIT_RE }
+  from './convert/credit.js';
 // LED / neon shapes + the emissive material, shared with the VelociDrone
 // converter so a placed neon ring and a converted one are the same object
 import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './convert/neon.js';
@@ -1323,7 +1351,7 @@ async function build(data, keepCamera = false) {
       }
     });
 
-    // sensor trigger volumes (contactMaterial="-1") — shown in edit mode
+    // sensor trigger volumes (material="-1") — shown in edit mode
     (el.sensors || []).forEach(sn => {
       const geo = sn.shape === 'cyl' ? unitCyl : unitBox;
       const dims = sn.shape === 'cyl'
@@ -1495,6 +1523,20 @@ function renderDiag(data, extra) {
       `<div class="chips">${Object.entries(counts).map(([k, v]) => chip(KIND_LABEL[k] || k, v)).join('')}</div>` +
     `</section>` +
 
+    (editState?.migrated?.converted || editState?.migrated?.credit
+      ? `<section><div class="warn">⟳ ${[
+            editState.migrated.converted
+              ? `updated ${editState.migrated.converted} legacy collision tag(s) ` +
+                `(contactMaterial → material)` +
+                (editState.migrated.sensors
+                  ? `, incl. ${editState.migrated.sensors} checkpoint sensor(s) that ` +
+                    `would otherwise fly solid` : '')
+              : '',
+            editState.migrated.credit ? 'refreshed the export credit' : '',
+          ].filter(Boolean).join(' · ')}` +
+          `${editState.migrated.saved ? ' \u2014 saved' : ' \u2014 export to save'}</div></section>`
+      : '') +
+
     (issues.length
       ? `<section><div class="issue">! ${issues.length} parser issue(s)</div>` +
           issues.map(i => `<div class="issue">· ${escapeHtml(i)}</div>`).join('') + `</section>`
@@ -1534,6 +1576,76 @@ const errEl = document.createElement('div'); errEl.id = 'err'; diagEl.prepend(er
 let editState = null;   // {doc, fileName, index: Map(name -> rec), dirty}
 let currentData = null;
 
+// ---- legacy-format migration ----------------------------------------------
+// The 2026-08-20 MRSIM update renamed <StaticContact>'s attribute from
+// contactMaterial to material. The old spelling is simply ignored now, so a
+// trigger volume that relied on contactMaterial="-1" loses its "not solid"
+// marking and the checkpoint becomes an invisible wall. Tracks assembled purely
+// from library <Include>/<Instance macro> objects were repaired by the game
+// update itself — only inline geometry (fabricated gates, flags, prims and the
+// _pass sensors) carries the attribute in the track file and has to be rewritten
+// here. Deliberately does NOT set dirty: re-running this on the original file
+// reproduces it exactly, so there is no work to lose, and the export keeps its
+// own filename so the fixed track can replace the broken one in place.
+function migrateLegacyDoc(doc) {
+  const stale = [...doc.getElementsByTagName('StaticContact')]
+    .filter(sc => sc.hasAttribute('contactMaterial'));
+  let sensors = 0;
+  for (const sc of stale) {
+    const v = sc.getAttribute('contactMaterial');
+    sc.removeAttribute('contactMaterial');
+    sc.setAttribute('material', v);
+    if (v === '-1') sensors++;       // the ones that were flying solid
+  }
+  return { converted: stale.length, sensors, credit: migrateLegacyCredit(doc) };
+}
+
+// Tracks exported before the credit banner existed still carry the converter's
+// old <!-- Converted from VelociDrone by track-viewer --> header. Swap it for
+// the current credit here rather than waiting for the export, so what the panel
+// reports and what the file will contain are the same thing. stampCredit clears
+// every credit-shaped comment, so pass any name already on the file through or
+// the upgrade would quietly drop it.
+function migrateLegacyCredit(doc) {
+  const root = doc.documentElement;
+  if (!root) return false;
+  const comments = [...root.childNodes].filter(n => n.nodeType === Node.COMMENT_NODE);
+  if (!comments.some(n => LEGACY_CREDIT_RE.test(n.nodeValue))) return false;
+  const pilot = comments.map(n => n.nodeValue.match(CREDIT_PILOT_RE)?.[1]).find(Boolean);
+  stampCredit(doc, pilot || '');
+  return true;
+}
+
+const migrateEl = document.getElementById('migrate');
+document.getElementById('migrateOk').addEventListener('click',
+  () => migrateEl.classList.remove('show'));
+
+// Tell the user what just happened to their file — silently rewriting someone's
+// track is the kind of thing they should hear about, especially as it only
+// sticks if they export.
+function showMigrationNotice(m) {
+  if (!m.converted && !m.credit) { migrateEl.classList.remove('show'); return; }
+  const s1 = n => n === 1 ? '' : 's';
+  const did = [];
+  if (m.converted)
+    did.push(`converted <b>${m.converted}</b> collision tag${s1(m.converted)} to <b>material</b>`);
+  if (m.credit)
+    did.push('replaced the old <b>track-viewer</b> header with the current credit');
+  document.getElementById('migrateText').innerHTML =
+    (m.converted
+      ? 'This track was built for an older MRSIM: its collision tags use the old ' +
+        '<b>contactMaterial</b> name, which the current game ignores' +
+        (m.sensors
+          ? ` \u2014 <b>${m.sensors}</b> checkpoint sensor${s1(m.sensors)} would have ` +
+            'flown solid.'
+          : '.')
+      : 'This track carries a header from an older version of the exporter.') +
+    ` Updated here in the editor: ${did.join(' and ')}.` +
+    ' Use <b>\u2913 export</b> to save the fixed track — the file on disk is ' +
+    'untouched until you do.';
+  migrateEl.classList.add('show');
+}
+
 async function loadFromText(text, fileName, opts = {}) {
   errEl.textContent = '';
   let data;
@@ -1552,6 +1664,10 @@ async function loadFromText(text, fileName, opts = {}) {
       doc: new DOMParser().parseFromString(text, 'text/xml'),
       fileName, index: new Map(), dirty: false, undo: [], redo: [],
     };
+    // repair a pre-2026-08-20 track in place, so anything the editor exports
+    // is loadable by the game sitting on the user's disk right now
+    editState.migrated = migrateLegacyDoc(editState.doc);
+    showMigrationNotice(editState.migrated);
   }
   currentData = data;
   buildEditIndex(data);
@@ -1574,6 +1690,7 @@ async function loadFromText(text, fileName, opts = {}) {
     kinds: data.elements.reduce((a, e) => (a[e.kind] = (a[e.kind] || 0) + 1, a), {}),
     checkpointCount: data.seq.length,
     issues: data.issues,
+    migrated: editState?.migrated || null,
     groundY: extra.groundY,
     startElement: (data.elements.find(e => e.isStart) || {}).name || null,
     gateWidths: extra.gateWidths,
@@ -1938,7 +2055,9 @@ function sensorBoxEl(name) {
     for (const c of el.children || []) {
       if (c.tagName === 'Entity' &&
           [...c.children].some(k => k.tagName === 'Checkpoint') &&
-          [...c.children].some(k => k.tagName === 'StaticContact' && k.getAttribute('contactMaterial') === '-1')) {
+          [...c.children].some(k => k.tagName === 'StaticContact' &&
+            // renamed from contactMaterial by the 2026-08-20 game update
+            (k.getAttribute('material') ?? k.getAttribute('contactMaterial')) === '-1')) {
         const box = [...c.children].find(k => k.tagName === 'Box');
         if (box) return box;
       }
@@ -2740,7 +2859,7 @@ function buildCustomGate(doc, ent, name, kind) {
     const e = mk('Entity', { name: name + suffix });
     e.appendChild(mk('WorldFromEntityComponent', wf));
     e.appendChild(mk(tag, prim));
-    e.appendChild(mk('StaticContact', { contactMaterial: 'TrackPart' }));
+    e.appendChild(mk('StaticContact', { material: 'TrackPart' }));
     e.appendChild(mk('MeshRendererComponent', { material, subdivisions: tag === 'Cylinder' ? '10' : '1' }));
     ent.appendChild(e);
   };
@@ -2749,12 +2868,12 @@ function buildCustomGate(doc, ent, name, kind) {
   part('_postR', { x: pX, z: pZ }, 'Cylinder', { radius: '.06', height: pH }, 'GatePostMaterial');
   part('_banner', { z: sq ? '2.575' : '2.637' }, 'Box',
     { x: sq ? '2.74' : '3.2', y: '.04', z: '.15' }, 'GateBannerMaterial');
-  // checkpoint sensor (the trigger, contactMaterial="-1") + ring reference
+  // checkpoint sensor (the trigger, material="-1") + ring reference
   const passZ = sq ? '1.25' : '1.281';
   const pass = mk('Entity', { name: name + '_pass' });
   pass.appendChild(mk('WorldFromEntityComponent', { z: passZ }));
   pass.appendChild(mk('Box', { x: sq ? '2.5' : '2.96', y: '.3', z: sq ? '2.5' : '2.562' }));
-  pass.appendChild(mk('StaticContact', { contactMaterial: '-1' }));
+  pass.appendChild(mk('StaticContact', { material: '-1' }));
   const ref = mk('Entity', { name: 'CheckpointReference' });
   ref.appendChild(mk('WorldFromEntityComponent', { z: passZ }));
   pass.append(ref, mk('Checkpoint', {}));
@@ -2895,7 +3014,7 @@ function buildCustomComponent(doc, ent, name, def, ops) {
     else e.appendChild(mk('Box', { x: d[0] || '0.5', y: d[1] || '0.5', z: d[2] || '0.5' }));
     // solid:false = render only, no collider — VD flag cloth is soft enough to
     // brush at race speed, so the converter never makes it a hard surface
-    if (part.solid !== false) e.appendChild(mk('StaticContact', { contactMaterial: 'TrackPart' }));
+    if (part.solid !== false) e.appendChild(mk('StaticContact', { material: 'TrackPart' }));
     // subdivisions tessellates curved prims (BaylandsPark spheres use 32)
     e.appendChild(mk('MeshRendererComponent', { material,
       subdivisions: part.shape === 'cyl' ? '12' : part.shape === 'sphere' ? '24' : '1' }));
@@ -2912,7 +3031,7 @@ function buildCustomComponent(doc, ent, name, def, ops) {
     const p = mk('Entity', { name: name + '_pass' });
     const wf = mk('WorldFromEntityComponent', {}); writeVec(wf, pos); p.appendChild(wf);
     p.appendChild(mk('Box', { x: dims[0], y: dims[1], z: dims[2] }));
-    p.appendChild(mk('StaticContact', { contactMaterial: '-1' }));
+    p.appendChild(mk('StaticContact', { material: '-1' }));
     const ref = mk('Entity', { name: 'CheckpointReference' });
     const rwf = mk('WorldFromEntityComponent', {});
     writeVec(rwf, refDef.pos || pos); writeRotation(rwf, quatFromRot(refDef.rot));
@@ -2962,7 +3081,7 @@ function buildPlacement(def, name, mx, my, mz, ops) {
     const box = doc.createElement('Box');
     box.setAttribute('x', '3'); box.setAttribute('y', '.05'); box.setAttribute('z', '2.5');
     const sc = doc.createElement('StaticContact');
-    sc.setAttribute('contactMaterial', '-1');
+    sc.setAttribute('material', '-1');
     const ref = doc.createElement('Entity');
     ref.setAttribute('name', 'CheckpointReference');
     ref.appendChild(doc.createElement('WorldFromEntityComponent'));
@@ -4558,6 +4677,11 @@ function exportXml() {
   a.download = editState.dirty ? `${stem}-edited.xml` : `${stem}.xml`;
   a.click();
   URL.revokeObjectURL(a.href);
+  // the repaired track is now on disk — retire the migration prompt
+  if (editState.migrated?.converted || editState.migrated?.credit) {
+    editState.migrated.saved = true;
+    migrateEl.classList.remove('show');
+  }
   // the work is now on disk — stop the discard prompts until the next edit
   editState.savedMark = historyMark();
   statusEl.textContent = statusEl.textContent.replace(' · UNSAVED', ' · exported');

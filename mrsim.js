@@ -251,7 +251,11 @@ function processComponents(node, ctx, st) {
         if (p) shapes.push(p);
         break;
       }
-      case 'StaticContact': contact = c.getAttribute('contactMaterial'); break;
+      // the 2026-08-20 game update renamed this attribute from contactMaterial;
+      // tracks exported before then still carry the old spelling
+      case 'StaticContact':
+        contact = c.getAttribute('material') ?? c.getAttribute('contactMaterial');
+        break;
       case 'MeshRendererComponent': material = c.getAttribute('material'); break;
       case 'BinaryModelRenderer': models.push(c.getAttribute('file')); break;
       case 'RenderInstance': instRefs.push(c.getAttribute('group')); break;

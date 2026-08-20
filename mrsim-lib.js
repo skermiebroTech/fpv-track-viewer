@@ -28,7 +28,7 @@ export const MRSIM_LIB = {
         <Entity name="Passage Geometry">
             <WorldFromEntityComponent/>
             <Polyhedron binaryModelFile="5x5Gate.model" part="PassageGeometry"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
 
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent x="1.05" z=".75"/>
@@ -38,32 +38,32 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x=".15" z=".75"/>
             <Box x=".3" y=".01" z="1.5"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="2" z=".75"/>
             <Box x=".3" y=".01" z="1.5"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.05" z="1.65"/>
             <Box x="2.1" y=".01" z=".3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="0" z=".9"/>
             <Cylinder radius=".02" height="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="2.1" z=".9"/>
             <Cylinder radius=".02" height="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.05" z="1.8" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.1"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
@@ -77,7 +77,7 @@ export const MRSIM_LIB = {
         <Entity name="Passage Geometry">
             <WorldFromEntityComponent/>
             <Polyhedron binaryModelFile="5x5Gate.model" part="PassageGeometry"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
 
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent x="1.05" z=".75"/>
@@ -97,32 +97,32 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x=".15" z=".75"/>
             <Box x=".3" y=".01" z="1.5"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="2" z=".75"/>
             <Box x=".3" y=".01" z="1.5"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.05" z="1.65"/>
             <Box x="2.1" y=".01" z=".3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="0" z=".9"/>
             <Cylinder radius=".02" height="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="2.1" z=".9"/>
             <Cylinder radius=".02" height="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.05" z="1.8" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.1"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
@@ -134,7 +134,7 @@ export const MRSIM_LIB = {
         <Entity name="Passage Geometry">
             <WorldFromEntityComponent/>
             <Polyhedron binaryModelFile="7x6Gate.model" part="PassageGeometry"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent x="1.5" z=".9"/>
             </Entity>
@@ -147,32 +147,32 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x=".2" z=".9"/>
             <Box x=".4" y=".01" z="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="2.8" z=".9"/>
             <Box x=".4" y=".01" z="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" z="2.05"/>
             <Box x="3" y=".01" z=".5"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="0" z="1.15"/>
             <Cylinder radius=".02" height="2.3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="3" z="1.15"/>
             <Cylinder radius=".02" height="2.3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" z="2.3" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
@@ -186,7 +186,7 @@ export const MRSIM_LIB = {
         <Entity name="Timing Gate">
             <WorldFromEntityComponent/>
             <Polyhedron binaryModelFile="7x6Gate.model" part="PassageGeometry"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent x="1.5" z=".9"/>
             </Entity>
@@ -205,32 +205,32 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x=".2" z=".9"/>
             <Box x=".4" y=".01" z="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="2.8" z=".9"/>
             <Box x=".4" y=".01" z="1.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" z="2.05"/>
             <Box x="3" y=".01" z=".5"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="0" z="1.15"/>
             <Cylinder radius=".02" height="2.3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="3" z="1.15"/>
             <Cylinder radius=".02" height="2.3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" z="2.3" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
@@ -241,21 +241,21 @@ export const MRSIM_LIB = {
     <Entity>
         <WorldFromEntityComponent x="0" z=".9"/>
         <Cylinder radius=".02" height="1.8"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="PVCMaterial"/>
     </Entity>
 
     <Entity>
         <WorldFromEntityComponent x="2.1" z=".9"/>
         <Cylinder radius=".02" height="1.8"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="PVCMaterial"/>
     </Entity>
 
     <Entity>
         <WorldFromEntityComponent x="1.05" z="1.64"/>
         <Box x="2.1" y=".01" z=".3"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="GateTopMaterial"/>
     </Entity>
 
@@ -271,21 +271,21 @@ export const MRSIM_LIB = {
     <Entity>
         <WorldFromEntityComponent x="0" z="1.15"/>
         <Cylinder radius=".02" height="2.3"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="PVCMaterial"/>
     </Entity>
 
     <Entity>
         <WorldFromEntityComponent x="3" z="1.15"/>
         <Cylinder radius=".02" height="2.3"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="PVCMaterial"/>
     </Entity>
 
     <Entity>
         <WorldFromEntityComponent x="1.5" z="2.05"/>
         <Box x="3" y=".01" z=".5"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="GateTopMaterial"/>
     </Entity>
 
@@ -303,7 +303,7 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="1.05" z=".6"/>
             <Box x="2.1" y=".01" z="1.2"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="GateSideMaterial"/>
         </Entity>
     </Entity>
@@ -323,12 +323,12 @@ export const MRSIM_LIB = {
     <Entity name="5x10Hurdle">
         <WorldFromEntityComponent x="1.5" z=".75"/>
         <Box x="3" y=".01" z="1.5"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="GateSideMaterial"/>
         <Entity name="Passage Geometry">
             <WorldFromEntityComponent x="1.5" z="6.5"/>
             <Box x="6" y=".01" z="10"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent x="1.5" z="2.5"/>
             </Entity>
@@ -351,12 +351,12 @@ export const MRSIM_LIB = {
     <Entity name="7x16Hurdle">
         <WorldFromEntityComponent x="2.5" z="1.05"/>
         <Box x="5" y=".01" z="2.1"/>
-        <StaticContact contactMaterial="TrackPart"/>
+        <StaticContact material="TrackPart"/>
         <MeshRendererComponent material="GateSideMaterial"/>
         <Entity name="Passage Geometry">
             <WorldFromEntityComponent x="1.5" z="6.5"/>
             <Box x="6" y=".01" z="10"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent x="1.5" z="2.5"/>
             </Entity>
@@ -372,7 +372,7 @@ export const MRSIM_LIB = {
     <Entity name="DiveGate">
         <Entity>
             <Transform y="-1.35" z="4.5">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Box x="3" y=".3" z=".01"/>
                     </Geometry>
@@ -382,7 +382,7 @@ export const MRSIM_LIB = {
         </Entity>
         <Entity>
             <Transform y="1.35" z="4.5">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Box x="3" y=".3" z=".01"/>
                     </Geometry>
@@ -392,7 +392,7 @@ export const MRSIM_LIB = {
         </Entity>
         <Entity>
             <Transform x="-1.35" z="4.5">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Box x=".3" y="2.4" z=".01"/>
                     </Geometry>
@@ -402,7 +402,7 @@ export const MRSIM_LIB = {
         </Entity>
         <Entity>
             <Transform x="1.35" z="4.5">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Box x=".3" y="2.4" z=".01"/>
                     </Geometry>
@@ -413,7 +413,7 @@ export const MRSIM_LIB = {
 
         <Entity>
             <Transform x="-1.5" y="-1.5" z="2.25">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Cylinder radius=".02" height="4.5"/>
                     </Geometry>
@@ -423,7 +423,7 @@ export const MRSIM_LIB = {
         </Entity>
         <Entity>
             <Transform x="1.5" y="-1.5" z="2.25">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Cylinder radius=".02" height="4.5"/>
                     </Geometry>
@@ -433,7 +433,7 @@ export const MRSIM_LIB = {
         </Entity>
         <Entity>
             <Transform x="1.5" y="1.5" z="2.25">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Cylinder radius=".02" height="4.5"/>
                     </Geometry>
@@ -443,7 +443,7 @@ export const MRSIM_LIB = {
         </Entity>
         <Entity>
             <Transform x="-1.5" y="1.5" z="2.25">
-                <StaticContact contactMaterial="TrackPart">
+                <StaticContact material="TrackPart">
                     <Geometry>
                         <Cylinder radius=".02" height="4.5"/>
                     </Geometry>
@@ -463,7 +463,7 @@ export const MRSIM_LIB = {
             <Entity name="Passage Geometry">
                 <WorldFromEntityComponent/>
                 <Polyhedron binaryModelFile="7x7DiveGate.model" part="PassageGeometry"/>
-                <StaticContact contactMaterial="-1"/>
+                <StaticContact material="-1"/>
                 <Entity name="CheckpointReference">
                     <WorldFromEntityComponent rx="1" angle="-1.570796"/>
                 </Entity>
@@ -478,50 +478,50 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="1.275" z="2.7"/>
             <Box x=".45" y="3" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="-1.275" z="2.7"/>
             <Box x=".45" y="3" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="1.275" z="2.7"/>
             <Box x="2.1" y=".45" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="-1.275" z="2.7"/>
             <Box x="2.1" y=".45" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="-1.5" y="-1.5" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
             <MeshRendererComponent material="PVCMaterial"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" y="-1.5" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
             <MeshRendererComponent material="PVCMaterial"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" y="1.5" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
             <MeshRendererComponent material="PVCMaterial"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-1.5" y="1.5" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
             <MeshRendererComponent material="PVCMaterial"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
@@ -535,7 +535,7 @@ export const MRSIM_LIB = {
             <Entity name="Passage Geometry">
                 <WorldFromEntityComponent/>
                 <Polyhedron binaryModelFile="7x7ClimbGate.model" part="PassageGeometry"/>
-                <StaticContact contactMaterial="-1"/>
+                <StaticContact material="-1"/>
                 <Entity name="CheckpointReference">
                     <WorldFromEntityComponent rx="1" angle="1.570796"/>
                 </Entity>
@@ -550,49 +550,49 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="1.2" z="2.7"/>
             <Box x=".3" y="2.7" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="-1.2" z="2.7"/>
             <Box x=".3" y="2.7" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="1.2" z="2.7"/>
             <Box x="2.1" y=".3" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="-1.2" z="2.7"/>
             <Box x="2.1" y=".3" z=".01"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="-1.35" y="-1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.35" y="-1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.35" y="1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-1.35" y="1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
     </Entity>
@@ -607,7 +607,7 @@ export const MRSIM_LIB = {
             <Entity name="Passage Geometry">
                 <WorldFromEntityComponent/>
                 <Box x="2.7" y="2.7" z=".01"/>
-                <StaticContact contactMaterial="-1"/>
+                <StaticContact material="-1"/>
                 <Entity name="CheckpointReference">
                     <WorldFromEntityComponent rx="1" angle="-1.570796"/>
                 </Entity>
@@ -618,44 +618,44 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="-1.35" z="1.35"/>
             <Box x=".01" y="2.7" z="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="GateSideMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.35" z="1.35"/>
             <Box x=".01" y="2.7" z="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="GateSideMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent y="1.35" z="1.35"/>
             <Box x="2.7" y=".01" z="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="GateSideMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="-1.35" y="-1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.35" y="-1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.35" y="1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-1.35" y="1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
@@ -663,28 +663,28 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="-1.35" z="2.7" rx="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="1.35" z="2.7" rx="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="-1.35" z="2.7" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="1.35" z="2.7" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
     </Entity>
@@ -699,7 +699,7 @@ export const MRSIM_LIB = {
             <Entity name="Passage Geometry">
                 <WorldFromEntityComponent/>
                 <Box x="2.7" y="2.7" z=".01"/>
-                <StaticContact contactMaterial="-1"/>
+                <StaticContact material="-1"/>
                 <Entity name="CheckpointReference">
                     <WorldFromEntityComponent rx="1" angle="-1.570796"/>
                 </Entity>
@@ -710,38 +710,38 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="-1.35" z="1.35"/>
             <Box x=".01" y="2.7" z="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="GateSideMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent y="1.35" z="1.35"/>
             <Box x="2.7" y=".01" z="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="GateSideMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="-1.35" y="-1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.35" y="-1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.35" y="1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-1.35" y="1.35" z="1.35"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
@@ -749,28 +749,28 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="-1.35" z="2.7" rx="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent x="1.35" z="2.7" rx="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="-1.35" z="2.7" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
 
         <Entity>
             <WorldFromEntityComponent y="1.35" z="2.7" ry="1" angle="1.570796"/>
             <Cylinder radius=".02" height="2.7"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
             <MeshRendererComponent material="PVCMaterial"/>
         </Entity>
     </Entity>
@@ -811,27 +811,27 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="0" y="0" z=".0125"/>
             <Box x="3" y="3" z=".025"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" y="0" z=".02" rx="1" angleDegrees="-90"/>
             <Cylinder radius=".02" height="3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-1.5" y="0" z=".02" rx="1" angleDegrees="-90"/>
             <Cylinder radius=".02" height="3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="0" y="1.5" z=".02" ry="1" angleDegrees="90"/>
             <Cylinder radius=".02" height="3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="0" y="-1.5" z=".02" ry="1" angleDegrees="90"/>
             <Cylinder radius=".02" height="3"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
@@ -851,13 +851,13 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x=".1"/>
             <Box x=".1" y=".2" z=".2"/>
-            <StaticContact contactMaterial="TerrainMaterial"/>
+            <StaticContact material="TerrainMaterial"/>
             <MeshRendererComponent material="GrayPaint" subdivisions="1"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-.1"/>
             <Box x=".1" y=".2" z=".2"/>
-            <StaticContact contactMaterial="TerrainMaterial"/>
+            <StaticContact material="TerrainMaterial"/>
             <MeshRendererComponent material="GrayPaint" subdivisions="1"/>
         </Entity>
     </Entity>
@@ -886,17 +886,17 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x="0" z="1.9"/>
             <Cylinder radius=".04" height="2.8"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent/>
             <Cylinder radius=".02" height="1"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent/>
             <Polyhedron binaryModelFile="Flag.model" part="Flag"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
@@ -938,7 +938,7 @@ export const MRSIM_LIB = {
     <Entity name="HalfPlanePassageRight">
         <WorldFromEntityComponent x="10"/>
         <Box x="20" y=".001" z="20"/>
-        <StaticContact contactMaterial="-1"/>
+        <StaticContact material="-1"/>
         <Entity name="CheckpointReference">
             <WorldFromEntityComponent x="1"/>
         </Entity>
@@ -950,7 +950,7 @@ export const MRSIM_LIB = {
     <Entity name="HalfPlanePassageLeft">
         <WorldFromEntityComponent x="-10"/>
         <Box x="20" y=".001" z="20"/>
-        <StaticContact contactMaterial="-1"/>
+        <StaticContact material="-1"/>
         <Entity name="CheckpointReference">
             <WorldFromEntityComponent x="-1"/>
         </Entity>
@@ -1063,13 +1063,13 @@ export const MRSIM_LIB = {
             <WorldFromEntityComponent/>
             <RenderInstance group="Pole Gate Inner Instance Group"/>
             <Cylinder radius=".02" height="2"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent/>
             <RenderInstance group="Pole Gate Padding Instance Group"/>
             <Cylinder radius=".04" height="1.9"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Macro>
     <Macro name="PoleGateBlueTape">
@@ -1114,7 +1114,7 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent/>
             <Box x="2" y=".001" z="2"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent/>
             </Entity>
@@ -1324,7 +1324,7 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent/>
             <Box x="2" y=".001" z="1.5"/>
-            <StaticContact contactMaterial="-1"/>
+            <StaticContact material="-1"/>
             <Entity name="CheckpointReference">
                 <WorldFromEntityComponent/>
             </Entity>
@@ -1478,7 +1478,7 @@ export const MRSIM_LIB = {
             <Entity name="Passage Geometry">
                 <WorldFromEntityComponent/>
                 <Polyhedron binaryModelFile="/Data/Simulations/Multirotor/Gates/Champs25Gate.model" part="PassageGeometry"/>
-                <StaticContact contactMaterial="-1"/>
+                <StaticContact material="-1"/>
     
                 <Entity name="CheckpointReference">
                     <WorldFromEntityComponent x="0" z="1.27"/>
@@ -1488,22 +1488,22 @@ export const MRSIM_LIB = {
             <Entity>
                 <WorldFromEntityComponent z=".025"/>
                 <Box x="2.54" y=".5" z=".05"/>
-                <StaticContact contactMaterial="TrackPart"/>
+                <StaticContact material="TrackPart"/>
             </Entity>
             <Entity>
                 <WorldFromEntityComponent z="2.515"/>
                 <Box x="2.54" y=".5" z=".05"/>
-                <StaticContact contactMaterial="TrackPart"/>
+                <StaticContact material="TrackPart"/>
             </Entity>
             <Entity>
                 <WorldFromEntityComponent x="1.2456" z="1.27"/>
                 <Box x=".05" y=".5" z="2.54"/>
-                <StaticContact contactMaterial="TrackPart"/>
+                <StaticContact material="TrackPart"/>
             </Entity>
             <Entity>
                 <WorldFromEntityComponent x="-1.2456" z="1.27"/>
                 <Box x=".05" y=".5" z="2.54"/>
-                <StaticContact contactMaterial="TrackPart"/>
+                <StaticContact material="TrackPart"/>
             </Entity>
         </Entity>
     </Macro>
@@ -1581,12 +1581,12 @@ export const MRSIM_LIB = {
             <Entity>
                 <WorldFromEntityComponent x="0" z="2"/>
                 <Cylinder radius=".04" height="3"/>
-                <StaticContact contactMaterial="TrackPart"/>
+                <StaticContact material="TrackPart"/>
             </Entity>
             <Entity>
                 <WorldFromEntityComponent/>
                 <Cylinder radius=".02" height="1"/>
-                <StaticContact contactMaterial="TrackPart"/>
+                <StaticContact material="TrackPart"/>
             </Entity>
         </Entity>
     </Macro>
@@ -1673,17 +1673,17 @@ export const MRSIM_LIB = {
         <Entity>
             <WorldFromEntityComponent x=".073" z=".0375"/>
             <Box x=".04" y=".25" z=".075"/>
-            <StaticContact contactMaterial="TerrainMaterial"/>
+            <StaticContact material="TerrainMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-.073" z=".0375"/>
             <Box x=".04" y=".25" z=".075"/>
-            <StaticContact contactMaterial="TerrainMaterial"/>
+            <StaticContact material="TerrainMaterial"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="0" y="-.095" z=".07"/>
             <Box x=".106" y=".06" z=".007"/>
-            <StaticContact contactMaterial="TerrainMaterial"/>
+            <StaticContact material="TerrainMaterial"/>
         </Entity>
         <Entity name="StartPosition">
             <WorldFromEntityComponent y=".03" z=".075"/>
@@ -1768,27 +1768,27 @@ export const MRSIM_LIB = {
         <Entity name="Passage Geometry">
             <WorldFromEntityComponent/>
             <Polyhedron binaryModelFile="ShadeCanopyCollision.model" part="FabricCollision"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" y="1.5" z="1"/>
             <Box x=".04" y=".04" z="2"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-1.5" y="1.5" z="1"/>
             <Box x=".04" y=".04" z="2"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="-1.5" y="-1.5" z="1"/>
             <Box x=".04" y=".04" z="2"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
         <Entity>
             <WorldFromEntityComponent x="1.5" y="-1.5" z="1"/>
             <Box x=".04" y=".04" z="2"/>
-            <StaticContact contactMaterial="TrackPart"/>
+            <StaticContact material="TrackPart"/>
         </Entity>
     </Entity>
 </Simulation>
