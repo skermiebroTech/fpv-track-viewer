@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CATALOG, DIMS, loadFixture } from './helpers.mjs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { CATALOG, DIMS, loadFixture, ROOT } from './helpers.mjs';
 import { makeClassifier } from '../convert/vd-classify.js';
 import { vdToMrsim } from '../convert/emit-mrsim.js';
 import { parseMrsim } from '../mrsim.js';
@@ -364,4 +366,29 @@ test('a neon ring raced through stays a ring, with the opening as its trigger', 
   assert.equal(last.form, 'neon-ring');
   // a hanging hoop gets no scaffolding legs
   assert.ok(!/GateLegMaterial/.test(ring));
+});
+
+// The 2026-08-20 game update renamed <StaticContact>'s attribute from
+// contactMaterial to material. A writer left on the old spelling is invisible
+// to the rest of this suite: the file still parses, still validates, and only
+// misbehaves in the game, where the checkpoint becomes an invisible wall. One
+// emitter WAS missed on the first pass (_make_led_test.mjs), so guard the whole
+// tree at once rather than trusting a per-call-site grep.
+test('no source file emits the pre-2026-08-20 StaticContact spelling', () => {
+  // built at runtime so this file does not match its own assertion
+  const OLD = `<StaticContact ${'contact'}Material=`;
+  const SKIP = new Set(['node_modules', '.git', 'venv', 'models', '__pycache__',
+    '.wrangler', 'tracks', 'ghosts']);
+  const offenders = [];
+  (function walk(dir) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (SKIP.has(e.name)) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+      if (readFileSync(p, 'utf8').includes(OLD)) offenders.push(relative(ROOT, p));
+    }
+  })(ROOT);
+  assert.deepEqual(offenders, [],
+    `still emitting the old attribute: ${offenders.join(', ')}`);
 });
