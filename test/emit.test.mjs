@@ -127,6 +127,67 @@ test('checkpoint rings sit at the gate/opening centre, not the base', () => {
     `start gate ring should be centred, not at the floor (y=${t.seq[0].pos.y})`);
 });
 
+// MRSIM writes a collider in two shapes. The nested one puts the geometry
+// inside the component and names its render material there, and it can hang
+// straight off a <Transform> rather than an <Entity> — DiveGate.xml does both
+// at once, which is why the deco dive frame used to render as nothing at all.
+// Locations use the same nesting for <Terrain>, which is a heightfield off a
+// .model and must NOT become a prim.
+const asTrack = body => `<Simulation><Entity name="Track">${body}</Entity></Simulation>`;
+const primsOf = t => t.elements.flatMap(e => e.prims || []);
+const sensorsOf = t => t.elements.flatMap(e => e.sensors || []);
+
+test('a collider nested inside <StaticContact> is read, with its own material', () => {
+  const t = parseMrsim(asTrack(
+    '<Entity name="w"><Transform x="-1.5" z="1">' +
+    '<StaticContact material="TrackPart">' +
+    '<Geometry><Box x=".01" y="8" z="2"/></Geometry>' +
+    '<StandardRendering material="GateSideMaterial"/>' +
+    '</StaticContact></Transform></Entity>'), 'nested.xml');
+  const prims = primsOf(t);
+  assert.equal(prims.length, 1);
+  assert.equal(prims[0].shape, 'box');
+  assert.equal(prims[0].material, 'GateSideMaterial');
+  assert.equal(prims[0].solid, true);
+});
+
+test('the whole DiveGate library object renders', () => {
+  const t = parseMrsim(asTrack(
+    '<Entity name="d"><Include file="/Data/Simulations/Multirotor/DiveGate.xml"/></Entity>'),
+    'dive.xml');
+  const prims = primsOf(t);
+  assert.equal(prims.length, 8, '4 panels + 4 corner pipes');
+  assert.deepEqual([...new Set(prims.map(p => p.shape))].sort(), ['box', 'cyl']);
+  assert.deepEqual([...new Set(prims.map(p => p.material))].sort(),
+    ['GateTopMaterial', 'PVCMaterial']);
+});
+
+test('a nested trigger volume is still a sensor, not a solid prim', () => {
+  const t = parseMrsim(asTrack(
+    '<Entity name="s"><Transform><StaticContact material="-1">' +
+    '<Geometry><Box x="2" y="2" z="2"/></Geometry>' +
+    '</StaticContact></Transform></Entity>'), 'sensor.xml');
+  assert.equal(primsOf(t).length, 0);
+  assert.equal(sensorsOf(t).length, 1);
+});
+
+test('a <Terrain> collider does not become a prim', () => {
+  const t = parseMrsim(asTrack(
+    '<Entity name="t"><StaticContact><Geometry>' +
+    '<Terrain binaryModelFile="X.model" bottomDistance="1"/></Geometry>' +
+    '<ContactMaterial name="TerrainMaterial"/></StaticContact></Entity>'), 'terrain.xml');
+  assert.equal(primsOf(t).length, 0);
+  assert.equal(sensorsOf(t).length, 0);
+});
+
+test('components repeat with a <ForEachTransform> that carries them directly', () => {
+  const t = parseMrsim(asTrack(
+    '<Entity name="f"><ForEachTransform x="2" count="4">' +
+    '<Box x="1" y="1" z="1"/><StaticContact material="TrackPart"/>' +
+    '</ForEachTransform></Entity>'), 'foreach.xml');
+  assert.equal(primsOf(t).length, 4);
+});
+
 test('parseMrsim resolves the ring against the checkpoint entity parent, not its own lift', () => {
   // a checkpoint whose sensor entity is lifted 2 m with a zero-offset reference
   // renders at the PARENT level (0), not at 2 — the game skips the entity's own
