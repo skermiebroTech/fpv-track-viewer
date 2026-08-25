@@ -235,6 +235,16 @@
     border-radius: var(--r-sm); cursor: pointer; }
   #editPanel input.swatch:hover { border-color: var(--accent); }
   #editPanel input.swatch::-webkit-color-swatch-wrapper { padding: 0; }
+  /* saved-colour palette: one row of clickable chips + a save button */
+  #editPanel #savedCols { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-height: 18px; align-items: center; }
+  #editPanel #savedCols .sc { width: 18px; height: 18px; border-radius: 4px;
+    border: 1px solid var(--line-2); cursor: pointer; padding: 0; }
+  #editPanel #savedCols .sc:hover { border-color: #fff; }
+  #editPanel #savedCols .none { color: var(--faint); font-size: 10.5px; }
+  #editPanel #saveCol { flex: 0 0 auto; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: 4px; width: 22px; height: 20px;
+    cursor: pointer; line-height: 1; padding: 0; }
+  #editPanel #saveCol:hover { background: var(--surface-3); border-color: var(--edit); }
   #editPanel input.swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
   #editPanel input.swatch::-moz-color-swatch { border: none; border-radius: 3px; }
   #editPanel .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
@@ -393,6 +403,16 @@
     color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
     padding: 5px 7px; font: inherit; width: 100%; }
   #builder input:hover { border-color: #46516b; }
+  /* own up/down steppers on the part cards' number fields — native spinners
+     are hidden globally and render inconsistently across browsers anyway */
+  #builder .nw { position: relative; display: flex; min-width: 0; }
+  #builder .nw input { flex: 1; min-width: 0; padding-right: 15px; }
+  #builder .nw .stp { position: absolute; right: 2px; top: 2px; bottom: 2px;
+    width: 12px; display: flex; flex-direction: column; gap: 1px; }
+  #builder .nw .stp button { flex: 1; padding: 0; border: none; border-radius: 2px;
+    background: var(--surface-3); color: var(--dim); cursor: pointer;
+    font-size: 6.5px; line-height: 1; }
+  #builder .nw .stp button:hover { background: #3a445e; color: #fff; }
   #builder input:focus { border-color: var(--accent); outline: none;
     box-shadow: 0 0 0 2px #5a8dff33; }
   #builder .parts { border-top: 1px solid var(--line-3); margin-top: 12px; padding-top: 10px; }
@@ -530,7 +550,7 @@
   </div>
   <div class="snap">
     <span>snap</span>
-    <select id="snapPos" title="position snap — gizmo drags land on this grid">
+    <select id="snapPos" title="position snap — gizmo drags land on this grid (off still steps by 0.01 m so numbers stay clean)">
       <option value="0">pos: off</option>
       <option value="0.1">0.1 m</option>
       <option value="0.25">0.25 m</option>
@@ -540,7 +560,7 @@
       <option value="5">5 m</option>
       <option value="10">10 m</option>
     </select>
-    <select id="snapRot" title="rotation snap — gizmo rotation lands on this increment">
+    <select id="snapRot" title="rotation snap — gizmo rotation lands on this increment (off still steps by 0.01 degrees so numbers stay clean)">
       <option value="0">rot: off</option>
       <option value="5">5°</option>
       <option value="15">15°</option>
@@ -586,8 +606,11 @@
   </div>
   <div id="edColorRow" class="edGroup">
     <div class="row"><label>colour</label>
-      <input id="edColor" class="swatch" type="color" value="#e67300" title="colour to apply">
+      <input id="edColor" class="swatch" type="color" value="#e67300" list="colList" title="colour to apply">
       <span class="hint flush" id="edColorTip">recolour by material</span></div>
+    <div class="row"><label title="your palette — saved colours also show as presets inside every colour picker">saved</label>
+      <div id="savedCols" title="click to use · right-click to remove"></div>
+      <button id="saveCol" title="save the current colour to the palette">＋</button></div>
     <div class="btnRow">
       <button id="edColThis">this item</button>
       <button id="edColType">all <span id="edColTypeName">type</span></button>
@@ -624,6 +647,8 @@
 
 <!-- object builder: compose a custom track object from box/cylinder parts,
      save it to the palette, and export it as a shareable components.json -->
+<!-- saved colours double as native preset swatches in every colour picker -->
+<datalist id="colList"></datalist>
 <div id="builder">
   <div class="sheet">
     <div class="bHead">
@@ -1914,8 +1939,10 @@ const snapUi = { pos: 0, rot: 0 };
 const snapPosSel = document.getElementById('snapPos');
 const snapRotSel = document.getElementById('snapRot');
 function applySnap() {
-  tc.setTranslationSnap(snapUi.pos || null);
-  tc.setRotationSnap(snapUi.rot ? snapUi.rot * DEG : null);
+  // "off" is not free-floating: a fine 0.01 m / 0.01° step keeps the panel's
+  // numbers (and the exported XML) clean without being feelable in a drag
+  tc.setTranslationSnap(snapUi.pos || 0.01);
+  tc.setRotationSnap((snapUi.rot || 0.01) * DEG);
   snapPosSel.classList.toggle('act', !!snapUi.pos);
   snapRotSel.classList.toggle('act', !!snapUi.rot);
 }
@@ -3557,6 +3584,44 @@ document.getElementById('edDel').onclick = deleteSelected;
 document.getElementById('edDup').onclick = duplicateSelected;
 document.getElementById('edToBuilder').onclick = copySelectionToBuilder;
 document.getElementById('edSetStart').onclick = () => setAsStart();
+// ---- saved colours --------------------------------------------------------
+// a small persistent palette: chips under the recolour swatch, mirrored into
+// <datalist id=colList> so every colour input (edit panel, builder parts)
+// offers the same presets natively
+let savedColors = [];
+try { savedColors = JSON.parse(localStorage.getItem('mrsim.savedColors')) || []; } catch {}
+function renderSavedColors() {
+  const box = document.getElementById('savedCols');
+  box.innerHTML = '';
+  if (!savedColors.length) {
+    const s = document.createElement('span'); s.className = 'none';
+    s.textContent = 'none yet — ＋ saves the swatch'; box.appendChild(s);
+  }
+  savedColors.forEach(hex => {
+    const b = document.createElement('button');
+    b.className = 'sc'; b.style.background = hex;
+    b.title = hex + ' — click to use, right-click to remove';
+    b.onclick = () => { document.getElementById('edColor').value = hex; };
+    b.oncontextmenu = e => { e.preventDefault();
+      savedColors = savedColors.filter(c => c !== hex); persistSavedColors(); };
+    box.appendChild(b);
+  });
+  document.getElementById('colList').innerHTML =
+    savedColors.map(c => `<option value="${c}">`).join('');
+}
+function persistSavedColors() {
+  try { localStorage.setItem('mrsim.savedColors', JSON.stringify(savedColors)); } catch {}
+  renderSavedColors();
+}
+document.getElementById('saveCol').onclick = () => {
+  const hex = document.getElementById('edColor').value;
+  if (savedColors.includes(hex)) return;
+  savedColors.push(hex);
+  while (savedColors.length > 16) savedColors.shift();
+  persistSavedColors();
+};
+renderSavedColors();
+
 document.getElementById('edColThis').onclick = () => applyColor('this');
 document.getElementById('edColType').onclick = () => applyColor('type');
 document.getElementById('edColAll').onclick = () => applyColor('all');
@@ -3966,6 +4031,23 @@ function initBuilderPreview() {
   s.add(new THREE.GridHelper(20, 20, 0x36415a, 0x1a1e28));
   const cam = new THREE.PerspectiveCamera(45, 1, 0.05, 500); cam.position.set(4, 3, 5);
   const ctrl = new OrbitControls(cam, r.domElement); ctrl.enableDamping = true; ctrl.target.set(0, 1, 0);
+  // click a part in the preview -> its card highlights in the parts list; a
+  // small movement threshold keeps orbit drags from counting as picks
+  let downX = 0, downY = 0;
+  r.domElement.addEventListener('pointerdown', e => { downX = e.clientX; downY = e.clientY; });
+  r.domElement.addEventListener('pointerup', e => {
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 4 || !BP.group) return;
+    const rect = r.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    // don't rely on a render having run: compose camera + group matrices here
+    cam.updateMatrixWorld();
+    BP.group.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, cam);
+    const hit = ray.intersectObjects(BP.group.children, true)
+      .find(h => h.object.userData.partIdx !== undefined);
+    if (hit) selectBuilderPart(hit.object.userData.partIdx);
+  });
   Object.assign(BP, { renderer: r, scene: s, camera: cam, controls: ctrl });
 }
 function sizeBuilderPreview() {
@@ -3993,6 +4075,10 @@ function builderPreviewGroup() {
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
     const data = parseMrsim(xml, 'builder.xml');
     group = buildPreviewGroup(data, doc);
+    // each part emits exactly one prim, in order, so the non-sensor meshes map
+    // back to def.parts by position — that index is what preview picking reads
+    let pi = 0;
+    group.children.forEach(o => { if (o.isMesh && o.material !== sensorMat) o.userData.partIdx = pi++; });
   }
   if (def.cp === 'pass') addCheckpointVis(group, def);
   return group;
@@ -4106,16 +4192,21 @@ function renderParts() {
   };
   const TAG = { box: 'box', cyl: 'cylinder', sphere: 'sphere',
     pyramid: 'pyramid', wedge: 'wedge', cone: 'cone', mesh: 'mesh' };
+  // every live number field gets explicit up/down steppers (stepUp/stepDown
+  // via the delegated click handler) so values can be nudged mouse-only
+  const num = attrs => `<span class="nw"><input type="number" ${attrs}><span class="stp">
+    <button data-s="1" tabindex="-1" title="step up">▲</button>
+    <button data-s="-1" tabindex="-1" title="step down">▼</button></span></span>`;
   host.innerHTML = parts.map((p, i) => {
     const shape = normShape(p.shape, p), d = p.dims, pos = p.pos, rot = p.rot;
     const size = `<span class="gl">size</span>` + SIZE_FIELDS[shape].map((f, k) => f
-      ? `<input data-f="${f[0]}" type="number" step="${f[0] === 'd0' && (shape === 'cyl' || shape === 'cone' || shape === 'sphere') ? 0.05 : 0.1}"
-           min="0.01" value="${fv(d[k])}" title="${f[1]}">`
+      ? num(`data-f="${f[0]}" step="${f[0] === 'd0' && (shape === 'cyl' || shape === 'cone' || shape === 'sphere') ? 0.05 : 0.1}"
+           min="0.01" value="${fv(d[k])}" title="${f[1]}"`)
       : `<input type="number" value="" disabled style="opacity:.25" title="n/a">`).join('');
-    return `<div class="part" data-i="${i}">
+    return `<div class="part${i === builderState.selPart ? ' sel' : ''}" data-i="${i}">
       <div class="ph">
         <span class="tag" title="${shape === 'mesh' ? `imported mesh · ${(p.tris || []).length / 3} triangles` : ''}">${TAG[shape]}${shape === 'mesh' ? ` ▲${Math.round((p.tris || []).length / 3)}` : ''}</span>
-        <input class="col" type="color" value="${p.color || '#cccccc'}" title="colour">
+        <input class="col" type="color" value="${p.color || '#cccccc'}" list="colList" title="colour">
         <button class="glow${p.glow ? ' on' : ''}" title="LED / neon: light this part up instead of shading it (never a collider)">◉</button>
         <input class="pnm" type="text" maxlength="24" spellcheck="false"
           value="${escapeHtml(p.name || '')}" placeholder="part name (optional)"
@@ -4125,13 +4216,13 @@ function renderParts() {
       <div class="grid3">
         ${size}
         <span class="gl">pos</span>
-        <input data-f="p0" type="number" step="0.1" value="${fv(pos[0])}" title="x">
-        <input data-f="p1" type="number" step="0.1" value="${fv(pos[1])}" title="y">
-        <input data-f="p2" type="number" step="0.1" value="${fv(pos[2])}" title="z (up)">
+        ${num(`data-f="p0" step="0.1" value="${fv(pos[0])}" title="x"`)}
+        ${num(`data-f="p1" step="0.1" value="${fv(pos[1])}" title="y"`)}
+        ${num(`data-f="p2" step="0.1" value="${fv(pos[2])}" title="z (up)"`)}
         <span class="gl">rot°</span>
-        <input data-f="r0" type="number" step="5" value="${fv(rot[0])}" title="yaw">
-        <input data-f="r1" type="number" step="5" value="${fv(rot[1])}" title="pitch">
-        <input data-f="r2" type="number" step="5" value="${fv(rot[2])}" title="roll">
+        ${num(`data-f="r0" step="5" value="${fv(rot[0])}" title="yaw"`)}
+        ${num(`data-f="r1" step="5" value="${fv(rot[1])}" title="pitch"`)}
+        ${num(`data-f="r2" step="5" value="${fv(rot[2])}" title="roll"`)}
       </div>
     </div>`;
   }).join('');
@@ -4448,8 +4539,21 @@ document.getElementById('bParts').addEventListener('input', e => {
 document.getElementById('bParts').addEventListener('click', e => {
   if (!builderState) return;
   const row = e.target.closest('.part'); if (!row) return;
+  const stp = e.target.closest('.stp button');
+  if (stp) {   // stepper: nudge the field, then let the input handler commit it
+    const inp = stp.closest('.nw').querySelector('input');
+    // not stepUp/stepDown: those align to the min attribute's grid (1 -> 1.01)
+    const step = parseFloat(inp.step) || 1;
+    let v = (parseFloat(inp.value) || 0) + step * +stp.dataset.s;
+    const min = parseFloat(inp.min);
+    if (!isNaN(min)) v = Math.max(min, v);
+    inp.value = +v.toFixed(3);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
   if (e.target.classList.contains('rm')) {
     builderState.def.parts.splice(+row.dataset.i, 1);
+    builderState.selPart = null;
   } else if (e.target.classList.contains('glow')) {
     // a glowing part is a light source, not structure: MRSIM would collide
     // against the polyhedron's hull, so a neon ring you fly through has to
@@ -4457,9 +4561,18 @@ document.getElementById('bParts').addEventListener('click', e => {
     const part = builderState.def.parts[+row.dataset.i]; if (!part) return;
     part.glow = !part.glow;
     part.solid = part.glow ? false : undefined;
-  } else return;
+  } else { selectBuilderPart(+row.dataset.i); return; }
   renderParts(); updateBuilderPreview();
 });
+// highlight one part card (clicked directly, or picked in the 3D preview)
+function selectBuilderPart(i) {
+  if (!builderState) return;
+  builderState.selPart = i;
+  document.querySelectorAll('#bParts .part').forEach(el =>
+    el.classList.toggle('sel', +el.dataset.i === i));
+  document.querySelector(`#bParts .part[data-i="${i}"]`)
+    ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
 document.getElementById('bSave').onclick = saveComponent;
 document.getElementById('bExportOne').onclick = () => {
   if (!builderState) return;
