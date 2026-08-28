@@ -1914,8 +1914,9 @@ tc.addEventListener('dragging-changed', e => {
 tc.addEventListener('objectChange', () => {
   if (tc.mode === 'scale') {
     const sc = proxy.scale, s0 = editUi.startScale;
-    if (isFreeSensor(editUi.selectedName)) {
-      // bare sensor: per-axis scale is allowed (it folds into the <Box> dims)
+    if (isFreeSensor(editUi.selectedName) || primBlockEls(editUi.selectedName)) {
+      // bare sensor / prim block: per-axis scale is allowed (it folds into the
+      // <Box> dims or the polyhedron vertex data)
       const cl = v => Math.min(s0 * 20, Math.max(s0 * 0.05, v));
       sc.set(cl(sc.x), cl(sc.y), cl(sc.z));
     } else {
@@ -2036,6 +2037,8 @@ function setPrimary(name, silent = false) {
     ? `moving <b>${editUi.selection.length}</b> objects together · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl</b>-click adds/removes · <b>Ctrl+G</b> group`
     : isFreeSensor(name)
       ? 'sensor box: <b>g</b> move · <b>r</b> rotate (any axis) · <b>s</b> scale (per-axis) · <b>w×h×d</b> fields'
+      : primBlockEls(name)
+      ? 'prim block: <b>g</b> move · <b>r</b> rotate (any axis) · <b>s</b> scale (per-axis)'
       : 'drag gizmo or type values · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl</b>-click multi · <b>Ctrl-Z</b> undo';
   refreshEditPanelNumbers();
   renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow(); refreshStartRow();
@@ -2115,6 +2118,48 @@ function isFreeSensor(name) {
   const el = ei >= 0 ? currentData.elements[ei] : null;
   return !!el && !(el.prims || []).some(p => p.solid);
 }
+// A PRIM BLOCK = a placed object whose entire subtree is inline prim geometry
+// in unrotated part frames — no library Include/Instance (the engine can only
+// instance those uniformly), no Checkpoint (the bare-sensor path owns those).
+// Everything about its size lives in this document, so per-axis scale can fold
+// straight into the part dims / vertex data, the same trick the sensor <Box>
+// uses. A cylinder folds z into height and a circular x=y into radius, a
+// sphere folds a uniform stretch into radius; uneven stretches bake them into
+// an elliptical-prism / ellipsoid <Polyhedron>.
+// Returns {boxes, cyls, spheres, polys, wfs} or null.
+function primBlockEls(name) {
+  const rec = editState?.index.get(name);
+  if (!rec?.trEl) return null;
+  const boxes = [], cyls = [], spheres = [], polys = [], wfs = [];
+  let ok = true;
+  const walk = el => {
+    for (const c of el.children || []) {
+      const t = c.tagName;
+      if (t === 'Include' || t === 'Instance' || t === 'Checkpoint') { ok = false; return; }
+      if (t === 'WorldFromEntityComponent') {
+        // a rotated part frame would shear under non-uniform scale
+        if (c.getAttribute('angleDegrees') || c.getAttribute('angle')) { ok = false; return; }
+        wfs.push(c);
+      } else if (t === 'Box') boxes.push(c);
+      else if (t === 'Cylinder') cyls.push(c);
+      else if (t === 'Sphere') spheres.push(c);
+      else if (t === 'Polyhedron') polys.push(c);
+      walk(c);
+      if (!ok) return;
+    }
+  };
+  walk(rec.trEl);
+  return ok && (boxes.length || cyls.length || spheres.length || polys.length)
+    ? { boxes, cyls, spheres, polys, wfs } : null;
+}
+// the <Box> the w×h×d fields edit: the sensor trigger, or a single-box prim block
+function whBoxEl(name) {
+  const sb = sensorBoxEl(name);
+  if (sb) return sb;
+  const prim = primBlockEls(name);
+  return prim && prim.boxes.length === 1 && !prim.polys.length && !prim.cyls.length
+    && !prim.spheres.length ? prim.boxes[0] : null;
+}
 // write a rotation onto a <Transform> as MRSIM axis-angle. Pure yaw keeps the
 // clean rz="-1"/angleDegrees form (what the rest of the pipeline emits); any
 // other tilt writes the full rx/ry/rz axis + angle that localMatrixDom reads.
@@ -2137,22 +2182,27 @@ function writeRotation(tr, q) {
   }
 }
 function refreshWHRow() {
-  const box = editUi.selectedName ? sensorBoxEl(editUi.selectedName) : null;
+  const box = editUi.selectedName ? whBoxEl(editUi.selectedName) : null;
   document.getElementById('edWHRow').style.display = box ? 'flex' : 'none';
   if (box) {
+    // solid blocks may be far thinner than a sensor is allowed to be
+    const solid = !sensorBoxEl(editUi.selectedName);
+    document.getElementById('edW').min = solid ? 0.05 : 0.5;
+    document.getElementById('edH').min = solid ? 0.05 : 0.5;
     document.getElementById('edW').value = parseFloat(box.getAttribute('x') || 3).toFixed(1);
     document.getElementById('edH').value = parseFloat(box.getAttribute('z') || 2.5).toFixed(1);
     document.getElementById('edD').value = parseFloat(box.getAttribute('y') || 0.3).toFixed(2);
   }
 }
 // w = Box x, h = Box z (vertical), d = Box y (through-thickness). All three axes
-// of the trigger volume are editable directly on the <Box>.
+// are editable directly on the <Box> — the sensor trigger, or a single-box prim.
 for (const [inputId, attr, mn] of [['edW', 'x', 0.5], ['edH', 'z', 0.5], ['edD', 'y', 0.02]]) {
   document.getElementById(inputId).addEventListener('change', e => {
-    const box = sensorBoxEl(editUi.selectedName);
+    const box = whBoxEl(editUi.selectedName);
     if (!box) return;
+    const lo = sensorBoxEl(editUi.selectedName) ? mn : 0.02;
     pushUndoOps([attrsOp(box)]);
-    box.setAttribute(attr, Math.max(mn, parseFloat(e.target.value) || 1).toFixed(2));
+    box.setAttribute(attr, Math.max(lo, parseFloat(e.target.value) || 1).toFixed(2));
     editState.dirty = true;
     rebuildFromDoc();
   });
@@ -2295,6 +2345,7 @@ function commitOne(name, restWorld, world, ops) {
     e[2] / sx, e[6] / sy, e[10] / sz, 0,
     0, 0, 0, 1));
   const box = isFreeSensor(name) ? sensorBoxEl(name) : null;
+  const prim = box ? null : primBlockEls(name);
   ops.push(...(box ? [attrsOp(tr), attrsOp(box)] : [attrsOp(tr)]));
   setTransformPos(tr, e[12], e[13], e[14]);
   writeRotation(tr, q);                                 // full axis-angle (any tilt)
@@ -2307,6 +2358,87 @@ function commitOne(name, restWorld, world, ops) {
       box.setAttribute('x', cd(parseFloat(box.getAttribute('x') || 1) * sx / s0).toFixed(2));
       box.setAttribute('y', cd(parseFloat(box.getAttribute('y') || 0.3) * sy / s0).toFixed(2));
       box.setAttribute('z', cd(parseFloat(box.getAttribute('z') || 1) * sz / s0).toFixed(2));
+    }
+    if (Math.abs(s0 - 1) > 2e-3) tr.setAttribute('s', s0.toFixed(3)); else tr.removeAttribute('s');
+  } else if (prim) {
+    // prim block: per-axis size folds into every part — box dims and polyhedron
+    // vertices stretch, part origins move with the stretch — while the wrapper
+    // keeps the uniform scale it started the drag with
+    const s0 = new THREE.Vector3().setFromMatrixColumn(restWorld, 0).length() || 1;
+    const r = [sx / s0, sy / s0, sz / s0];
+    if (r.some(v => Math.abs(v - 1) > 2e-3)) {
+      const cd = v => Math.min(40, Math.max(0.02, v));
+      for (const wf of prim.wfs) {
+        ops.push(attrsOp(wf));
+        const v = wf.getAttribute('v');
+        if (v) {                                   // fold v="x, y, z" into x/y/z attrs
+          const pn = v.split(',').map(parseFloat);
+          wf.removeAttribute('v');
+          ['x', 'y', 'z'].forEach((a, i) => { if (Math.abs(pn[i] || 0) > 5e-4) wf.setAttribute(a, String(pn[i])); });
+        }
+        ['x', 'y', 'z'].forEach((a, i) => { if (wf.getAttribute(a))
+          wf.setAttribute(a, (parseFloat(wf.getAttribute(a)) * r[i]).toFixed(3)); });
+      }
+      for (const b of prim.boxes) {
+        ops.push(attrsOp(b));
+        ['x', 'y', 'z'].forEach((a, i) =>
+          b.setAttribute(a, cd((parseFloat(b.getAttribute(a)) || 0.5) * r[i]).toFixed(3)));
+      }
+      for (const c of prim.cyls) {
+        const rad = parseFloat(c.getAttribute('radius')) || 0.1;
+        const h = parseFloat(c.getAttribute('height')) || 1;
+        if (Math.abs(r[0] - r[1]) < 2e-3) {
+          // circular stretch: stays a native <Cylinder>
+          ops.push(attrsOp(c));
+          c.setAttribute('radius', cd(rad * r[0]).toFixed(3));
+          c.setAttribute('height', cd(h * r[2]).toFixed(3));
+        } else {
+          // uneven x/y: bake into an elliptical <Polyhedron> prism (like the
+          // builder's cone); it keeps stretching per-axis from here on
+          const poly = ellipsePrismEl(editState.doc, cd(rad * r[0]), cd(rad * r[1]), cd(h * r[2]));
+          ops.push({ type: 'remove', node: c, parent: c.parentNode, next: c.nextSibling },
+                   { type: 'insert', node: poly });
+          c.parentNode.insertBefore(poly, c);
+          c.parentNode.removeChild(c);
+          const mrc = [...poly.parentNode.children].find(k => k.tagName === 'MeshRendererComponent');
+          if (mrc && mrc.getAttribute('subdivisions') !== '1') {
+            ops.push(attrsOp(mrc));
+            mrc.setAttribute('subdivisions', '1');   // the verts are already tessellated
+          }
+        }
+      }
+      for (const s of prim.spheres) {
+        const rad = parseFloat(s.getAttribute('radius')) || 0.5;
+        if (Math.abs(r[0] - r[1]) < 2e-3 && Math.abs(r[0] - r[2]) < 2e-3) {
+          // uniform stretch: stays a native <Sphere>
+          ops.push(attrsOp(s));
+          s.setAttribute('radius', cd(rad * r[0]).toFixed(3));
+        } else {
+          // uneven: bake into an ellipsoid <Polyhedron>
+          const poly = ellipsoidEl(editState.doc, cd(rad * r[0]), cd(rad * r[1]), cd(rad * r[2]));
+          ops.push({ type: 'remove', node: s, parent: s.parentNode, next: s.nextSibling },
+                   { type: 'insert', node: poly });
+          s.parentNode.insertBefore(poly, s);
+          s.parentNode.removeChild(s);
+          const mrc = [...poly.parentNode.children].find(k => k.tagName === 'MeshRendererComponent');
+          if (mrc && mrc.getAttribute('subdivisions') !== '1') {
+            ops.push(attrsOp(mrc));
+            mrc.setAttribute('subdivisions', '1');   // the verts are already tessellated
+          }
+        }
+      }
+      for (const p of prim.polys) {
+        const verts = [...p.children].find(c => c.tagName === 'Vertices');
+        if (!verts) continue;
+        ops.push({ type: 'text', el: verts, text: verts.textContent });
+        const nums = verts.textContent.split(/[\s,]+/).filter(Boolean).map(parseFloat);
+        const rows = [];
+        for (let i = 0; i + 2 < nums.length; i += 3)
+          rows.push([nums[i] * r[0], nums[i + 1] * r[1], nums[i + 2] * r[2]]);
+        verts.textContent = '\n' + rows.map((row, i) =>
+          '            ' + row.map(v => (+v.toFixed(4)).toString()).join(', ') +
+          (i < rows.length - 1 ? ',' : '')).join('\n') + '\n        ';
+      }
     }
     if (Math.abs(s0 - 1) > 2e-3) tr.setAttribute('s', s0.toFixed(3)); else tr.removeAttribute('s');
   } else {
@@ -2994,6 +3126,51 @@ function polyhedronFromRows(doc, verts, tris) {
 }
 function mkPolyhedronEl(doc, shape, dims) {
   const { verts, tris } = polyGeo(shape, dims);
+  return polyhedronFromRows(doc, verts, tris);
+}
+// elliptical prism: what a <Cylinder> becomes when per-axis scale makes its
+// cross-section non-circular. Origin-centred like the native prim (z spans
+// -h/2..+h/2), outward CCW winding, 24 segments (the native cylinder renders
+// at 10-12 subdivisions, so this matches its roundness)
+function ellipsePrismEl(doc, rx, ry, h) {
+  const N = 24, hh = h / 2, verts = [], tris = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2, x = rx * Math.cos(a), y = ry * Math.sin(a);
+    verts.push([x, y, -hh], [x, y, hh]);           // bottom 2i, top 2i+1
+  }
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    tris.push([2 * i, 2 * j, 2 * j + 1], [2 * i, 2 * j + 1, 2 * i + 1]);  // side
+    if (i > 1) {
+      tris.push([0, 2 * i, 2 * (i - 1)]);          // bottom fan (faces -z)
+      tris.push([1, 2 * (i - 1) + 1, 2 * i + 1]);  // top fan (faces +z)
+    }
+  }
+  return polyhedronFromRows(doc, verts, tris);
+}
+// ellipsoid: what a <Sphere> becomes when per-axis scale makes it non-round.
+// Lat-long tessellation, outward CCW winding; 24 segments to match the
+// elliptical prism and the native sphere's subdivisions=24
+function ellipsoidEl(doc, rx, ry, rz) {
+  const N = 24, R = 12;                            // segments, rings between poles
+  const verts = [[0, 0, rz], [0, 0, -rz]];         // top pole 0, bottom pole 1
+  for (let k = 1; k <= R; k++) {
+    const phi = Math.PI * k / (R + 1), sp = Math.sin(phi), cp = Math.cos(phi);
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      verts.push([rx * sp * Math.cos(a), ry * sp * Math.sin(a), rz * cp]);
+    }
+  }
+  const ring = k => 2 + (k - 1) * N;               // index of ring k's first vertex
+  const tris = [];
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    tris.push([0, ring(1) + i, ring(1) + j]);      // top cap
+    tris.push([1, ring(R) + j, ring(R) + i]);      // bottom cap (reversed)
+    for (let k = 1; k < R; k++)                    // band between ring k and k+1
+      tris.push([ring(k) + i, ring(k + 1) + i, ring(k + 1) + j],
+                [ring(k) + i, ring(k + 1) + j, ring(k) + j]);
+  }
   return polyhedronFromRows(doc, verts, tris);
 }
 // an imported-mesh part: its stored verts scaled per-axis by dims (the part's
