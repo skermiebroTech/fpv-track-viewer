@@ -68,14 +68,14 @@
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
-  #btnTrk, #btnDownload, #btnBrowse, #btnTheme {
+  #btnTrk, #btnBrowse, #btnTheme {
     flex: 0 0 auto; background: var(--green); color: #fff;
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 12px; font-size: 13px; font-weight: 800; cursor: pointer;
   }
-  #btnDownload, #btnBrowse, #btnTheme { background: var(--card); color: var(--green); }
+  #btnBrowse, #btnTheme { background: var(--card); color: var(--green); }
   #btnTheme { padding: 7px 9px; }
-  #btnTrk:hover, #btnDownload:hover, #btnBrowse:hover, #btnTheme:hover { filter: brightness(1.12); }
+  #btnTrk:hover, #btnBrowse:hover, #btnTheme:hover { filter: brightness(1.12); }
 
   /* ---- Community track browser ---- */
   #browser {
@@ -257,7 +257,7 @@
     #header .btxt { white-space: nowrap; }
     #trackSelect { flex: 1 1 130px; min-width: 0; margin-left: 0;
       padding: 8px 6px; font-size: 12px; }
-    #btnTrk, #btnDownload, #btnBrowse, #btnTheme { padding: 8px 10px; }
+    #btnTrk, #btnBrowse, #btnTheme { padding: 8px 10px; }
 
     #panel { left: 10px; width: min(300px, calc(100vw - 20px)); }
     #materials { right: 10px; width: min(220px, calc(100vw - 20px)); }
@@ -286,7 +286,6 @@
   <select id="trackSelect"></select>
   <button id="btnBrowse" title="Search and view official VD tracks (community index)"><span class="btxt">Browse</span></button>
   <button id="btnTrk" title="View a VD .trk or MRSIM .xml track file"><span class="btxt">Open track</span></button>
-  <button id="btnDownload" title="Download the displayed track as a VD .trk file" style="display:none"><span class="btxt">Download .trk</span></button>
   <button id="btnTheme" title="Toggle dark mode">dark</button>
   <input type="file" id="trkFile" accept=".trk,.xml" hidden>
 </div>
