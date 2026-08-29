@@ -1,4 +1,21 @@
 .claude/
+# The FPV Track Editor and the VD <-> MRSIM converter have moved to their own
+# repo (~/Documents/mrsim-editor). Files kept locally so ad-hoc round-trip work
+# still runs, but never published from this repo.
+mrsim-test.html
+convert/
+convert.js
+convert-cli.mjs
+# Converter tests moved with the converter; keep local runs available but
+# ignored here.
+test/emit.test.mjs
+test/fitting.test.mjs
+test/mrsim-to-vd.test.mjs
+test/normalize.test.mjs
+test/regression.test.mjs
+test/space.test.mjs
+test/validate.test.mjs
+
 # unpublished tracks stay local-only
 tracks/2026-au-nats-v3-polished.json
 tracks/aus-nats.json

@@ -1,8 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node --test 'test/*.test.mjs'",
-    "convert": "node convert-cli.mjs"
+    "test": "node --test 'test/*.test.mjs'"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.9.10",
