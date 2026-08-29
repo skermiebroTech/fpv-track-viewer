@@ -17,12 +17,6 @@ test/regression.test.mjs
 test/space.test.mjs
 test/validate.test.mjs
 
-# Game-asset extraction tooling — kept locally for regenerating mrsim-lib.js
-# and models/ after a game update, but not shipped in the public repo.
-export_models.py
-export_mrsim_lib.py
-export_mrsim_models.py
-
 # unpublished tracks stay local-only
 tracks/2026-au-nats-v3-polished.json
 tracks/aus-nats.json
