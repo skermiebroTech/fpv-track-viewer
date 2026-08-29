@@ -1,8 +1,9 @@
 .claude/
 # The FPV Track Editor and the VD <-> MRSIM converter have moved to their own
 # repo (~/Documents/mrsim-editor). Files kept locally so ad-hoc round-trip work
-# still runs, but never published from this repo.
-mrsim-test.html
+# still runs, but never published from this repo. The exception is
+# mrsim-test.html — the shipped copy is now a redirect stub for old bookmarks
+# and is tracked; do local editor work in ~/Documents/mrsim-editor instead.
 convert/
 convert.js
 convert-cli.mjs
