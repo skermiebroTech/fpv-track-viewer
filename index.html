@@ -68,19 +68,14 @@
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
-  #btnTrk, #btnConvert, #btnDownload, #btnBrowse, #btnTheme {
+  #btnTrk, #btnDownload, #btnBrowse, #btnTheme {
     flex: 0 0 auto; background: var(--green); color: #fff;
     border: 2px solid var(--green); border-radius: 8px;
     padding: 7px 12px; font-size: 13px; font-weight: 800; cursor: pointer;
   }
-  #btnConvert, #btnDownload, #btnBrowse, #btnTheme { background: var(--card); color: var(--green); }
+  #btnDownload, #btnBrowse, #btnTheme { background: var(--card); color: var(--green); }
   #btnTheme { padding: 7px 9px; }
-  #btnTrk:hover, #btnConvert:hover, #btnDownload:hover, #btnBrowse:hover, #btnTheme:hover { filter: brightness(1.12); }
-  #convEnv {
-    flex: 0 0 auto; max-width: 170px; background: var(--card); color: var(--ink);
-    border: 2px solid var(--line); border-radius: 8px;
-    padding: 7px 6px; font-size: 12px; font-weight: 600; cursor: pointer;
-  }
+  #btnTrk:hover, #btnDownload:hover, #btnBrowse:hover, #btnTheme:hover { filter: brightness(1.12); }
 
   /* ---- Community track browser ---- */
   #browser {
@@ -115,35 +110,6 @@
     padding: 8px 2px 0; }
   #brLoadAll { margin-top: 8px; }
   #brLoadAll:disabled { opacity: .6; cursor: default; }
-
-  /* ---- Conversion report ---- */
-  #convReport {
-    display: none; position: absolute; z-index: 16;
-    top: calc(var(--headerH, 64px) + 14px); left: 50%; transform: translateX(-50%);
-    width: min(460px, calc(100vw - 32px));
-    flex-direction: column;
-    max-height: calc(100dvh - var(--headerH, 64px) - 46px);
-  }
-  #convReport.open { display: flex; }
-  #convReport h2 { display: flex; align-items: center; justify-content: space-between; }
-  #cvClose { border: none; background: none; color: var(--muted); font-size: 18px;
-    cursor: pointer; line-height: 1; padding: 0 2px; font-weight: 700; }
-  #cvClose:hover { color: var(--red); }
-  #cvBody { overflow-y: auto; font-size: 13px; }
-  #cvBody .cvTitle { font-weight: 800; margin-bottom: 8px; }
-  #cvBody .cvBadge { display: inline-block; border-radius: 6px; padding: 2px 8px;
-    font-size: 11.5px; font-weight: 800; letter-spacing: .5px; margin-left: 6px; }
-  #cvBody .cvBadge.ok { background: var(--green); color: #fff; }
-  #cvBody .cvBadge.bad { background: var(--red); color: #fff; }
-  #cvBody .cvGrid { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px;
-    margin: 6px 0 10px; }
-  #cvBody .cvGrid b { text-align: right; color: var(--green); font-weight: 800; }
-  #cvBody h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px;
-    color: var(--green); font-style: italic; margin: 10px 0 4px; font-weight: 900; }
-  #cvBody ul { margin: 0 0 6px; padding-left: 18px; }
-  #cvBody li { margin: 2px 0; }
-  #cvBody li.err { color: var(--red); font-weight: 700; }
-  #cvBody .cvNote { color: var(--muted); font-size: 12px; margin-top: 6px; }
 
   /* ---- Cards ---- */
   .card {
@@ -291,8 +257,7 @@
     #header .btxt { white-space: nowrap; }
     #trackSelect { flex: 1 1 130px; min-width: 0; margin-left: 0;
       padding: 8px 6px; font-size: 12px; }
-    #btnTrk, #btnConvert, #btnDownload, #btnBrowse, #btnTheme { padding: 8px 10px; }
-    #convEnv { max-width: 96px; font-size: 11px; padding: 8px 4px; }
+    #btnTrk, #btnDownload, #btnBrowse, #btnTheme { padding: 8px 10px; }
 
     #panel { left: 10px; width: min(300px, calc(100vw - 20px)); }
     #materials { right: 10px; width: min(220px, calc(100vw - 20px)); }
@@ -322,11 +287,6 @@
   <button id="btnBrowse" title="Search and view official VD tracks (community index)"><span class="btxt">Browse</span></button>
   <button id="btnTrk" title="View a VD .trk or MRSIM .xml track file"><span class="btxt">Open track</span></button>
   <button id="btnDownload" title="Download the displayed track as a VD .trk file" style="display:none"><span class="btxt">Download .trk</span></button>
-  <!-- converter kept in the DOM (still reachable via window.convertCurrent) but
-       hidden from the header — flip these back to show it again -->
-  <select id="convEnv" title="Environment for the converted track" style="display:none"></select>
-  <button id="btnConvert" title="Convert the displayed track to the other sim's format and download it (VD ⇄ MRSIM)" style="display:none">⇄<span class="btxt"> Convert</span></button>
-  <button id="btnEditor" title="FPV Track Editor — place MRSIM gates and checkpoints, edit the lap, import VD or MRSIM tracks" onclick="location.href='mrsim-test.html'"><span class="btxt">Editor</span></button>
   <button id="btnTheme" title="Toggle dark mode">dark</button>
   <input type="file" id="trkFile" accept=".trk,.xml" hidden>
 </div>
@@ -425,11 +385,6 @@
   <b>Drop</b> a VD .trk or MRSIM .xml anywhere
 </div>
 
-<div id="convReport" class="card">
-  <h2><span>Conversion report</span><button id="cvClose" title="Close (Esc)">×</button></h2>
-  <div id="cvBody"></div>
-</div>
-
 <div id="browser" class="card">
   <h2><span>Official VD tracks</span><button id="brClose" title="Close (Esc)">×</button></h2>
   <div id="brBar">
@@ -493,16 +448,7 @@
 
     "./trk.js": "./trk.js?v=11",
     "./mrsim.js": "./mrsim.js?v=12",
-    "./mrsim-lib.js": "./mrsim-lib.js?v=6",
-    "./convert.js": "./convert.js?v=9",
-    "./convert/index.js": "./convert/index.js?v=2",
-    "./convert/space.js": "./convert/space.js?v=2",
-    "./convert/mapping.js": "./convert/mapping.js?v=2",
-    "./convert/vd-classify.js": "./convert/vd-classify.js?v=2",
-    "./convert/vd-normalize.js": "./convert/vd-normalize.js?v=2",
-    "./convert/emit-mrsim.js": "./convert/emit-mrsim.js?v=2",
-    "./convert/mrsim-to-vd.js": "./convert/mrsim-to-vd.js?v=2",
-    "./convert/validate.js": "./convert/validate.js?v=2"
+    "./mrsim-lib.js": "./mrsim-lib.js?v=6"
   }
 }
 </script>

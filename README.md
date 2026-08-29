@@ -42,17 +42,6 @@ official 2D layout poster), **2022 Mission Foods Australian Drone Nationals**,
   [bolagnaise/vdrone-tracks](https://github.com/bolagnaise/vdrone-tracks);
   the AES-encrypted list is decoded client-side, downloads come straight
   from VelociDrone's public API).
-- **⇄ Convert** — convert the displayed track to the other sim's format and
-  download it: MRSIM `.xml` → VelociDrone `.trk` (encrypted, ready to import
-  in-game) or VelociDrone → MRSIM `.xml`. The environment selector next to
-  the button picks the target scene (Empty Scene Day/Night… for VD; Empty
-  Grass World / Baylands Park / Hardesty BMX for MRSIM).
-- **Editor** — the **FPV Track Editor**, a full 3D MRSIM track editor (opens
-  `mrsim-test.html`): place any MRSIM object from a palette, edit the lap /
-  checkpoint order, move-rotate-scale with a gizmo, and import a VelociDrone
-  `.trk`/`.json` or MRSIM `.xml` to edit and re-export. See
-  [FPV Track Editor](#fpv-track-editor).
-
 ## Human world-record line
 
 Alongside the computed line, the viewer can overlay a **real human racing
@@ -203,159 +192,6 @@ can decode the real meshes locally into `models/mrsim/` with
 overlay then makes the viewer prefer them on your own machine only. See
 [Assets & attribution](#assets--attribution).
 
-## FPV Track Editor
-
-The **Editor** button (top-right of the viewer) opens `mrsim-test.html`, the
-**FPV Track Editor** — a standalone 3D MRSIM track editor. It renders gates,
-flags, mat and terrain from the real decoded MRSIM meshes (falling back to
-collision primitives), and while it is MRSIM-native it can import either sim's
-tracks:
-
-- **Palette** — place any MRSIM library object: 5×5 / 7×6 / Champs gates,
-  start/finish, dive / climb / corner gates, hurdles, half-plane passages,
-  flags, towers, launch stands, mat and custom sensor boxes. Objects marked ◉
-  carry a checkpoint and auto-join the lap when placed; ▫ objects are scenery.
-  Click a palette entry, then click the ground to drop it (hold shift to place
-  several). A translucent **3D ghost of the actual object** follows the cursor
-  while placing, so you see exactly what you're dropping. Hover a palette entry
-  for a live 3D thumbnail of the object.
-- **Track objects (VD)** — a second palette section with the objects
-  the converter emits, which MRSIM's own library has no equivalent for: the
-  true-size 3.2 m VD race gate and start/finish gate, the 4 m feather flag
-  with its one-sided pole-side pass, the MGP hurdle panel, upright and dive
-  checkpoint panes, net panels and stretch blocks. They carry the converter's
-  own material names, so one dropped next to a converted object matches it —
-  which is what you want when hand-fixing a conversion.
-- **LED / neon** — a third palette section of glowing objects: neon ring,
-  square, triangle, arch, corner, LED bar, and a *neon ring + checkpoint* that
-  races like a gate. MRSIM ships no light-emitting placeable, only a
-  light-emitting **material** — the one the drone's own arm LEDs use
-  (`RaceLEDs.xml` → `DroneRenderingMaterials.xml` `LEDLighting`, a `PBREmissive`
-  with an HDR `emissive` uniform). These objects are tube runs of ordinary
-  cylinders painted with exactly that, so they glow in-game. They are never
-  colliders (a hoop's collision hull would be a wall across the opening), and
-  the **colour** picker recolours them while keeping the glow. The same shapes
-  are what a converted VelociDrone neon object becomes — see
-  [`convert/neon.js`](convert/neon.js).
-- **＋ Build / manage objects** — the object builder (bottom of the palette)
-  lets you compose your **own** track object from box / cylinder parts — each
-  with a size, offset, rotation and colour — plus an optional fly-through
-  checkpoint whose **ring position and crossing direction** (yaw / pitch / roll)
-  you can aim, shown live in the preview. A 3D preview updates as you edit. Saved
-  objects appear in a **custom** section of the palette and place exactly like
-  the built-ins (the placed object is self-contained XML, so exported tracks
-  load in MRSIM as-is). See [Custom objects & components](#custom-objects--components).
-- **Move / rotate / scale** — select any object for a TransformControls gizmo
-  and a numeric panel (MRSIM coordinates, yaw / pitch / roll and uniform scale,
-  kept MRSIM-legal). **★ Set as start / finish** marks the red-banner gate the
-  lap begins and ends at; the **colour** picker recolours by material — just
-  this object, everything of its type, or all items.
-- **View** — toggle **perspective / orthographic / isometric** projection and
-  pick a **camera control scheme** (Orbit, Blender, Fusion / CAD or Maya) so
-  navigation matches whichever 3D tool you're used to; the choice is remembered.
-- **Environment** — the look of the world you build in: **grid** cell size
-  (10 / 5 / 2 / 1 m, or off) and line colour, **sky** colour (the background and
-  the distance haze, which track it together) and **ground** colour, plus
-  **↺ reset to defaults**. Every 5th grid line is drawn brighter so the coarse
-  marks read at a glance, and the whole setting is remembered. Position snap
-  runs from 0.1 m to 10 m, so snapping can match the grid you see.
-- **Lap panel** — the ordered checkpoint list from the track's
-  `<CheckpointList>`, with reorder (▲▼), remove (✕), add-selected (+ lap) and a
-  circuit toggle, written straight back into the scene.
-- **Delete / duplicate / undo** — Del removes an object (and cleans up its lap
-  entry), `d` duplicates it (renaming the subtree uniquely), Ctrl-Z undoes any
-  step.
-- **Import / New** — the file picker (or drag-and-drop) accepts a MRSIM `.xml`
-  directly, or a VelociDrone `.trk` / `.json` that is converted in-browser
-  first; **New track** starts from an Empty Grass World template.
-- **⤓ Export .xml** — writes the edited `<Simulation>` back out; objects you
-  didn't touch round-trip byte-for-byte. Copy it into `Documents/MRSIM/Tracks/`
-  and it appears in MRSIM's track list.
-
-### Custom objects & components
-
-The object builder saves each custom object as a small JSON **component** — a
-list of primitive `parts` (box / cylinder with `pos`, `rot`, `dims`, `color`)
-and an optional `pass` checkpoint (`pos`/`dims` trigger box plus a `ref` with
-`pos` + `rot` for the ring position and crossing direction). Components live in
-two places, and both feed the palette's **custom** section:
-
-- **Your browser** — objects you build are stored in `localStorage`, so they
-  persist across sessions on that machine (and stay private to it).
-- **`components.json`** (repo root) — a shared bundle loaded at startup and
-  shown as *repo-shared* objects for everyone who opens the editor.
-
-To **contribute an object to the repo**: build it, then use the builder's
-**⤓ Export all** button to download a `components.json` (your local objects in
-the shared format), drop it in the repo root, and commit — it now ships to every
-user. **⤓ Export this** downloads a single component for sharing one object;
-**⤒ Import** loads either back in. A repo-shared object can be tweaked locally
-(your copy shadows the shared one by id) without editing the file.
-
-Headless hooks mirror `__edit`/`__preview`: `window.__build.save(component)`,
-`.list()`, `.exportAll()`, `.open(id)`, `.remove(id)`.
-
-## Converting between sims
-
-The **⇄ Convert** button translates the loaded track to the other sim,
-driven by what defines the race — the ordered checkpoint crossings
-(position + crossing direction) plus the object type at each one:
-
-| VelociDrone | MRSIM |
-|---|---|
-| MultiGP gate (285) | 7x6 gate (closest aperture), same tilt for dive gates |
-| 4 m flag (170) | pole + soft cloth at the exact scaled height + a one-sided pole-side sensor plane |
-| invisible checkpoint (88) | library-style `<Box>` sensor entity with a `<Checkpoint>` |
-| building blocks (all 13 colours) | coloured `<Box>` entities, exact size + orientation |
-| MGP hurdles | grey panel `<Box>` at the exact scaled size and full orientation (rolled slats stay rolled) |
-| decorative flags | `Flag.xml` (+ riser to the scaled height) |
-| neon (rings, squares, triangles, decagons, semicircles, corners, angles, back bars, strips, cone collars) | glowing tube runs on a `PBREmissive` material — the drone's own LED shader — at the prefab's true size and colour; render-only, never a collider. A neon ring in the *sequence* keeps its shape and takes its own opening as the checkpoint trigger instead of becoming a white gate frame. |
-| blocks | ← pipe cube PVC structure |
-
-MRSIM→VD: every checkpoint-list entry becomes a VD sequence gate — repeat
-passes through the same element (cubes, double-sided gates) become invisible
-checkpoints so the lap is preserved exactly; pole/flag passes become flags;
-the `.trk` is AES-encrypted in the browser and imports straight into the
-game (Empty Scene Day). VD→MRSIM emits a ready-to-fly `<Simulation>` XML on
-Empty Grass World with a launch pad behind the start gate — scenery
-barriers convert too (VD dive-gate towers are built from blocks, so they
-carry over intact; nets become solid dark panels). Fixed-size objects mean
-scaled VD gates export at MRSIM's native size; objects with no equivalent
-are skipped and the report lists exactly what was dropped.
-
-The conversion logic lives in `convert/` as separate modules (coordinate
-maths → normalisation → object mapping → XML emission → validation), so the
-same code runs in the browser, from Node, and under the test suite. After
-every VD→MRSIM export the viewer shows a **conversion report**: object and
-checkpoint counts, every warning, and a validation pass that re-parses the
-emitted XML with the game-library-driven MRSIM parser and confirms each
-checkpoint resolves exactly where the converter aimed.
-
-Command line (same engine, no browser needed):
-
-```bash
-npm install                                  # three + @xmldom/xmldom
-node convert-cli.mjs "My Track.trk"          # → "My Track-MRSIM.xml" + report
-node convert-cli.mjs track.json -l BaylandsPark -g ghosts/wr.json -s report.json
-npm test                                     # converter test suite
-```
-
-Copy the exported XML into `Documents/MRSIM/Tracks/` and it appears in
-MRSIM's track list.
-
-VD invisible checkpoints store a near-vertical crossing axis (turn poles,
-flat "stay low" squares) that is no use as a heading. Every one of them
-exports as a **window pane** — 0.3 m thick, the same as MRSIM's own gate
-triggers — wide and tall enough that no line round the mark can miss it:
-markers you fly PAST (turn poles, offset flags) become an upright pane
-squared to the lap direction and anchored on the marker, so it fires exactly
-where VelociDrone fires; a rolled square, which is a real aperture you cross
-vertically, becomes a flat horizontal pane whose ring points down (dive) or
-up (climb). Flags follow VD's own one-sided trigger: a long thin box running
-out of the POLE side, away from the fabric. Consecutive checkpoints stacked
-on the same spot (VD fires both in one pass) are merged into one sensor so
-the MRSIM lap counts exactly like the VD lap.
-
 ## Data interpretation (verified against the official 2024 poster)
 
 - **Positions**: integer centimetres, Unity left-handed Y-up. Imported as
@@ -391,10 +227,9 @@ the MRSIM lap counts exactly like the VD lap.
 
 ## Assets & attribution
 
-This is a **non-commercial, fan-made interoperability tool** — a track viewer
-and format converter. It is **not affiliated with, endorsed by, or associated
-with** VelociDrone or its developers, or MRSIM / Multi Rotor SIM or its
-developers. "VelociDrone", "MRSIM", their names and logos, and all in-game 3D
+This is a **non-commercial, fan-made** track viewer. It is **not affiliated
+with, endorsed by, or associated with** VelociDrone or its developers, or
+MRSIM / Multi Rotor SIM or its developers. "VelociDrone", "MRSIM", their names and logos, and all in-game 3D
 models, textures and other art are the property of their respective owners.
 
 The viewer works by reading each game's file formats from **your own licensed
@@ -412,8 +247,7 @@ track catalogue and public leaderboard times). What that means for game art:
   are drawn procedurally. Run your own copy of VelociDrone to extract the rest.
 
 If you are a rights holder and would like something changed, please open an
-issue. Contributions that add value back to the sims (the VD⇄MRSIM converter,
-for example) are the point — not re-hosting anyone's assets.
+issue.
 
 ## Files
 
@@ -425,13 +259,7 @@ for example) are the point — not re-hosting anyone's assets.
 | `trk.js` | VelociDrone `.trk` decoder/encoder (base64 + AES-128-ECB, pure JS) |
 | `mrsim.js` | MRSIM `.xml` track decoder (scene-graph walker) |
 | `mrsim-lib.js` | Embedded MRSIM object library (generated) |
-| `mrsim-test.html` | FPV Track Editor — 3D MRSIM track editor (palette, lap editor, gizmo, object builder, import/export) |
-| `components.json` | Repo-shared custom objects for the editor's object builder |
-| `convert.js` | VelociDrone ⇄ MRSIM track converter (façade over `convert/`) |
-| `convert/*.js` | Converter modules: coordinate spaces, VD classify/normalise, mapping, XML emit, MRSIM→VD, validate |
-| `convert/neon.js` | LED / neon shapes + the `PBREmissive` material, shared by the editor palette and the converter |
-| `convert-cli.mjs` | Node CLI: `.trk`/`.json` → validated MRSIM XML |
-| `test/` | Converter test suite (`npm test`, node:test) |
+| `test/` | Viewer test suite (`npm test`, node:test) |
 | `ghostfetch.js` | Live leaderboard/flight fetch + ghost decoding (zlib + MS-NRBF) |
 | `serve.py` | Local dev server: static files + same-origin `/vd` proxy |
 | `proxy-worker.js` | Personal Cloudflare Worker proxy for flight fetch on a hosted viewer |
