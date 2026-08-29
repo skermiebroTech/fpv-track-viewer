@@ -691,8 +691,8 @@ function modelInstance(id) {
   return tpl ? tpl.clone() : null;
 }
 
-// MRSIM object meshes (gates / mats / stands / flags / canopy…) decoded from
-// MRSIM.dkb by export_mrsim_models.py, keyed by BinaryModelRenderer basename.
+// MRSIM object meshes (gates / mats / stands / flags / canopy…) keyed by the
+// BinaryModelRenderer basename, when a local model overlay supplies them.
 // Vertices are raw MRSIM Z-up local space, so the element's three()-converted
 // matrix orients them exactly like the collision prims they replace.
 let MRSIM_MODELS = {};

@@ -175,21 +175,13 @@ racing line is exact — including multi-pass elements and cube entries/exits.
 
 The library objects are embedded in `mrsim-lib.js` — the object geometry
 (collision-primitive coordinates + sizes) needed to place and draw any MRSIM
-track, read from your own licensed `MRSIM.dkb`. After a game update,
-regenerate with:
-
-```bash
-python3 export_mrsim_lib.py   # reads ~/.local/share/Steam/steamapps/common/MRSIM/MRSIM.dkb
-```
+track.
 
 MRSIM's rendered **meshes and textures** (gates, flags, mat, terrain, drone
 frames, logo…) are **not redistributed with this project** — they are the
 developer's copyrighted art. The hosted viewer draws every MRSIM object from
 those collision primitives instead, which is faithful (the thin boxes *are*
-the fabric panels, the cylinders *are* the PVC/poles). If you own MRSIM you
-can decode the real meshes locally into `models/mrsim/` with
-`export_mrsim_models.py`; a gitignored `models/mrsim/models.local.json`
-overlay then makes the viewer prefer them on your own machine only. See
+the fabric panels, the cylinders *are* the PVC/poles). See
 [Assets & attribution](#assets--attribution).
 
 ## Data interpretation (verified against the official 2024 poster)
@@ -209,19 +201,15 @@ overlay then makes the viewer prefer them on your own machine only. See
   Objects classify from it: type `Invisible` → hidden checkpoint, `Tools` →
   editor helpers (not rendered), names containing `Flag` → flags.
 - `models/*.glb` are the **actual in-game meshes** (gates, flags, hurdles,
-  trees, cones, rocks, gazebos, banners… ~250 prefabs) extracted from the
-  Unity asset bundles in `StreamingAssets/assetbundles/*` by
-  `export_models.py` (UnityPy → GLB with textures; the set covers every
-  scenery prefab used by ≥2 of the top-130 official tracks plus all cones,
-  trees, rocks and fast foliage). Stretchable blocks/nets/neon generate their
-  meshes at runtime in-game, so they render procedurally using the exact
-  material colours (all 13 block colours, name-derived neon tints, sphere
-  primitives).
-- `tracks/prefab-dims.json` (also from `export_models.py --dims`) holds the
-  real local-space bounding box + a representative colour for **every**
-  prefab in the catalog, so scenery without an extracted model still draws as
-  a correctly sized, category-tinted box instead of a raw-scale cube.
-  Particle-only prefabs (fog, smoke) are skipped entirely.
+  trees, cones, rocks, gazebos, banners… ~250 prefabs). Stretchable
+  blocks/nets/neon generate their meshes at runtime in-game, so they render
+  procedurally using the exact material colours (all 13 block colours,
+  name-derived neon tints, sphere primitives).
+- `tracks/prefab-dims.json` holds the real local-space bounding box + a
+  representative colour for **every** prefab in the catalog, so scenery
+  without a shipped mesh still draws as a correctly sized, category-tinted
+  box instead of a raw-scale cube. Particle-only prefabs (fog, smoke) are
+  skipped entirely.
 - Click any object in the viewer to open the **inspector** with its raw
   database values (position, quaternion, scale, prefab id/name) and derived info.
 
@@ -237,14 +225,10 @@ copy** of the game (and public, already-shareable data such as the community
 track catalogue and public leaderboard times). What that means for game art:
 
 - **MRSIM meshes and textures are not redistributed here.** MRSIM objects
-  render procedurally from their collision-primitive geometry. The real meshes
-  can be decoded locally by owners of the game and stay on that machine (a
-  gitignored `models/mrsim/models.local.json` overlay); they are never
-  committed or served.
+  render procedurally from their collision-primitive geometry.
 - **VelociDrone:** the bundled example tracks include a small subset of
-  VelociDrone scenery meshes needed to display *those* tracks; the full ~3300
-  prefab extraction stays local (gitignored), and objects with no shipped mesh
-  are drawn procedurally. Run your own copy of VelociDrone to extract the rest.
+  VelociDrone scenery meshes needed to display *those* tracks; objects with
+  no shipped mesh are drawn procedurally.
 
 If you are a rights holder and would like something changed, please open an
 issue.
@@ -267,8 +251,5 @@ issue.
 | `tracks/manifest.json` | Tracks shown in the dropdown |
 | `tracks/*.json` | Exported layouts (`meta` + `gates` + `barriers`) |
 | `export_tracks.py` | Export tracks from the VelociDrone user DB |
-| `export_models.py` | Extract prefab GLBs + `prefab-dims.json` from the asset bundles |
-| `export_mrsim_lib.py` | Regenerate `mrsim-lib.js` from `MRSIM.dkb` |
-| `export_mrsim_models.py` | Decode MRSIM `.model` meshes + atlases → `models/mrsim/` (local only) |
 | `ghost_extract.py` | Pull ghost lines from the local VelociDrone `user11.db` |
 | `.nojekyll` | Serve files verbatim on GitHub Pages |
