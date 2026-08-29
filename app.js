@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { parseTrk, buildTrk, decryptTrk } from './trk.js?v=11';
+import { parseTrk, decryptTrk } from './trk.js?v=11';
 import { parseMrsim } from './mrsim.js';
 import { computeRaceline, planeBasis } from './raceline.js';
 import { fetchLeaderboard, searchLeaderboard, fetchFlightFor, averageLaps,
@@ -2359,8 +2359,6 @@ async function presentTrack(data, gen) {
   }
   currentTrack = data;
   resetBoardUI();   // the open leaderboard (and any running scan) is stale now
-  // only VelociDrone tracks can be handed back out as a .trk
-  btnDownload.style.display = data.format === 'mrsim' ? 'none' : '';
   if (data.format === 'mrsim') {
     await preloadMrsimModels(data);
     if (gen !== loadGen) return;
@@ -2466,45 +2464,9 @@ function importFile(file) {
     const text = await file.text();
     const isXml = /\.xml$/i.test(file.name);
     const data = isXml ? parseMrsim(text, file.name) : parseTrk(text, file.name);
-    if (!isXml) data.meta.trkSource = text;   // download re-emits the original bytes
     return registerUpload(data);
   }, e => `Could not read ${file.name}: ${e.message}`);
 }
-
-// ---------------------------------------------------------------------------
-// Download the displayed VelociDrone track as a .trk file
-// ---------------------------------------------------------------------------
-// Tracks that arrived as a .trk (imported, or fetched by the community browser)
-// carry their original file text, so the download is byte-identical to what the
-// game reads. The repo's bundled tracks are stored decoded as JSON, so those are
-// re-encrypted from the track data instead.
-const btnDownload = document.getElementById('btnDownload');
-
-function downloadTrkFor(data) {
-  if (!data) throw new Error('no track loaded');
-  if (data.format === 'mrsim') throw new Error('not a VD track');
-  const name = data.meta?.name || 'track';
-  const { meta, ...json } = data;
-  return {
-    fileName: `${name.replace(/[\\/:*?"<>|]+/g, '_')}.trk`,
-    content: meta?.trkSource ?? buildTrk(meta?.scene_id ?? 0, name, json),
-  };
-}
-
-btnDownload.addEventListener('click', () => {
-  try {
-    const { fileName, content } = downloadTrkFor(currentTrack);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    document.getElementById('trackSub').textContent = `Downloaded ${fileName}`;
-  } catch (e) {
-    console.error(e);
-    document.getElementById('trackSub').textContent = `Download failed: ${e.message}`;
-  }
-});
 
 const trkInput = document.getElementById('trkFile');
 document.getElementById('btnTrk').addEventListener('click', () => trkInput.click());
@@ -2688,7 +2650,6 @@ function brRow(t) {
       const text = await res.text();
       if (!text.trim()) throw new Error('track file is empty / unavailable');
       const data = parseTrk(text, `${t.name}.trk`);
-      data.meta.trkSource = text;         // download re-emits the server's own bytes
       data.meta.name = t.name;
       data.meta.source = 'Official track';
       data.meta.onlineId = t.id;          // catalogue track_id -> enables Fetch WR
@@ -2816,7 +2777,6 @@ window.__viewer = {
     return renderer.domElement.toDataURL('image/jpeg', quality);
   },
   topView, frameTrack, camera, controls, selectSeq, pick, loadTrack,
-  downloadTrkFor,
   get bounds() { return bounds; },
   get groups() { return groups; },
   get currentTrack() { return currentTrack; },
